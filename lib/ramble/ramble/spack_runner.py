@@ -169,22 +169,22 @@ class SpackRunner(object):
         """
         if self.shell == 'bash':
             regex = \
-                re.compile('\A.*export ' +  # noqa: W605
-                           '(?P<var>[\S^=]+)=' +  # noqa: W605
-                           '(?P<val>[\S]+);\Z')  # noqa: W605
+                re.compile(r'\A.*export ' +  # noqa: W605
+                           r'(?P<var>[\S^=]+)=' +  # noqa: W605
+                           r'(?P<val>[\S]+);\Z')  # noqa: W605
 
             shell_flag = '--sh'
         elif self.shell == 'csh':
             regex = \
-                re.compile('\A.*setenv ' +  # noqa: W605
-                           '(?P<var>[\S^=]+) ' +  # noqa: W605
-                           '(?P<val>[\S]+);\Z')  # noqa: W605
+                re.compile(r'\A.*setenv ' +  # noqa: W605
+                           r'(?P<var>[\S^=]+) ' +  # noqa: W605
+                           r'(?P<val>[\S]+);\Z')  # noqa: W605
             shell_flag = '--csh'
         elif self.shell == 'fish':
             regex = \
-                re.compile('\A.*set -gx ' +  # noqa: W605
-                           '(?P<var>[\S^=]+) ' +  # noqa: W605
-                           '(?P<val>[\S]+);\Z')  # noqa: W605
+                re.compile(r'\A.*set -gx ' +  # noqa: W605
+                           r'(?P<var>[\S^=]+) ' +  # noqa: W605
+                           r'(?P<val>[\S]+);\Z')  # noqa: W605
             shell_flag = '--fish'
         else:
             raise RunnerError('Shell %s not supported' % self.shell)
