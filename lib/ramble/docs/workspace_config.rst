@@ -37,13 +37,9 @@ responsible for configuring, executing, analyzing, and archiving.
 .. code-block:: yaml
 
     ramble:
-      mpi:
-        command: mpirun
-        args:
-        - '-n'
-        - '{n_ranks}'
-      batch:
-        submit: '{execute_experiment}'
+      variables:
+        mpi_command: 'mpirun -n {n_ranks}'
+        batch_submit: '{execute_experiment}'
       applications:
         hostname:
           workloads:
@@ -85,6 +81,8 @@ string, and can take variables for expansion.
               experiments:
                 test_{n_ranks}_{n_nodes}:
                   variables:
+                    mpi_command: 'mpirun -n {n_ranks}'
+                    batch_submit: '{execute_experiment}'
                     n_ranks: '1'
                     n_nodes: '1'
 
@@ -114,8 +112,9 @@ individual experiments take precendence.
 .. code-block:: yaml
 
     ramble:
-      ...
       variables:
+        mpi_command: 'mpirun -n {n_ranks}'
+        batch_submit: '{execute_experiment}'
         processes_per_node: '16'
         n_ranks: '{n_nodes}*{processes_per_node}'
       applications:
@@ -145,8 +144,9 @@ math and variable expansion syntax as defined above).
 .. code-block:: yaml
 
     ramble:
-      ...
       variables:
+        mpi_command: 'mpirun -n {n_ranks}'
+        batch_submit: '{execute_experiment}'
         processes_per_node: '16'
         n_ranks: '{n_nodes}*{processes_per_node}'
       applications:
@@ -182,8 +182,9 @@ consumes.
 .. code-block:: yaml
 
     ramble:
-      ...
       variables:
+        mpi_command: 'mpirun -n {n_ranks}'
+        batch_submit: '{execute_experiment}'
         n_ranks: '{n_nodes}*{processes_per_node}'
       applications:
         hostname:
@@ -211,8 +212,9 @@ Mulitple matrices are allowed to be defined:
    :linenos:
 
     ramble:
-      ...
       variables:
+        mpi_command: 'mpirun -n {n_ranks}'
+        batch_submit: '{execute_experiment}'
         n_ranks: '{n_nodes}*{processes_per_node}'
       applications:
         hostname:
@@ -249,8 +251,9 @@ something ramble automatically generates in a different experiment.
 .. code-block:: yaml
 
     ramble:
-      ...
       variables:
+        mpi_command: 'mpirun -n {n_ranks}'
+        batch_submit: '{execute_experiment}'
         processes_per_node: '16'
         n_ranks: '{n_nodes}*{processes_per_node}'
       applications:
@@ -364,6 +367,8 @@ Ramble requires the following variables to be defined:
   ``ceiling({n_ranks}/{processes_per_node})``
 * ``processes_per_node`` - Defines how many ranks should be on each node. If
   not explicitly set, is defined as: ``ceiling({n_ranks}/{n_nodes})``
+* ``mpi_command`` - Template for generating an MPI command
+* ``batch_submit`` - Template for generating a batch system submit command
 
 """"""""""""""""""""
 Generated Variables:
@@ -374,7 +379,7 @@ Ramble automatically generates definitions for the following varialbes:
 * ``application_name`` - Set to the name of the application
 * ``workload_name`` - Set to the name of the workload within the application
 * ``experiment_name`` - Set to the name of the experiment
-* ``spec_name`` - By default defined as ``{application_name}``. Can be
+* ``env_name`` - By default defined as ``{application_name}``. Can be
   overriden to control the spack definition to use.
 * ``application_run_dir`` - Absolute path to
   ``$workspace_root/experiments/{application_name}``
@@ -387,7 +392,7 @@ Ramble automatically generates definitions for the following varialbes:
 * ``workload_input_dir`` - Absolute path to
   ``$workspace_root/inputs/{application_name}/{workload_name}``
 * ``spack_env`` - Absolute path to
-  ``$workspace_root/software/{spec_name}.{workload_name}``
+  ``$workspace_root/software/{env_name}.{workload_name}``
 * ``log_dir`` - Absolute path to ``$workspace_root/logs``
 * ``log_file`` - Absolute path to
   ``{experiment_run_dir}/{experiment_name}.out``
@@ -403,8 +408,6 @@ Ramble automatically generates definitions for the following varialbes:
 * ``command`` - Set to all of the commands needed to perform an experiment.
 * ``spack_setup`` - Set to the commands needed to load a spack environment for
   an experiment. Set to an empty string for non-spack applications
-* ``mpi_command`` - By default, set to the contents of ``ramble:mpi```
-* ``batch_submit`` - By default, set to the contents of ``ramble:batch:submit``
 
 """""""""""""""""""""""""""""""""""
 Spack Specific Generated Variables:
@@ -413,69 +416,150 @@ When using spack applications, Ramble also geneates the following variables:
 
 * ``<software_spec_name>`` - Set to the equivalent of ``spack location -i
   <spec>`` for packages defined in a ramble ``spec_name`` package set.
-  ``<software_spec_name>`` is set to the name of the package (one level lower
-  than ramble's ``spec_name``).
+  ``<software_spec_name>`` is set to the name of the package as defined in the
+  ``spack:packages`` dictionary.
 
 -----------------
 Spack Dictionary:
 -----------------
 
 Within a ramble.yaml file, the ``spack:`` dictionary controlls the software
-stack installation that ramble performs.
+stack installation that ramble performs. This is accomplished by defining
+a packages dictionary, and an environments dictionary.
+
+The packages dictionary houses ramble descriptions of spack packages that can
+be used to construct environments with. A package is defined as software that
+spack should install for the user. These have one required attribute, and two
+optional attributes. The ``spack_spec`` attribute is required to be defined,
+and should be the spec passed to ``spack install`` on the command line for the
+package. Optionally, a package can defined a ``compiler_spec`` attribute, which
+will be the spec used when this package is used as a compiler for another
+package. Packages can also optionally defined a ``compiler`` attribute, which
+is the name of another package that should be used as it's compiler.
+
+The environments dictionary contains descriptions of spack environments that
+Ramble might generate based on the requested experiments. Environments are
+defined as a list of packages (in the aforementioned packages dictionary) that
+should be bundled into a spack environment.
 
 Below is an annotated example of the spack dictionary.
 
 .. code-block:: yaml
 
     spack:
-      compilers:
-        gcc9: # Abstract name to refer to this compiler
-          base: gcc # Spack packge name
-          version: 9.3.0 # Spack package version
-          target: x86_64 # Spack target option
-      mpi_libraries:
-        impi2018: # Abstract name to refer to this MPI
-          base: intel-mpi
-          version: 2018.4.274
-          target: x86_64
-      applications:
-        gromacs: # Ramble's spec_name variable
-          gromacs: # application.py named software_spec, name of Ramble spec object
-            base: gromacs # Spack package name
-            version: 2022.4 # Spack package version
-            compiler: gcc9 # Ramble compiler name
-            mpi: impi2018 # Ramble MPI name
+      packages:
+        gcc9: # Abstract name to refer to this package
+          spack_spec: gcc@9.3.0 target=x86_64 # Spack spec for this package
+          compiler_spec: gcc@9.3.0 # Spack compiler spec for this package
+        impi2018:
+          spack_spec: intel-mpi@2018.4.274 target=x86_64
+          compiler: gcc9 # Other package name to use as compiler for this package
+        gromacs:
+          spack_spec: gromacs@2022.4
+          compiler: gcc9
+      environments:
+        gromacs:
+          packages: # List of packages to include in this environment
+          - impi2018
+          - gromacs
+
+
+The ``ramble workspace concretize`` command can help construct a functional
+spack dictionary based on the experiments listed.
+
+It is important to note that packages and environments that are not used by an
+experiment are not installed.
 
 Application definition files can define one or more ``software_spec``
-directives, which are packages the application might need to run properly. Some
-are marked as required, and others might not be.
+directives, which are packages the application might need to run properly.
+Additionally, spack packages can be marked as required through the
+``required_package`` directive.
 
-Multiple compilers and MPI libraries can be defined, even if they are not used.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Vector and Matrix Packages and Environments:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-^^^^^^^^^^^^^^^^^^^
-Ramble Spec Format:
-^^^^^^^^^^^^^^^^^^^
+As with experiments, package and environment definitions can generate many
+packages and environments following the same previously mentioned vector and
+matrix syntax.
 
-When writing Spack spec information in Ramble configuration files, the format
-is as follows:
+Below is an example of using this logic within the spack dictionary:
 
 .. code-block:: yaml
 
-   <software_spec:name>:
-     base: # Takes the Spack package name
-     version: # Takes the version, which would be passed in with @
-     compiler: # Takes the name of the ramble spec object to use
-               # to compile this package
+    spack:
+      packages:
+        gcc-{ver}:
+          variables:
+            ver: ['9.3.0', '10.3.0', '12.2.0']
+          spack_spec: gcc@{ver} target=x86_64
+          compiler_spec: gcc@{ver}
+        intel-mpi-{comp}:
+          variables:
+            comp: gcc-{ver}
+            ver: ['9.3.0', '10.3.0', '12.2.0']
+          spack_spec: intel-mpi@2018.4.274
+          compiler: {comp}
+        openmpi-{comp}:
+          variables:
+            comp: gcc-{ver}
+            ver: ['9.3.0', '10.3.0', '12.2.0']
+          spack_spec: openmpi@4.1.4
+          compiler: {comp}
+        wrf-{comp}:
+          variables:
+            comp: gcc-{ver}
+            ver: ['9.3.0', '10.3.0', '12.2.0']
+          spack_spec: wrf@4.2
+          compiler: {comp}
+      environments:
+        wrf-{comp}-{mpi}:
+          variables:
+            comp: gcc-{ver}
+            ver: ['9.3.0', '10.3.0', '12.2.0']
+            mpi: [intel-mpi-{comp}, openmpi-{comp}']
+          matrix:
+          - mpi
+          packages:
+          - {mpi}
+          - wrf-{comp}
 
-     variants: # Takes any variant strings the package should be built with
-     mpi: # Takes the name of the Ramble spec object to use for an MPI dependency
-     arch: # Takes the input to the Spack `arch` option
-     target: # Takes the input to the Spack `target` option
-     dependencies: # YAML List containing Ramble spec object names this
-                   # package depends on
+The above file will generate 3 versions of ``gcc``, 3 versions each of ``wrf``,
+``intel-mpi`` and ``openmpi`` built with each ``gcc`` version, and 6 spack
+environments, with each combination of the 2 ``mpi`` libraries and 3 compilers.
 
-Not all of the options are required, but generally a spec object should contain
-at least ``base``, and ``version``.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+External Spack Environment Support:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**NOTE**: Using external Spack environments is an advanced feature.
+
+Some experiments will want to use an externally defined Spack environment
+instead of having Ramble generate its own Spack environment file. This can be
+useful when the Spack environment a user wants to experiment with is
+complicated.
+
+This section shows how this feature can be used.
+
+.. code-block:: yaml
+
+    spack:
+      environments:
+        gromacs:
+          external_spack_env: name_or_path_to_spack_env
+
+In the above example, the ``external_spack_env`` keyword refers an external
+Spack environment. This can be the name of a named Spack environment, or the
+path to a directory which contains a Spack environment. Ramble will copy the
+``spack.yaml`` file from this environment, instead of generating its own.
+
+This allows users to describe custom Spack environments and allow them to be
+used with Ramble generated experiments.
+
+It is important to note that Ramble copies in the external environment files
+every time ``ramble workspace setup`` is called. The new files will clobber the
+old files, changing the configuration of the environment that Ramble will use
+for the experiments it generates.
 
 --------------------------------------------
 Controlling MPI Libraries and Batch Systems:
@@ -505,12 +589,8 @@ Below is an example of running a Gromacs experiment in both MPICH and OpenMPI:
 .. code-block:: yaml
 
     ramble:
-      mpi:
-        command: ''
-        args: []
-      batch:
-        submit: '{execute_experiment}'
       variables:
+        batch_submit: '{execute_experiment}'
         mpi_command:
         - 'mpirun -n {n_ranks} -ppn {processes_per_node} ' # MPICH
         - 'mpirun -n {n_ranks} -nperhost {processes_per_node} ' # OpenMPI
@@ -519,49 +599,41 @@ Below is an example of running a Gromacs experiment in both MPICH and OpenMPI:
           workloads:
             water_bare:
               experiments:
-                '{spec_name}':
+                '{env_name}':
                   variables:
                     n_ranks: '1'
                     n_nodes: '1'
-                    spec_name: ['gromacs-mpich', 'gromacs-ompi']
+                    env_name: ['gromacs-mpich', 'gromacs-ompi']
     spack:
-      compilers:
+      packages:
         gcc9:
-          base: gcc
-          version: 9.3.0
-          target: x86_64
-      mpi_libraries:
+          spack_spec: gcc@9.3.0 target=x86_64
         mpich:
-          base: mpich
-          version: 4.0.2
-          target: x86_64
+          spack_spec: mpich@4.0.2 target=x86_64
+          compiler: gcc9
         ompi:
-          base: openmpi
-          version: 4.1.4
-          target: x86_64
-      applications:
-        gromacs-ompi:
-          gromacs:
-            base: gromacs
-            version: 2022.4
-            compiler: gcc9
-            mpi: ompi
-        gromacs-mpich:
-          gromacs:
-            base: gromacs
-            version: 2022.4
-            compiler: gcc9
-            mpi: mpich
+          spack_spec: openmpi@4.1.4 target=x86_64
+          compiler: gcc9
+        gromacs:
+          spack_spec: gromacs@2022.4
+          compiler: gcc9
+      environments:
+        gromacs-{mpi}:
+          variables:
+            mpi: ['mpich', 'ompi']
+          packages:
+          - gromacs
+          - '{mpi}'
 
-In the above example, you can see how ``spec_name`` is used to test both an
+In the above example, you can see how ``env_name`` is used to test both an
 OpenMPI and MPICH version of Gromacs. Additionally, the ``mpi_command``
 variable is used to define how ``mpirun`` should look for each of the MPI
 libraries.
 
 Using the previously described Ramble vector syntax, this configuration file
-will generate 2 experiments. Both ``spec_name`` and ``mpi_command`` will be
+will generate 2 experiments. Both ``env_name`` and ``mpi_command`` will be
 zipped together, giving each experiment a tuple of: ``(mpi_command,
-spec_name)`` which allows us to pair a specific MPI command to the
+env_name)`` which allows us to pair a specific MPI command to the
 corresponding Gromacs spec.
 
 
@@ -572,26 +644,14 @@ Batch System Control:
 Similar to the previously describe MPI command control, experiments can use
 different batch systems by overriding the ``batch_submit`` variable.
 
-As in the MPI command example, the ``ramble:batch:submit`` definition is
-insufficient for changing how each experiment is submitted to a batch system
-(or even what batch system the experiment is submitted to).
-
 Below is an example configuration file showing how the ``batch_submit``
 variable can be used to submit the same experiment to multiple batch systems.
 
 .. code-block:: yaml
 
     ramble:
-      mpi:
-        command: mpirun
-        args:
-        - '-n'
-        - '{n_ranks}'
-        - '-ppn'
-        - '{processes_per_node}'
-      batch:
-        submit: ''
       variables:
+        mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
         batch_system:
         - slurm
         - pbs
@@ -608,23 +668,20 @@ variable can be used to submit the same experiment to multiple batch systems.
                     n_ranks: '1'
                     n_nodes: '1'
     spack:
-      compilers:
+      packages:
         gcc9:
-          base: gcc
-          version: 9.3.0
-          target: x86_64
-      mpi_libraries:
+          spack_spec: gcc@9.3.0 target=x86_64
         impi2018:
-          base: intel-mpi
-          version: 2018.4.274
-          target: x86_64
-      applications:
+          spack_spec: intel-mpi@2018.4.274 target=x86_64
+          compiler: gcc9
         gromacs:
-          gromacs:
-            base: gromacs
-            version: 2022.4
-            compiler: gcc9
-            mpi: impi2018
+          spack_spec: gromacs@2022.4
+          compiler: gcc9
+      environments:
+        gromacs:
+          packages:
+          - impi2018
+          - gromacs
 
 The above example overrides the generated ``batch_submit`` variable to change
 how different experiments are submitted. In this example, we submit the same
@@ -634,3 +691,189 @@ Note that each of the two ``batch_submit`` commands submits a different
 template. This means the workspace's configs directory should have two files:
 ``execute_slurm.tpl`` and ``execute_pbs.tpl`` which will be template submission
 scripts to each of the batch systems.
+
+------------------
+Experiment Chains:
+------------------
+
+Multiple experiments can be executed within the same context by a process known
+as chaining, this allows multiple experiments (potentially from multiple
+applications) to be executed in the same context and is useful for many
+potential use cases such as running multiple experiments on the same physical
+hardware
+
+There are two important parts for defining an experiment chain. The first of
+these is simply defining the experiment chain, and the second is defining
+experiments which are only intended to be used when chained into another
+experiment, known as template experiments.
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Defining Experiment Chains:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The following example shows how to specify a chain of experiments:
+
+.. code-block:: yaml
+
+    ramble:
+      variables:
+        mpi_command: 'mpirun -n {n_ranks}'
+        batch_submit: '{execute_experiment}'
+        processes_per_node: '16'
+        n_ranks: '{n_nodes}*{processes_per_node}'
+      applications:
+        hostname:
+          variables:
+            n_threads: '1'
+          workloads:
+            serial:
+              variables:
+                n_nodes: '1'
+              experiments:
+                test_exp1:
+                  variables:
+                    n_ranks: '1'
+                test_exp2:
+                  variables:
+                    n_ranks: '1'
+                  chained_experiments:
+                  - name: hostname.serial.test_exp1
+                    command: '{execute_experiment}'
+                    order: 'append'
+                    variables:
+                      n_ranks: '2'
+
+In the above example, the ``hostname.serial.test_exp2`` experiment defines an
+experiment chain. The chain is defined by mergining the ``chained_experiments``
+dictionaries and inserting itself at the appropriate location.
+
+Experiments can be defined with in the ``chained_experiments`` dictionary using
+the following format:
+
+.. code-block:: yaml
+
+   chained_experiments: # List of experiments to chain
+   - name: Fully qualified experiment namespace
+     command: Command that executes the sub experiment
+     order: Order to chain this experiment. Defaults to 'after_root'
+     variables: Variables dictionary to override the variables from the
+                original experiment
+
+Each chained experiment receives its own unique namespace. These take the form of:
+``<parent_experiment_namespace>.chain.<chain_index>.<chained_experiment_namespace>``
+
+In the above example, the chained experiment would have a namespace of:
+``hostname.serial.test_exp2.chain.0.hostname.serial.test_exp1``
+
+The ``name`` attribute can use `globbing
+syntax<https://docs.python.org/3/library/fnmatch.html#module-fnmatch>` to chain
+multiple experiments at once.
+
+The ``order`` keyword is optional. Valid options include:
+* ``before_chain`` Chained experiment is injected at the beginning of the chain
+* ``before_root`` Chained experiment is injected right before the root experiment in the chain
+* ``after_root`` Chained experiment is injected right after the root experiment in the chain
+* ``after_chain`` Chained experiment is injected at the end of the chain
+
+The ``root`` experiment is defined as the initial experiment that started the
+chain. When examining the entire chain, the root experiment is the only one
+that does not have ``chain.{idx}`` in its name.
+
+The ``variables`` keyword is optional. It can be used to override the
+definition of variables from the chained experiment if needed.
+
+^^^^^^^^^^^^^^^^^^^^^^^^
+Suppressing Experiments:
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+The below example shows how to suppress generation of an experiment, by marking
+it as a template.
+
+.. code-block:: yaml
+
+    ramble:
+      variables:
+        mpi_command: 'mpirun -n {n_ranks}'
+        batch_submit: '{execute_experiment}'
+        processes_per_node: '16'
+        n_ranks: '{n_nodes}*{processes_per_node}'
+      applications:
+        hostname:
+          variables:
+            n_threads: '1'
+          workloads:
+            serial:
+              variables:
+                n_nodes: '1'
+              experiments:
+                test_exp1:
+                  template: true
+                  variables:
+                    n_ranks: '1'
+                test_exp2:
+                  variables:
+                    n_ranks: '1'
+                  chained_experiments:
+                  - name: hostname.serial.test_exp1
+                    command: '{execute_experiment}'
+                    order: 'append'
+                    variables:
+                      n_ranks: '2'
+
+In the above example, the ``template`` keyword is used to mark
+``hostname.serial.test_exp1`` as a template experiment. This prevents it from
+being used as a stand-alone experiment, but it will still be generated and used
+when it's chained into other experiments.
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+Defining Chains of Chains:
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Ramble supports the ability to define chains of experiment chains. This allows
+an experiment to automatically implicity include all of the experiments chained
+into the explicitly chained experiment.
+
+Below is an example showing how chains of chains can be defined:
+
+.. code-block:: yaml
+
+    ramble:
+      variables:
+        mpi_command: 'mpirun -n {n_ranks}'
+        batch_submit: '{execute_experiment}'
+        processes_per_node: '16'
+        n_ranks: '{n_nodes}*{processes_per_node}'
+      applications:
+        hostname:
+          variables:
+            n_threads: '1'
+          workloads:
+            serial:
+              variables:
+                n_nodes: '1'
+              experiments:
+                child_level2_experiment:
+                  template: true
+                  variables: '1'
+                child_level1_experiment:
+                  template: true
+                  variables:
+                    n_ranks: '1'
+                  chained_experiments:
+                  - name: hostname.serial.child_level2_experiment
+                    order: 'prepend'
+                    command: '{execute_experiment}'
+                parent_experiment:
+                  variables:
+                    n_ranks: '1'
+                  chained_experiments:
+                  - name: hostname.serial.child_level1_experiment
+                    command: '{execute_experiment}'
+
+In the above example, the resulting experiment chain would be:
+
+.. code-block:: yaml
+
+    - hostname.serial.parent_experiment.chain.0.hostname.serial.child_level2_experiment
+    - hostname.serial.parent_experiment
+    - hostname.serial.parent_experiment.chain.1.hostname.serial.child_level1_experiment

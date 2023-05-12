@@ -10,6 +10,7 @@ import llnl.util.tty as tty
 
 import ramble.language.language_base
 from ramble.language.language_base import DirectiveError
+from ramble.schema.applications import OUTPUT
 
 
 class ApplicationMeta(ramble.language.language_base.DirectiveMeta):
@@ -75,7 +76,8 @@ def workload(name, executables=None, executable=None, input=None,
 
 
 @application_directive('executables')
-def executable(name, template, use_mpi=False, redirect='{log_file}', **kwargs):
+def executable(name, template, use_mpi=False, redirect='{log_file}',
+               output_capture=OUTPUT.DEFAULT, **kwargs):
     """Adds an executable to this application
 
     Defines a new executable that can be used to configure workloads and
@@ -89,6 +91,8 @@ def executable(name, template, use_mpi=False, redirect='{log_file}', **kwargs):
                  wrapped with an `mpirun` like command or not.
      - redirect (optional): Sets the path for outputs to be written to.
                             defaults to {log_file}
+     - output_capture (optional): Declare which ouptu (stdout, stderr, both) to
+                                  capture. Defaults to stdout
 
     """
 
@@ -97,7 +101,8 @@ def executable(name, template, use_mpi=False, redirect='{log_file}', **kwargs):
             {
                 'template': template,
                 'mpi': use_mpi,
-                'redirect': redirect
+                'redirect': redirect,
+                'output_capture': output_capture
             }  # noqa: E123
 
     return _execute_executable
@@ -247,9 +252,7 @@ def workload_variable(name, default, description, values=None, workload=None,
 
 
 @application_directive('default_compilers')
-def default_compiler(name, base, version=None, variants=None,
-                     dependencies=None, arch=None, target=None,
-                     custom_specifier=None):
+def default_compiler(name, spack_spec, compiler_spec=None, compiler=None):
     """Defines the default compiler that will be used with this application
 
     Adds a new compiler spec to this application. Software specs should
@@ -259,52 +262,16 @@ def default_compiler(name, base, version=None, variants=None,
     def _execute_default_compiler(app):
         if app.uses_spack:
             app.default_compilers[name] = {
-                'base': base,
-                'version': version,
-                'variants': variants,
-                'dependencies': dependencies,
-                'target': target,
-                'arch': arch,
-                'spec_type': 'compiler',
-                'application_name': app.name,
-                'custom_specifier': custom_specifier
+                'spack_spec': spack_spec,
+                'compiler_spec': compiler_spec,
+                'compiler': compiler
             }
 
     return _execute_default_compiler
 
 
-@application_directive('mpi_libraries')
-def mpi_library(name, base, version=None, variants=None,
-                dependencies=None, arch=None,
-                target=None, custom_specifier=None):
-    """Defines a new mpi library that software_specs can use
-
-    Adds a new mpi_library to this app that can be referenced by
-    software_specs.
-    """
-
-    def _execute_mpi_library(app):
-        if app.uses_spack:
-            app.mpi_libraries[name] = {
-                'base': base,
-                'version': version,
-                'variants': variants,
-                'dependencies': dependencies,
-                'target': target,
-                'arch': arch,
-                'spec_type': 'mpi_library',
-                'application_name': app.name,
-                'custom_specifier': custom_specifier
-            }
-
-    return _execute_mpi_library
-
-
 @application_directive('software_specs')
-def software_spec(name, base, version=None, variants=None,
-                  compiler=None, mpi=None, dependencies=None,
-                  arch=None, target=None, custom_specifier=None,
-                  required=False):
+def software_spec(name, spack_spec, compiler_spec=None, compiler=None):
     """Defines a new software spec needed for this application.
 
     Adds a new software spec (for spack to use) that this application
@@ -322,21 +289,24 @@ def software_spec(name, base, version=None, variants=None,
 
             # Define the spec
             app.software_specs[name] = {
-                'base': base,
-                'version': version,
-                'variants': variants,
-                'compiler': compiler,
-                'mpi': mpi,
-                'dependencies': dependencies,
-                'target': target,
-                'arch': arch,
-                'spec_type': 'package',
-                'application_name': app.name,
-                'custom_specifier': custom_specifier,
-                'required': required
+                'spack_spec': spack_spec,
+                'compiler_spec': compiler_spec,
+                'compiler': compiler
             }
 
     return _execute_software_spec
+
+
+@application_directive('required_packages')
+def required_package(name):
+    """Defines a new spack package that is required for this application
+    to function properly.
+    """
+
+    def _execute_required_package(app):
+        app.required_packages[name] = True
+
+    return _execute_required_package
 
 
 @application_directive('success_criteria')

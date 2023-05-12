@@ -112,7 +112,6 @@ def format_data(data_in):
     # TODO: what is the nice way to deal with the distinction between
     # numberic/float and string FOM values
 
-
     from datetime import datetime
     current_dateTime = datetime.now()
 

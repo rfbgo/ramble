@@ -13,6 +13,7 @@ import pytest
 import llnl.util.filesystem as fs
 
 import ramble.workspace
+from ramble.software_environments import RambleSoftwareEnvironmentError
 from ramble.main import RambleCommand, RambleCommandError
 
 # everything here uses the mock_workspace_path
@@ -79,8 +80,9 @@ def check_info_basic(output):
     assert 'Application' in output
     assert 'Workload' in output
     assert 'Experiment' in output
-
-    assert 'MPI Command' in output
+    assert 'Software Stack' in output
+    assert 'Packages' in output
+    assert 'Environments' in output
 
 
 def check_results(ws):
@@ -161,18 +163,9 @@ def test_workspace_list(mutable_mock_workspace_path):
 def test_workspace_info():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}*{n_nodes}'
   applications:
@@ -189,8 +182,10 @@ ramble:
               variables:
                 n_nodes: '2'
 
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_info'
@@ -212,18 +207,9 @@ spack:
 def test_workspace_info_prints_all_levels():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}*{n_nodes}'
   applications:
@@ -238,8 +224,10 @@ ramble:
             test_experiment:
               variables:
                 n_nodes: '2'
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     config_file = """
@@ -269,6 +257,102 @@ config:
     assert 'Variables from Application:' in output
     assert 'Variables from Workload:' in output
     assert 'Variables from Experiment:' in output
+
+
+def test_workspace_info_with_templates():
+    test_config = """
+ramble:
+  variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
+    processes_per_node: '5'
+    n_ranks: '{processes_per_node}*{n_nodes}'
+  applications:
+    basic:
+      workloads:
+        test_wl:
+          experiments:
+            test_experiment:
+              template: true
+              variables:
+                n_nodes: '2'
+        test_wl2:
+          experiments:
+            test_experiment:
+              variables:
+                n_nodes: '2'
+
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
+"""
+
+    workspace_name = 'test_workspace_info_with_templates'
+    ws1 = ramble.workspace.create(workspace_name)
+    ws1.write()
+
+    config_path = os.path.join(ws1.config_dir, ramble.workspace.config_file_name)
+
+    with open(config_path, 'w+') as f:
+        f.write(test_config)
+
+    ws1._re_read()
+
+    output = workspace('info', global_args=['-w', workspace_name])
+
+    assert "Template Experiment: basic.test_wl.test_experiment" in output
+
+
+def test_workspace_info_with_experiment_chain():
+    test_config = """
+ramble:
+  variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
+    processes_per_node: '5'
+    n_ranks: '{processes_per_node}*{n_nodes}'
+  applications:
+    basic:
+      workloads:
+        test_wl:
+          experiments:
+            test_experiment:
+              template: true
+              variables:
+                n_nodes: '2'
+        test_wl2:
+          experiments:
+            test_experiment:
+              chained_experiments:
+              - name: basic.test_wl.test_experiment
+                order: 'after_root'
+                command: '{execute_experiment}'
+              variables:
+                n_nodes: '2'
+
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
+"""
+
+    workspace_name = 'test_workspace_info_with_experiment_chain'
+    ws1 = ramble.workspace.create(workspace_name)
+    ws1.write()
+
+    config_path = os.path.join(ws1.config_dir, ramble.workspace.config_file_name)
+
+    with open(config_path, 'w+') as f:
+        f.write(test_config)
+
+    ws1._re_read()
+
+    output = workspace('info', '-v', global_args=['-w', workspace_name])
+
+    assert "Template Experiment: basic.test_wl.test_experiment" in output
+    assert "Experiment Chain:" in output
+    assert "- basic.test_wl2.test_experiment.chain.0.basic.test_wl.test_experiment" in output
 
 
 def test_workspace_dir(tmpdir):
@@ -582,18 +666,9 @@ def test_edit_override_gets_correct_path():
 def test_dryrun_setup():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}*{n_nodes}'
   applications:
@@ -604,8 +679,10 @@ ramble:
             test_experiment:
               variables:
                 n_nodes: '2'
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_dryrun'
@@ -631,18 +708,9 @@ spack:
 def test_matrix_vector_workspace_full():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: [2, 4]
     n_ranks: '{processes_per_node}*{n_nodes}'
   applications:
@@ -660,8 +728,10 @@ ramble:
                - - cells
                  - n_nodes
                - - idx
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     # Should be ppn * ( cells * n_nodes, idx ) = 12
@@ -709,18 +779,9 @@ spack:
 def test_invalid_vector_workspace():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: [2, 4]
     n_ranks: '{processes_per_node}*{n_nodes}'
   applications:
@@ -734,8 +795,10 @@ ramble:
               variables:
                 n_nodes: [1, 2, 4]
                 idx: [1, 2, 3, 4, 5, 6]
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_invalid_vectors'
@@ -766,17 +829,9 @@ spack:
 def test_invalid_size_matrices_workspace():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
+  variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
   applications:
     basic:
       workloads:
@@ -789,8 +844,10 @@ ramble:
               matrices:
                 - - n_nodes
                 - - idx
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_invalid_size_matrices'
@@ -821,17 +878,9 @@ spack:
 def test_undefined_var_matrices_workspace():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
+  variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
   applications:
     basic:
       workloads:
@@ -840,8 +889,10 @@ ramble:
             exp_series_{foo}:
               matrices:
                 - - foo
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_invalid_input_matrices'
@@ -869,17 +920,9 @@ spack:
 def test_non_vector_var_matrices_workspace():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
+  variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
   applications:
     basic:
       workloads:
@@ -890,8 +933,10 @@ ramble:
                 foo: '1'
               matrices:
                 - - foo
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_non_vector_input_matrices'
@@ -919,17 +964,9 @@ spack:
 def test_multi_use_vector_var_matrices_workspace():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
+  variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
   applications:
     basic:
       workloads:
@@ -941,8 +978,10 @@ ramble:
               matrices:
                 - - foo
                 - - foo
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_non_vector_input_matrices'
@@ -974,11 +1013,9 @@ def test_reconcretize_in_configs_dir(tmpdir):
     """
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args: []
-  batch:
-    submit: '{execute_experiment}'
+  variables:
+    mpi_command: 'mpirun'
+    batch_submit: '{execute_experiment}'
   applications:
     basic:
       workloads:
@@ -987,8 +1024,10 @@ ramble:
             exp_series_{foo}:
               variables:
                 foo: 1
-spack:
-  concretized: false
+  spack:
+    concretized: false
+    packages: {}
+    environments: {}
 """
 
     import py
@@ -1023,18 +1062,9 @@ spack:
 def test_workspace_archive():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}*{n_nodes}'
   applications:
@@ -1045,8 +1075,10 @@ ramble:
             test_experiment:
               variables:
                 n_nodes: '2'
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_basic_archive'
@@ -1104,18 +1136,9 @@ spack:
 def test_workspace_tar_archive():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}*{n_nodes}'
   applications:
@@ -1126,8 +1149,10 @@ ramble:
             test_experiment:
               variables:
                 n_nodes: '2'
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_basic_archive'
@@ -1187,18 +1212,9 @@ spack:
 def test_workspace_tar_upload_archive():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}*{n_nodes}'
   applications:
@@ -1209,8 +1225,10 @@ ramble:
             test_experiment:
               variables:
                 n_nodes: '2'
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_basic_archive'
@@ -1275,18 +1293,9 @@ spack:
 def test_workspace_tar_upload_archive_config_url():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}*{n_nodes}'
   applications:
@@ -1297,8 +1306,10 @@ ramble:
             test_experiment:
               variables:
                 n_nodes: '2'
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_basic_archive'
@@ -1366,18 +1377,9 @@ spack:
 def test_dryrun_noexpvars_setup():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}'
   applications:
@@ -1386,8 +1388,10 @@ ramble:
         test_wl:
           experiments:
             test_experiment: {}
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_dryrun'
@@ -1420,25 +1424,16 @@ def test_workspace_include():
     inc_file = os.path.join(ws1.config_dir, "test_include.yaml")
 
     test_include = """
-ramble:
+config:
   variables:
     test_var: '1'
 """
 
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}*{n_nodes}'
   applications:
@@ -1456,8 +1451,10 @@ ramble:
                 n_nodes: '2'
   include:
      - '%s'
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """ % inc_file
 
     with open(inc_file, 'w+') as f:
@@ -1479,18 +1476,9 @@ spack:
 def test_invalid_template_name_errors(tpl_name, capsys):
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}'
   applications:
@@ -1499,8 +1487,10 @@ ramble:
         test_wl:
           experiments:
             test_experiment: {}
-spack:
-  concretized: true
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_invalid_template_name'
@@ -1527,18 +1517,9 @@ spack:
 def test_custom_executables_info():
     test_config = """
 ramble:
-  mpi:
-    command: mpirun
-    args:
-    - '-n'
-    - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
-  batch:
-    submit: 'batch_submit {execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}'
   applications:
@@ -1568,8 +1549,11 @@ ramble:
                     - 'exp_level_cmd'
                     use_mpi: false
                     redirect: '{log_file}'
-spack:
-  concretized: true
+                    output_capture: '&>'
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
 """
 
     workspace_name = 'test_custom_executables_info'
@@ -1593,18 +1577,77 @@ spack:
 def test_custom_executables_order_info():
     test_config = """
 ramble:
+  variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
+    processes_per_node: '5'
+    n_ranks: '{processes_per_node}'
+  applications:
+    basic:
+      internals:
+        custom_executables:
+          app_level_cmd:
+            template:
+            - 'app_level_cmd'
+            use_mpi: false
+            redirect: '{log_file}'
+      workloads:
+        test_wl:
+          internals:
+            custom_executables:
+              wl_level_cmd:
+                template:
+                - 'wl_level_cmd'
+                use_mpi: false
+                redirect: '{log_file}'
+          experiments:
+            test_experiment:
+              internals:
+                custom_executables:
+                  exp_level_cmd:
+                    template:
+                    - 'exp_level_cmd'
+                    use_mpi: false
+                    redirect: '{log_file}'
+                executables:
+                - exp_level_cmd
+                - wl_level_cmd
+                - app_level_cmd
+  spack:
+    concretized: true
+    packages: {}
+    environments: {}
+"""
+
+    workspace_name = 'test_custom_executables_info'
+    ws1 = ramble.workspace.create(workspace_name)
+    ws1.write()
+
+    config_path = os.path.join(ws1.config_dir, ramble.workspace.config_file_name)
+
+    with open(config_path, 'w+') as f:
+        f.write(test_config)
+
+    ws1._re_read()
+
+    output = workspace('info', '-v', global_args=['-w', workspace_name])
+
+    assert "['exp_level_cmd', 'wl_level_cmd', 'app_level_cmd']" in output
+
+
+def test_old_config_warns(capsys):
+    test_config = """
+ramble:
   mpi:
     command: mpirun
     args:
     - '-n'
     - '{n_ranks}'
-    - '-ppn'
-    - '{processes_per_node}'
-    - '-hostfile'
-    - 'hostfile'
   batch:
-    submit: 'batch_submit {execute_experiment}'
+    submit: '{execute_experiment}'
   variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '5'
     n_ranks: '{processes_per_node}'
   applications:
@@ -1640,6 +1683,8 @@ ramble:
                 - app_level_cmd
 spack:
   concretized: true
+  packages: {}
+  environments: {}
 """
 
     workspace_name = 'test_custom_executables_info'
@@ -1652,7 +1697,83 @@ spack:
         f.write(test_config)
 
     ws1._re_read()
+    captured = capsys.readouterr()
+    assert 'Your workspace configuration contains deprecated sections' in captured.err
+    assert 'ramble:mpi' in captured.err
+    assert 'ramble:batch' in captured.err
 
-    output = workspace('info', '-v', global_args=['-w', workspace_name])
 
-    assert "['exp_level_cmd', 'wl_level_cmd', 'app_level_cmd']" in output
+def test_v1_spack_config_warns(capsys):
+    test_config = """
+ramble:
+  variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
+    processes_per_node: '5'
+    n_ranks: '{processes_per_node}'
+  applications:
+    zlib:
+      workloads:
+        ensure_installed:
+          experiments:
+            test_experiment:
+              variables:
+                n_ranks: '1'
+spack:
+  concretized: true
+  compilers: {}
+  mpi_libraries: {}
+  applications:
+    zlib:
+      zlib:
+        base: zlib
+"""
+
+    workspace_name = 'test_v1_spack_config_warns'
+    ws1 = ramble.workspace.create(workspace_name)
+    ws1.write()
+
+    config_path = os.path.join(ws1.config_dir, ramble.workspace.config_file_name)
+
+    with open(config_path, 'w+') as f:
+        f.write(test_config)
+
+    ws1._re_read()
+    ramble.software_environments.SoftwareEnvironments(ws1)
+    captured = capsys.readouterr()
+    assert 'Your workspace configuration uses the v1 format for the spack section' in captured.err
+    assert 'v1 support will be removed in the future.' in captured.err
+
+
+def test_invalid_spack_config_errors(capsys):
+    test_config = """
+ramble:
+  variables:
+    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
+    batch_submit: 'batch_submit {execute_experiment}'
+    processes_per_node: '5'
+    n_ranks: '{processes_per_node}'
+  applications:
+    zlib:
+      workloads:
+        ensure_installed:
+          experiments:
+            test_experiment:
+              variables:
+                n_ranks: '1'
+"""
+
+    workspace_name = 'test_invalid_spack_config_errors'
+    ws1 = ramble.workspace.create(workspace_name)
+    ws1.write()
+
+    config_path = os.path.join(ws1.config_dir, ramble.workspace.config_file_name)
+
+    with open(config_path, 'w+') as f:
+        f.write(test_config)
+
+    ws1._re_read()
+    with pytest.raises(RambleSoftwareEnvironmentError):
+        ramble.software_environments.SoftwareEnvironments(ws1)
+        captured = capsys.readouterr()
+        assert "Software configuration type invalid is not one of ['v1', 'v2']" in captured.err

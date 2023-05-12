@@ -15,6 +15,13 @@
 import ramble.schema.licenses
 
 
+class OUTPUT:
+    STDERR = "2>"
+    STDOUT = ">>"
+    ALL = "&>"
+    DEFAULT = STDOUT
+
+
 # FIXME: should this use the vector notation which type natively supports?
 string_or_num = {
     'anyOf': [
@@ -95,7 +102,8 @@ custom_executables_def = {
         'default': {
             'template': [],
             'use_mpi': False,
-            'redirect': '{log_file}'
+            'redirect': '{log_file}',
+            'output_capture': OUTPUT.DEFAULT
         },
         'properties': {
             'template': array_or_scalar_of_strings_or_nums,
@@ -118,6 +126,22 @@ internals_def = {
     'additionalProperties': False
 }
 
+chained_experiment_def = {
+    'type': 'array',
+    'default': [],
+    'items': {
+        'type': 'object',
+        'default': {},
+        'properties': {
+            'name': {'type': 'string'},
+            'command': {'type': 'string'},
+            'order': {'type': 'string'},
+            'variables': variables_def,
+        },
+        'additionalProperties': False
+    }
+}
+
 #: Properties for inclusion in other schemas
 applications_schema = {
     'applications': {
@@ -133,6 +157,8 @@ applications_schema = {
                 'env-vars': ramble.schema.licenses.env_var_actions,
                 'internals': internals_def,
                 'success_criteria': success_list_def,
+                'chained_experiments': chained_experiment_def,
+                'template': {'type': 'boolean'},
                 'workloads': {
                     'type': 'object',
                     'default': {},
@@ -146,6 +172,8 @@ applications_schema = {
                             'env-vars': ramble.schema.licenses.env_var_actions,
                             'internals': internals_def,
                             'success_criteria': success_list_def,
+                            'chained_experiments': chained_experiment_def,
+                            'template': {'type': 'boolean'},
                             'experiments': {
                                 'type': 'object',
                                 'default': {},
@@ -161,6 +189,8 @@ applications_schema = {
                                         'env-vars': ramble.schema.licenses.env_var_actions,
                                         'internals': internals_def,
                                         'success_criteria': success_list_def,
+                                        'chained_experiments': chained_experiment_def,
+                                        'template': {'type': 'boolean'},
                                     }
                                 }
                             }
