@@ -24,4 +24,3 @@ jobs:
       if: github.ref == 'refs/heads/develop'
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        enable_jekyll: false
