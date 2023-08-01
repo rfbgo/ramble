@@ -1302,17 +1302,29 @@ class ApplicationBase(object, metaclass=ApplicationMeta):
             license_conf = ramble.config.config.get_config('licenses',
                                                            scope=scope)
             if license_conf:
-                app_licenses = license_conf[self.name] if self.name \
-                    in license_conf else {}
+                # TODO: what I really want here is the root of the workspace, but that's not easy to get
+                shared_license_dir = os.path.join(self.expander.application_run_dir, '..', '..', 'shared', 'licenses', self.name)
+                fs.mkdirp(shared_license_dir)
 
-                for action, conf in app_licenses.items():
-                    (env_cmds, var_set) = action_funcs[action](conf,
-                                                               var_set,
-                                                               shell=shell)
+                shared_license_path = os.path.join(shared_license_dir, 'license.inc')
+                tty.debug(f"Writing to {shared_license_path}")
+                app_licenses = {}
+                if self.name in license_conf:
+                    app_licenses = license_conf[self.name]
 
-                    for cmd in env_cmds:
-                        if cmd:
-                            command.append(cmd)
+                    command.append(f"source {shared_license_path}")
+
+                with open(shared_license_path, 'w+') as f:
+                    for action, conf in app_licenses.items():
+                        (env_cmds, var_set) = action_funcs[action](conf,
+                                                                   var_set,
+                                                                   shell=shell)
+
+                        for cmd in env_cmds:
+                            if cmd:
+                                # I would like to defer this writing, but the rigid
+                                # single return makes that messy...
+                                f.write(cmd)
 
         # Process environment variable actions
         for env_var_set in self._env_variable_sets:
