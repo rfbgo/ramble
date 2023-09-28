@@ -30,6 +30,7 @@ import ramble.context
 import ramble.pipeline
 import ramble.filters
 import ramble.experimental.uploader
+import ramble.experimental.reporter
 import ramble.software_environments
 import ramble.util.colors as rucolor
 
@@ -54,6 +55,7 @@ subcommands = [
     'info',
     'edit',
     'mirror',
+    'report',
     ['list', 'ls'],
     ['remove', 'rm'],
 ]
@@ -343,6 +345,13 @@ def workspace_setup(args):
         pipeline.run()
 
 
+def workspace_report_setup_parser(subparser):
+    pass
+
+def workspace_report(args):
+    reporter = ramble.experimental.reporter.PlotlyReporter(None)
+    reporter.generate()
+
 def workspace_analyze_setup_parser(subparser):
     """Analyze a workspace"""
     subparser.add_argument(
@@ -358,6 +367,13 @@ def workspace_analyze_setup_parser(subparser):
         dest='upload',
         action='store_true',
         help='Push experiment data to remote store (as defined in config)',
+        required=False)
+
+    subparser.add_argument(
+        '-p', '--plot',
+        dest='plot',
+        action='store_true',
+        help='Generate local plot of data',
         required=False)
 
     subparser.add_argument(
@@ -388,7 +404,8 @@ def workspace_analyze(args):
         pipeline = pipeline_cls(ws,
                                 filters,
                                 output_formats=args.output_formats,
-                                upload=args.upload)
+                                upload=args.upload,
+                                plot=args.plot)
         pipeline.run()
 
 

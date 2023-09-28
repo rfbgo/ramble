@@ -165,7 +165,7 @@ class AnalyzePipeline(Pipeline):
 
     name = 'analyze'
 
-    def __init__(self, workspace, filters, output_formats=['text'], upload=False):
+    def __init__(self, workspace, filters, output_formats=['text'], upload=False, plot=False):
         workspace_success = {
             namespace.success: ramble.config.config.get_config(namespace.success)
         }
@@ -177,6 +177,7 @@ class AnalyzePipeline(Pipeline):
         self.output_formats = output_formats
         self.require_inventory = True
         self.upload_results = upload
+        self.plot_results = plot
 
     def _prepare(self):
         super()._construct_hash()
@@ -187,6 +188,11 @@ class AnalyzePipeline(Pipeline):
 
         if self.upload_results:
             ramble.experimental.uploader.upload_results(self.workspace.results)
+
+        if self.plot_results:
+            # TODO: this should only pass results?
+            reporter = ramble.experimental.reporter.PlotlyReporter(self.workspace)
+            reporter.generate_plot()
 
 
 class ArchivePipeline(Pipeline):
