@@ -76,28 +76,51 @@ class PlotlyReporter(Reporter):
 
         # data
         formatted_data = ramble.experimental.uploader.format_data(self.workspace.results)
+        print([a.__dict__ for a in formatted_data])
 
-        exps_to_insert = []
-        foms_to_insert = []
-        for experiment in formatted_data:
-            experiment.generate_hash()
-            exps_to_insert.append(experiment.to_json())
+        # Convert to workload centric view
+        import collections
+        workloads = collections.defaultdict(set)
+        for exp in formatted_data:
+            workloads[ exp.workload_name ].add(exp)
 
-            for fom in experiment.foms:
-                fom_data = fom
-                fom_data['experiment_name'] = experiment.name
-                print(fom)
-                #foms_to_insert.append(fom_data)
+        plot_dir = 'plots'
+        from llnl.util.filesystem import mkdirp
+        mkdirp(plot_dir)
 
-        tmp_fom = {'name': 'Total Runtime 2', 'value': 10000, 'unit': 's', 'context': 'test', 'experiment_name': 'fake'}
-        foms_to_insert.append(tmp_fom)
+        #exps_to_insert = []
+        #foms_to_insert = []
+        import os
+        for workload_name, experiments in workloads.items():
 
-        # plotly express bar chart
-        #fig = px.line(df, x="year", y="lifeExp", color='country')
-        fig = px.bar(foms_to_insert, x='experiment_name', y='value')
+            workload_dir = os.path.join(plot_dir, workload_name)
+            mkdirp(workload_dir)
 
-        # html file
-        plotly.offline.plot(fig, filename='./lifeExp.html')
+            fom_output = collections.defaultdict(list)
+
+            for experiment in experiments:
+                print(experiment.__dict__)
+                experiment.generate_hash()
+                #exps_to_insert.append(experiment.to_json())
+
+                for fom in experiment.foms:
+                    fom_data = fom
+                    fom_data['experiment_name'] = experiment.name
+                    print(fom)
+                    fom_name = fom['name']
+                    fom_output[fom_name].append(fom_data)
+
+            #tmp_fom = {'name': 'Total Runtime 2', 'value': 10000, 'unit': 's', 'context': 'test', 'experiment_name': 'fake'}
+            #foms_to_insert.append(tmp_fom)
+
+            # plotly express bar chart
+            #fig = px.line(df, x="year", y="lifeExp", color='country')
+            for fom_name, values in fom_output.items():
+                fig = px.bar(values, x='experiment_name', y='value')
+
+                # html file
+                outfile = os.path.join(workload_dir, fom_name + '.html')
+                plotly.offline.plot(fig, filename=outfile, auto_open=False)
 
     def report(self):
         try:
