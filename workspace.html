@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ramble Workspace &mdash; Ramble 0.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=6c02275b"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Workspace Configuration File" href="workspace_config.html" />
+    <link rel="prev" title="Configuration Files" href="configuration_files.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html">
+            
+          </a>
+              <div class="version">
+                0.4
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basics</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="ramble.html">ramble package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration_files.html">Configuration Files</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Ramble Workspace</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#creating-workspaces">Creating Workspaces</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#named-workspace">Named Workspace</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#anonymous-workspace">Anonymous Workspace</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#workspace-links">Workspace Links</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#workspace-structure">Workspace Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#activating-a-workspace">Activating a Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#printing-workspace-information">Printing Workspace Information</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#concretizing-a-workspace">Concretizing a Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#setting-up-a-workspace">Setting up a Workspace</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#phase-selection">Phase Selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#filtering-experiments">Filtering Experiments</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#software-environments">Software Environments</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#workspace-inventory-and-hash">Workspace Inventory and Hash</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#executing-a-workspace">Executing a Workspace</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#custom-executors">Custom Executors</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#analyzing-a-workspace">Analyzing a Workspace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#archiving-a-workspace">Archiving a Workspace</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="workspace_config.html">Workspace Configuration File</a></li>
+<li class="toctree-l1"><a class="reference internal" href="success_criteria.html">Success Criteria</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributing</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/GoogleCloudPlatform/ramble#contributing">Contributing Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev_guides.html">Developer Guides</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">External Resources</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/spack/spack">Spack</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Ramble</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Ramble Workspace</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/workspace.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ramble-workspace">
+<span id="workspace"></span><h1>Ramble Workspace<a class="headerlink" href="#ramble-workspace" title="Link to this heading"></a></h1>
+<p>In Ramble, a workspace is a self contained directory representing a set of
+experiments that should be executed. This document describes overall aspects of
+workspaces, and how to use them.</p>
+<section id="creating-workspaces">
+<h2>Creating Workspaces<a class="headerlink" href="#creating-workspaces" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">ramble</span> <span class="pre">workspace</span> <span class="pre">create</span></code> command can be used to create workspaces.</p>
+<p>Workspaces are created with a standard structure, and some basic configuration
+files that the user can modify to control the exact behavior of the experiments
+within the workspace.</p>
+<p>Ramble can create two types of workspaces:
+* anonymous workspaces
+* named workspaces</p>
+<section id="named-workspace">
+<h3>Named Workspace<a class="headerlink" href="#named-workspace" title="Link to this heading"></a></h3>
+<p>By default, Ramble creates named workspaces, which are workspaces which Ramble
+will manage. To create a named workspace, use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>create<span class="w"> </span>&lt;name_of_workspace&gt;
+</pre></div>
+</div>
+<p>These workspaces are created by default in <code class="docutils literal notranslate"><span class="pre">$ramble/var/ramble/workspaces</span></code>,
+but that location can be changed. For example, the following command will
+change the default location for creating workspaces to
+<code class="docutils literal notranslate"><span class="pre">~/.ramble/workspaces</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>config<span class="w"> </span>add<span class="w"> </span><span class="s1">&#39;config:workspace_dirs:~/.ramble/workspaces&#39;</span>
+</pre></div>
+</div>
+</section>
+<section id="anonymous-workspace">
+<h3>Anonymous Workspace<a class="headerlink" href="#anonymous-workspace" title="Link to this heading"></a></h3>
+<p>Anonymous workspaces are workspaces that Ramble will not manage and will live
+in a specified directory. To create an anonymous workspace, use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>create<span class="w"> </span>-d<span class="w"> </span>&lt;path_to_workspace&gt;
+</pre></div>
+</div>
+</section>
+<section id="workspace-links">
+<span id="id1"></span><h3>Workspace Links<a class="headerlink" href="#workspace-links" title="Link to this heading"></a></h3>
+<p>In order to save disk space, sometimes it can be useful to share internal
+workspace directories across workspaces when they reuse aspects of each others
+workflows. Ramble provides a way to create a new workspace where the inputs and
+software directories are symbolic links to external directories (whether in a
+workspace or not), to help minimize duplication of files across workspaces.</p>
+<p>To use this, when creating a workspace you can use the <code class="docutils literal notranslate"><span class="pre">--inputs-dir</span></code> and
+<code class="docutils literal notranslate"><span class="pre">--software-dir</span></code> argument to provide paths for the source of these symbolic
+links.</p>
+<p>As an example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>create<span class="w"> </span>-d<span class="w"> </span>foo
+<span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>create<span class="w"> </span>-d<span class="w"> </span>bar<span class="w"> </span>--software-dir<span class="w"> </span>foo/software<span class="w"> </span>--inputs-dir<span class="w"> </span>foo/inputs
+</pre></div>
+</div>
+<p>In the above example, two workspaces are created (<code class="docutils literal notranslate"><span class="pre">foo</span></code> and <code class="docutils literal notranslate"><span class="pre">bar</span></code>). The
+workspace named <code class="docutils literal notranslate"><span class="pre">bar</span></code> has symbolic links for its <code class="docutils literal notranslate"><span class="pre">software</span></code> and <code class="docutils literal notranslate"><span class="pre">inputs</span></code>
+directories that link to the same named directories in the <code class="docutils literal notranslate"><span class="pre">foo</span></code> workspace.</p>
+<p>Additionally, these directories do not need to be part of any workspace, and
+could instead be external directories used to have a common storage location
+for software environments and input files.</p>
+</section>
+</section>
+<section id="workspace-structure">
+<span id="id2"></span><h2>Workspace Structure<a class="headerlink" href="#workspace-structure" title="Link to this heading"></a></h2>
+<p>Ramble creates workspaces using the following structure by default:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span>workspace
+<span class="go">| - configs/</span>
+<span class="go">|   | - ramble.yaml</span>
+<span class="go">|   | - execute_experiment.tpl</span>
+<span class="go">|   | - auxiliary_software_files/</span>
+<span class="go">| - experiments/</span>
+<span class="go">| - inputs/</span>
+<span class="go">| - logs/</span>
+<span class="go">| - software/</span>
+</pre></div>
+</div>
+<p>This various parts of this directory structure are defined as:
+* <code class="docutils literal notranslate"><span class="pre">configs/</span></code>: Contain configuration for the workspace
+* <code class="docutils literal notranslate"><span class="pre">configs/auxiliary_software_files</span></code>: Contain files used by the package managers
+* <code class="docutils literal notranslate"><span class="pre">experiments/</span></code>: Contain experiments define by the workspace configuration
+* <code class="docutils literal notranslate"><span class="pre">inputs</span></code>: Contain the inputs experiments in this workspace require
+* <code class="docutils literal notranslate"><span class="pre">logs</span></code>: Contain some logging output from ramble
+* <code class="docutils literal notranslate"><span class="pre">software</span></code>: Contain software environments an application’s package manager creates</p>
+<p>In the <code class="docutils literal notranslate"><span class="pre">configs</span></code> directory, the <code class="docutils literal notranslate"><span class="pre">ramble.yaml</span></code> file is the primary workspace
+configuration file. The definition for this file is documented in the
+:ref:<code class="docutils literal notranslate"><span class="pre">workspace</span> <span class="pre">config</span> <span class="pre">documentation&lt;workspace-config&gt;</span></code></p>
+<p>Every file with the <code class="docutils literal notranslate"><span class="pre">.tpl</span></code> extension is considered a template file in the
+workspace. These are rendered into each experiment (with the extension
+omitted). This allows control over the script format to execute an experiment.</p>
+</section>
+<section id="activating-a-workspace">
+<h2>Activating a Workspace<a class="headerlink" href="#activating-a-workspace" title="Link to this heading"></a></h2>
+<p>Several Ramble commands require an activated workspace to function properly. A workspace can be activated in a few different ways:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>activate<span class="w"> </span>&lt;name_or_path&gt;
+</pre></div>
+</div>
+<p>will activate a workspace until it is deactivated, while</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>-D<span class="w"> </span>&lt;path_to_workspace<span class="w"> </span>workspace<span class="w"> </span>...
+
+<span class="go">or</span>
+
+<span class="gp">$ </span>ramble<span class="w"> </span>-w<span class="w"> </span>&lt;workspace_name&gt;<span class="w"> </span>workspace<span class="w"> </span>...
+</pre></div>
+</div>
+<p>will activate a workspace for the specific command.</p>
+</section>
+<section id="printing-workspace-information">
+<h2>Printing Workspace Information<a class="headerlink" href="#printing-workspace-information" title="Link to this heading"></a></h2>
+<p>In order to see an overview of what experiments a workspace contains, one can
+use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>info
+</pre></div>
+</div>
+<p>To get basic information, and:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>info<span class="w"> </span>-v
+</pre></div>
+</div>
+<p>To get more detailed information, including which variables are defined and
+where they come from.</p>
+</section>
+<section id="concretizing-a-workspace">
+<h2>Concretizing a Workspace<a class="headerlink" href="#concretizing-a-workspace" title="Link to this heading"></a></h2>
+<p>The software definitions in a workspace need to be concretized before the
+workspace can be set up. To have Ramble pull software definitions from the
+application definition files, one can use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>concretize
+</pre></div>
+</div>
+</section>
+<section id="setting-up-a-workspace">
+<span id="workspace-setup"></span><h2>Setting up a Workspace<a class="headerlink" href="#setting-up-a-workspace" title="Link to this heading"></a></h2>
+<p>To make Ramble fully configure a workspace, one can use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>setup
+</pre></div>
+</div>
+<p>This can be an expensive process, and Ramble will:
+* Install software
+* Download input files
+* Create all experiment directives and content</p>
+<p>To perform a light-weight test version of this, one can use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>setup<span class="w"> </span>--dry-run
+</pre></div>
+</div>
+<p>Which will create experiments, but it won’t download anything, or execute any
+package manager commands.</p>
+<section id="phase-selection">
+<h3>Phase Selection<a class="headerlink" href="#phase-selection" title="Link to this heading"></a></h3>
+<p>Some workflows would benefit from more fine-grained control of the phases that
+are executed by Ramble. A good example is that sometimes one only wants to run
+the <code class="docutils literal notranslate"><span class="pre">make_experiments</span></code> phase of a workspace instead of all of the phases.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">ramble</span> <span class="pre">workspace</span> <span class="pre">setup</span></code> command has a <code class="docutils literal notranslate"><span class="pre">--phases</span></code> argument, which can
+take phase filters which will be used to down-select the phases which should be
+executed.</p>
+<p>As an example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>setup<span class="w"> </span>--phases<span class="w"> </span>make_experiments
+</pre></div>
+</div>
+<p>Would execute only the <code class="docutils literal notranslate"><span class="pre">make_experiments</span></code> phase of all experiments that have
+this phase.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">--phases</span></code> argument supports wildcard matching, i.e.:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>setup<span class="w"> </span>--phases<span class="w"> </span>*_experiments
+</pre></div>
+</div>
+<p>Would execute all phases that have then <code class="docutils literal notranslate"><span class="pre">_experiments</span></code> suffix.</p>
+</section>
+<section id="filtering-experiments">
+<span id="filter-experiments"></span><h3>Filtering Experiments<a class="headerlink" href="#filtering-experiments" title="Link to this heading"></a></h3>
+<p>Several of the workspace commands support filtering the experiments they should
+act on. This can be performed using the <code class="docutils literal notranslate"><span class="pre">--where</span></code> argument for inclusive
+filtering, the <code class="docutils literal notranslate"><span class="pre">--exclude-where</span></code> argument for exclusive filtering, or the
+<code class="docutils literal notranslate"><span class="pre">--filter-tags</span></code> argument to filter based on experiment tags.. These arguments
+take a string representing a logical expression, which can use variables the
+experiment would define. If the logical expression evaluates to true, the
+experiment will be included or excluded for action (respectively).</p>
+<p>As an example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>setup<span class="w"> </span>--where<span class="w"> </span><span class="s1">&#39;&quot;{n_ranks}&quot; &lt; 500&#39;</span>
+</pre></div>
+</div>
+<p>Will only setup experiments that have less than 500 ranks, and:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>setup<span class="w"> </span>--exclude-where<span class="w"> </span><span class="s1">&#39;&quot;{application_name}&quot; == &quot;hostname&quot;&#39;</span>
+</pre></div>
+</div>
+<p>Will exclude all experiments from the <code class="docutils literal notranslate"><span class="pre">hostname</span></code> application.</p>
+<p>To filter by tags, see the following example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>setup<span class="w"> </span>--filter-tags<span class="w"> </span>my-tag
+</pre></div>
+</div>
+<p>Will only setup experiments that have the <code class="docutils literal notranslate"><span class="pre">my-tag</span></code> on them.</p>
+<p>The commands that accept these filters are:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>analyze
+<span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>archive
+<span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>mirror
+<span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>setup
+<span class="gp">$ </span>ramble<span class="w"> </span>on
+</pre></div>
+</div>
+<p><strong>NOTE:</strong> The exclusive filter takes precedence over the inclusive filter.</p>
+</section>
+<section id="software-environments">
+<h3>Software Environments<a class="headerlink" href="#software-environments" title="Link to this heading"></a></h3>
+<p>When setting up a workspace, Ramble will install software defined by the
+workspace configuration file. Ramble uses external package mangers to perform
+the installation and generate software environments for each experiment.</p>
+<p>As an example, if the applications and workspace configuration file provide a
+configuration for Spack, Ramble will generate
+<cite>Spack environments&lt;https://spack.readthedocs.io/en/latest/environments.html&gt;</cite>.</p>
+<p>By default, Ramble uses the following format for creating a spack environment file:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">spack</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">concretizer</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">unify</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">specs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">for</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">environment</span>
+<span class="w">  </span><span class="nt">include</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">files</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">from</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auxiliary_software_files</span>
+</pre></div>
+</div>
+<p>In addition to generating a <code class="docutils literal notranslate"><span class="pre">spack.yaml</span></code> file for each software environment,
+Ramble will expand unique copies of each file contained in the
+<code class="docutils literal notranslate"><span class="pre">configs/auxiliary_software_files</span></code> directory into every software environment
+it generates.</p>
+<p>These can be used to modify the behavior of Spack environments generated by Ramble.</p>
+</section>
+<section id="workspace-inventory-and-hash">
+<h3>Workspace Inventory and Hash<a class="headerlink" href="#workspace-inventory-and-hash" title="Link to this heading"></a></h3>
+<p>Setting up a workspace will create inventory files that can be used to identify
+which aspects of experiments or workspaces change between different
+invocations.</p>
+<p>Most of an experiment’s inventory is defined regardless of if <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> is
+used or not. The notable exception to this is the <code class="docutils literal notranslate"><span class="pre">software</span></code> hashes. The file
+that is hashed depends on if the underlying software environment is fully
+defined or not.</p>
+<p>As an example, if Spack applications are used, <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> only creates (and
+hashes) <code class="docutils literal notranslate"><span class="pre">spack.yaml</span></code> files, which are not concrete. When <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> is not
+used, Ramble will cause Spack to generate <code class="docutils literal notranslate"><span class="pre">spack.lock</span></code> files, which will then
+be hashed, giving better information about if the file changes or not.</p>
+<p>The hash for a workspace is written to <code class="docutils literal notranslate"><span class="pre">$workspace/workspace_hash.sha256</span></code>,
+and the inventories are written to
+<code class="docutils literal notranslate"><span class="pre">$workspace/experiments/&lt;application&gt;/&lt;workload&gt;/&lt;experiment&gt;/ramble_inventory.json</span></code>
+and <code class="docutils literal notranslate"><span class="pre">$workspace/ramble_inventory.json</span></code>.</p>
+<p>Below is an example of a workspace inventory:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;experiments&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gromacs.water_bare.test&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;3f4a333db9f76a06826e4c3775bb4384af8904f474a74a4b1eb61f4d6d02939c&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;contents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;attributes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;variables&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0fc2c3b848885404201f5435389e9028460ea68affd6c78149b7a8c7e925d004&quot;</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;modifiers&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945&quot;</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;chained_experiments&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b&quot;</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;internals&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a&quot;</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;env_vars&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;035f0c03572706ee6da6f0f74614717b201aabe0f7671fc094478d1a97e5dcc4&quot;</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;template&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa&quot;</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">&quot;inputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;water_bare&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2fb58b2b856117515c75be9141450cca14642be2a1afe53baae3c85d06935caf&quot;</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">&quot;software&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;software/gromacs.water_bare&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;12f222f06ca05cb6fca37368452b3adedf316bc224ea447e894c87d672333cca&quot;</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">&quot;templates&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;execute_experiment&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ea07af55040670edaf23e2bfd0b537c8ed70280a3616021a5203bdf65e08a4c6&quot;</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;versions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ramble&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0.3.0 (9947210de68fb42dfd843ed1ab982aba0145e9d3)&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;02f5fbbfe0a9fe38b99186619e7fb1d11e6398c637a24bb972fffa66e82bf3fe&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;spack&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0.20.0.dev0 (3c3a4c75776ece43c95df46908dea026ac2a9276)&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;21fb90b4cffd46b2257469da346cdf0bcf7070227290262b000bb6c467acfc44&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>As mentioned above, the only part that varies when switching <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> on
+and off are the digest values for each software attribute. The hash of the
+workspace is the hash of its inventory file. All hashes are sha256.</p>
+</section>
+</section>
+<section id="executing-a-workspace">
+<h2>Executing a Workspace<a class="headerlink" href="#executing-a-workspace" title="Link to this heading"></a></h2>
+<p>Once a workspace is set up, the experiments inside it can be executed using:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>on
+</pre></div>
+</div>
+<section id="custom-executors">
+<h3>Custom Executors<a class="headerlink" href="#custom-executors" title="Link to this heading"></a></h3>
+<p>When executing the experiments within a workspace, an executor is used.
+Executors are arbitrary strings which are expanded for each experiment, and
+then executed directly.</p>
+<p>The default executor is <code class="docutils literal notranslate"><span class="pre">'{batch_submit}'</span></code> as this is the variable that is
+used to generate the execution command in the <code class="docutils literal notranslate"><span class="pre">all_experiments</span></code> script.</p>
+<p>Custom executors can be defined using the <code class="docutils literal notranslate"><span class="pre">--executor</span></code> argument to <code class="docutils literal notranslate"><span class="pre">ramble</span>
+<span class="pre">on</span></code> as in:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>on<span class="w"> </span>--executor<span class="w"> </span><span class="s1">&#39;echo &quot;{experiment_namespace}&quot;&#39;</span>
+</pre></div>
+</div>
+<p>This executor will echo each experiment’s fully qualified namespace instead of
+executing the experiment.</p>
+<p>The value of the executor will be expanded for each experiment, and executed
+independently. Custom executors can be used to have more control over what
+actions to perform with an experiment.</p>
+</section>
+</section>
+<section id="analyzing-a-workspace">
+<h2>Analyzing a Workspace<a class="headerlink" href="#analyzing-a-workspace" title="Link to this heading"></a></h2>
+<p>After the experiments inside a workspace are complete, they can be analyzed using:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>analyze
+</pre></div>
+</div>
+<p>By default this creates text output describing the figures of merit from the
+workspace’s experiments. The format can be controlled using:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>analyze<span class="w"> </span>--format<span class="w"> </span>text<span class="w"> </span>json<span class="w"> </span>yaml
+</pre></div>
+</div>
+<p>With supported formats being <code class="docutils literal notranslate"><span class="pre">text</span></code>, <code class="docutils literal notranslate"><span class="pre">json</span></code>, or <code class="docutils literal notranslate"><span class="pre">yaml</span></code>.</p>
+<p>Ramble also include an experimental capability to uplodate figures of merit
+into a back-end data base. Currently BigQuery is the only supported back-end,
+however more back-ends can be implemented. To upload data, one can use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>analyze<span class="w"> </span>--upload
+</pre></div>
+</div>
+<p>This will automatically read the upload configuration from the <code class="docutils literal notranslate"><span class="pre">upload</span></code> block
+of <a class="reference internal" href="configuration_files.html#config-yaml"><span class="std std-ref">Ramble’s config file</span></a>.</p>
+</section>
+<section id="archiving-a-workspace">
+<h2>Archiving a Workspace<a class="headerlink" href="#archiving-a-workspace" title="Link to this heading"></a></h2>
+<p>A workspace can be archived to either:
+* Share with other people
+* Keep for future reproduction</p>
+<p>In order to archive a workspace, one can use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>archive
+</pre></div>
+</div>
+<p>An archive can be automatically uploaded to a mirror using:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>archive<span class="w"> </span>-t<span class="w"> </span>--upload-url<span class="w"> </span>&lt;mirror_url&gt;
+</pre></div>
+</div>
+<p>When Ramble creates an archive, it will collect the following files:
+* All files in <code class="docutils literal notranslate"><span class="pre">$workspace/configs</span></code>
+* Generated files for each software environment. (i.e. Each <code class="docutils literal notranslate"><span class="pre">spack.yaml</span></code> for spack environments)
+* For each experiment, the following are collected:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Every rendered template (created from a <code class="docutils literal notranslate"><span class="pre">$workspace/configs/*.tpl</span></code> file)</p></li>
+<li><p>Every file a success criteria or figure of merit would be extract from</p></li>
+<li><p>Every file that matches an <code class="docutils literal notranslate"><span class="pre">archive_pattern</span></code> from the <code class="docutils literal notranslate"><span class="pre">application.py</span></code></p></li>
+</ul>
+</div></blockquote>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="configuration_files.html" class="btn btn-neutral float-left" title="Configuration Files" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="workspace_config.html" class="btn btn-neutral float-right" title="Workspace Configuration File" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022-2023, Google LLC.
+      <span class="lastupdated">Last updated on Feb 27, 2024.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

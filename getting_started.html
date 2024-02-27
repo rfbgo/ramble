@@ -1,24 +1,28 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Getting Started &mdash; Ramble 0.0.1 documentation</title>
-      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+  <title>Getting Started &mdash; Ramble 0.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
+
+  
   <!--[if lt IE 9]>
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=6c02275b"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Workspace Configuration File" href="workspace_config.html" />
+    <link rel="next" title="Configuration Files" href="configuration_files.html" />
     <link rel="prev" title="ramble.workspace package" href="ramble.workspace.html" /> 
 </head>
 
@@ -34,7 +38,7 @@
             
           </a>
               <div class="version">
-                0.0
+                0.4
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
@@ -44,17 +48,26 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Basics</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorials.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basics</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="ramble.html">ramble package</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#what-is-ramble">What is Ramble?</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#system-requirements">System Requirements</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#shell-support">Shell Support</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#command-help">Command Help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#command-help">Command Help</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#debugging-ramble">Debugging Ramble</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#defined-applications">Defined Applications</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#application-workloads">Application Workloads</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#ramble-workspaces">Ramble Workspaces</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#creating-workspaces">Creating Workspaces</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-a-workspace">Configuring A Workspace</a></li>
@@ -67,32 +80,15 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="configuration_files.html">Configuration Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workspace.html">Ramble Workspace</a></li>
 <li class="toctree-l1"><a class="reference internal" href="workspace_config.html">Workspace Configuration File</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html">ramble</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-add">ramble add</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-clean">ramble clean</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-commands">ramble commands</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-config">ramble config</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-debug">ramble debug</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-edit">ramble edit</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-flake8">ramble flake8</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-help">ramble help</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-info">ramble info</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-license">ramble license</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-list">ramble list</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-mirror">ramble mirror</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-on">ramble on</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-remove">ramble remove</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-repo">ramble repo</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-unit-test">ramble unit-test</a></li>
-<li class="toctree-l1"><a class="reference internal" href="command_index.html#ramble-workspace">ramble workspace</a></li>
+<li class="toctree-l1"><a class="reference internal" href="success_criteria.html">Success Criteria</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Contributing</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference external" href="https://github.com/GoogleCloudPlatform/ramble#contributing">Contributing Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev_guides.html">Developer Guides</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">External Resources</span></p>
 <ul>
@@ -124,25 +120,55 @@
            <div itemprop="articleBody">
              
   <section id="getting-started">
-<h1>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this heading"></a></h1>
+<h1>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading"></a></h1>
+<section id="what-is-ramble">
+<h2>What is Ramble?<a class="headerlink" href="#what-is-ramble" title="Link to this heading"></a></h2>
+<p>Ramble stands for Reproducible And Measurable Benchmarks in a Layered Environment.</p>
+<p>Ramble is a multi-platform experimentation framework to increase exploration
+productivity and improve reproducibility. Ramble is capable of driving software
+installation, acquiring input files, configuring experiments, and extracting results.
+It works on Linux, macOS, and many supercomputers.</p>
+<p>Ramble can be used to configure a variety of experiments for applications. These
+can include anything from:</p>
+<ul class="simple">
+<li><p>Scientific parameter sweeps</p></li>
+<li><p>Performance focused scalaing studies</p></li>
+<li><p>Compiler flag sweeps</p></li>
+</ul>
+</section>
 <section id="system-requirements">
-<h2>System Requirements<a class="headerlink" href="#system-requirements" title="Permalink to this heading"></a></h2>
-<p>Ramble’s dependencies are listed within the top level
-requirements.txt file.</p>
-<p>In addition to the listed python dependencies, Ramble depends on
-spack for some application definition files.</p>
-<p>Please see Spack’s <a class="reference external" href="https://spack.readthedocs.io/en/latest/getting_started.html">documentation</a> for getting spack installed.</p>
+<h2>System Requirements<a class="headerlink" href="#system-requirements" title="Link to this heading"></a></h2>
+<p>Ramble requires Python 3.6.8 or greater. Some applications also require
+<a class="reference external" href="https://spack.io/about/#install-spack">Spack</a>, which is used for managing
+binaries and their dependencies.</p>
+<p>Ramble’s Python dependencies are listed within the top level requirements.txt
+file.</p>
+<p>For Ramble developers, pytest and flake8 are required for linting and performing
+unit tests.</p>
 </section>
 <section id="installation">
-<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this heading"></a></h2>
-<p>Installing ramble is easy. You can clone it from the
-<a class="reference external" href="https://github.com/GoogleCloudPlatform/ramble">github repository</a> using this command:</p>
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
+<p>There are two ways to install Ramble. The first, and recommended, approach is to
+clone its <a class="reference external" href="https://github.com/GoogleCloudPlatform/ramble">github repository</a>.
+This can be done with:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>git<span class="w"> </span>clone<span class="w"> </span>-c<span class="w"> </span>feature.manyFiles<span class="o">=</span><span class="nb">true</span><span class="w"> </span>https://github.com/GoogleCloudPlatform/ramble.git
 </pre></div>
 </div>
-<p>This will create a directory called <code class="docutils literal notranslate"><span class="pre">ramble</span></code>.</p>
+<p>By default, this will checkout the <code class="docutils literal notranslate"><span class="pre">develop</span></code> branch, which is the most
+up-to-date version of Ramble. Several tags, as well as the <code class="docutils literal notranslate"><span class="pre">main</span></code> branch
+(which contains the latest tag) can provide a more stable exeperience.</p>
+<p>The second approach is to download one of the releases from
+<a class="reference external" href="https://github.com/GoogleCloudPlatform/ramble/releases">Ramble’s releases page</a></p>
+<p>Once Ramble is available on your system, its python dependencies can be
+installed using the <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> file included in the root of Ramble’s
+source directory.</p>
+<p>To install this, you can use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</pre></div>
+</div>
+<p>However, the exact command will depend on your environment.</p>
 <section id="shell-support">
-<h3>Shell Support<a class="headerlink" href="#shell-support" title="Permalink to this heading"></a></h3>
+<h3>Shell Support<a class="headerlink" href="#shell-support" title="Link to this heading"></a></h3>
 <p>Once you have cloned Ramble, we recommend sourcing the appropriate script for your shell:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>For<span class="w"> </span>bash/zsh/sh
 <span class="gp">$ </span>.<span class="w"> </span>ramble/share/ramble/setup-env.sh
@@ -159,7 +185,7 @@ spack for some application definition files.</p>
 <p>If you do not want to use Ramble’s shell support, you can always just run the
 <code class="docutils literal notranslate"><span class="pre">ramble</span></code> command directly from <code class="docutils literal notranslate"><span class="pre">ramble/bin/ramble</span></code>.</p>
 <p>When the <code class="docutils literal notranslate"><span class="pre">ramble</span></code> command is executed, it searches for an appropriate Python
-interpreter to use, which can be explicitly overriden by setting the
+interpreter to use, which can be explicitly overridden by setting the
 <code class="docutils literal notranslate"><span class="pre">RAMBLE_PYTHON</span></code> environment variable. When sourcing the appropriate shell
 setup script, <code class="docutils literal notranslate"><span class="pre">RAMBLE_PYTHON</span></code> will be set to the interpreter found at
 sourcing time, ensuring future invocations of the <code class="docutils literal notranslate"><span class="pre">ramble</span></code> command will
@@ -168,7 +194,7 @@ environment.</p>
 </section>
 </section>
 <section id="command-help">
-<h2>Command Help<a class="headerlink" href="#command-help" title="Permalink to this heading"></a></h2>
+<h2>Command Help<a class="headerlink" href="#command-help" title="Link to this heading"></a></h2>
 <p>To get information on the available commands, you can execute:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span><span class="nb">help</span><span class="w"> </span>--all
 </pre></div>
@@ -177,9 +203,20 @@ environment.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>&lt;subcommand&gt;<span class="w"> </span>-h
 </pre></div>
 </div>
+<section id="debugging-ramble">
+<h3>Debugging Ramble<a class="headerlink" href="#debugging-ramble" title="Link to this heading"></a></h3>
+<p>When an issue occurs while running Ramble, it can be useful to get additionally
+debugging information. To enable the debugging mode in Ramble, you can use the
+<cite>-d</cite> global option, as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>-d<span class="w"> </span>&lt;subcommand&gt;
+<span class="go">or;</span>
+<span class="gp">$ </span>ramble<span class="w"> </span>--debug<span class="w"> </span>&lt;subcommand&gt;
+</pre></div>
+</div>
+</section>
 </section>
 <section id="defined-applications">
-<h2>Defined Applications<a class="headerlink" href="#defined-applications" title="Permalink to this heading"></a></h2>
+<h2>Defined Applications<a class="headerlink" href="#defined-applications" title="Link to this heading"></a></h2>
 <p>In order to get information about the available applications defined within
 <code class="docutils literal notranslate"><span class="pre">ramble</span></code>, you can use the command:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>list
@@ -190,9 +227,36 @@ environment.</p>
 </pre></div>
 </div>
 <p>will list both <code class="docutils literal notranslate"><span class="pre">wrfv3</span></code> and <code class="docutils literal notranslate"><span class="pre">wrfv4</span></code>.</p>
+<p>Available applications can be filtered using tags, e.g.:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>list<span class="w"> </span>-t<span class="w"> </span>weather
+</pre></div>
+</div>
+<p>will also list both <code class="docutils literal notranslate"><span class="pre">wrfv3</span></code> and <code class="docutils literal notranslate"><span class="pre">wrfrv4</span></code>. The available tags can be seen with:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>attributes<span class="w"> </span>--tags<span class="w"> </span>--all
+</pre></div>
+</div>
+</section>
+<section id="application-workloads">
+<h2>Application Workloads<a class="headerlink" href="#application-workloads" title="Link to this heading"></a></h2>
+<p>To get detailed information about an application, you can use the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>info<span class="w"> </span>&lt;application&gt;
+</pre></div>
+</div>
+<p>For example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>info<span class="w"> </span>wrfv3
+</pre></div>
+</div>
+<p>Will show that <code class="docutils literal notranslate"><span class="pre">wrfv3</span></code> has two workloads</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">CONUS_12km</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CONUS_2p5km</span></code></p></li>
+</ul>
+<p>that experiments can be generated from. The <code class="docutils literal notranslate"><span class="pre">ramble</span> <span class="pre">info</span></code> command can also be
+used to see what variables each workload has, and potentially some suggested
+values for variables with a limited set of allowed values.</p>
 </section>
 <section id="ramble-workspaces">
-<h2>Ramble Workspaces<a class="headerlink" href="#ramble-workspaces" title="Permalink to this heading"></a></h2>
+<span id="id1"></span><h2>Ramble Workspaces<a class="headerlink" href="#ramble-workspaces" title="Link to this heading"></a></h2>
 <p>To configure experiments, you need to use a Ramble workspace. A workspace is a
 self contained directory that contains configuration files, template files, and
 eventually will contain spack environments, input files, and experiment
@@ -207,7 +271,7 @@ commands.</p>
 <p>A workspace can be selected when executing <code class="docutils literal notranslate"><span class="pre">ramble</span></code> through the use of the
 <code class="docutils literal notranslate"><span class="pre">-w</span></code> and <code class="docutils literal notranslate"><span class="pre">-D</span></code> flags.</p>
 <section id="creating-workspaces">
-<h3>Creating Workspaces<a class="headerlink" href="#creating-workspaces" title="Permalink to this heading"></a></h3>
+<h3>Creating Workspaces<a class="headerlink" href="#creating-workspaces" title="Link to this heading"></a></h3>
 <p>To create a new Ramble workspace, you can use:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>create<span class="w"> </span><span class="o">[</span>&lt;name&gt;<span class="o">]</span><span class="w"> </span><span class="o">[</span>-d<span class="w"> </span>&lt;path&gt;<span class="o">]</span>
 </pre></div>
@@ -224,7 +288,7 @@ is done through:</p>
 </div>
 </section>
 <section id="configuring-a-workspace">
-<h3>Configuring A Workspace<a class="headerlink" href="#configuring-a-workspace" title="Permalink to this heading"></a></h3>
+<h3>Configuring A Workspace<a class="headerlink" href="#configuring-a-workspace" title="Link to this heading"></a></h3>
 <p>Within the created workspace, a <code class="docutils literal notranslate"><span class="pre">configs</span></code> directory is created to house the
 configuration files.</p>
 <p>A newly created workspace will contain:</p>
@@ -247,12 +311,12 @@ the rendered version within every experiment. As an example:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">configs/execute_experiment.tpl</span>
 </pre></div>
 </div>
-<p>Will define <code class="docutils literal notranslate"><span class="pre">{execute_experiment}</span></code> with a value set to the path of hte
+<p>Will define <code class="docutils literal notranslate"><span class="pre">{execute_experiment}</span></code> with a value set to the path of the
 generated file.
 (More explicitly, <code class="docutils literal notranslate"><span class="pre">execute_experiment={experiment_run_dir}/{template_name_sans_extension}</span></code>)</p>
 </section>
 <section id="concretizing-a-workspace">
-<h3>Concretizing A Workspace<a class="headerlink" href="#concretizing-a-workspace" title="Permalink to this heading"></a></h3>
+<h3>Concretizing A Workspace<a class="headerlink" href="#concretizing-a-workspace" title="Link to this heading"></a></h3>
 <p>After configuring a workspace with applications, workloads, and experiments,
 Ramble can be used to inject default software configurations for the requested
 experiments. To do this, you can use the:</p>
@@ -264,7 +328,7 @@ with defaults. The defaults can be configured however you want before
 installing the actual software.</p>
 </section>
 <section id="setting-up-a-workspace">
-<h3>Setting Up A Workspace<a class="headerlink" href="#setting-up-a-workspace" title="Permalink to this heading"></a></h3>
+<h3>Setting Up A Workspace<a class="headerlink" href="#setting-up-a-workspace" title="Link to this heading"></a></h3>
 <p>Once a workspace is concretized, it can be set up. This process is executed through:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>setup
 </pre></div>
@@ -280,7 +344,7 @@ installing the actual software.</p>
 </dl>
 </section>
 <section id="executing-experiments">
-<h3>Executing Experiments<a class="headerlink" href="#executing-experiments" title="Permalink to this heading"></a></h3>
+<h3>Executing Experiments<a class="headerlink" href="#executing-experiments" title="Link to this heading"></a></h3>
 <p>After the workspace is set up, its experiments can be executed. The two methods
 to run the experiments are:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"> $ </span>ramble<span class="w"> </span>on
@@ -290,7 +354,7 @@ to run the experiments are:</p>
 </div>
 </section>
 <section id="analyzing-experiments">
-<h3>Analyzing Experiments<a class="headerlink" href="#analyzing-experiments" title="Permalink to this heading"></a></h3>
+<h3>Analyzing Experiments<a class="headerlink" href="#analyzing-experiments" title="Link to this heading"></a></h3>
 <p>Once the experiments within a workspace are complete, the experiments can be
 analyzed. This is done through:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ramble<span class="w"> </span>workspace<span class="w"> </span>analyze
@@ -300,14 +364,14 @@ analyzed. This is done through:</p>
 extracted figures of merit.</p>
 </section>
 <section id="archiving-a-workspace">
-<h3>Archiving A Workspace<a class="headerlink" href="#archiving-a-workspace" title="Permalink to this heading"></a></h3>
+<h3>Archiving A Workspace<a class="headerlink" href="#archiving-a-workspace" title="Link to this heading"></a></h3>
 <dl class="simple">
 <dt>Ramble can create an archive of a workspace. This is a self contained copy of various important aspects of the workspace, including:</dt><dd><ul class="simple">
 <li><p>All files in the <code class="docutils literal notranslate"><span class="pre">configs</span></code> directory</p></li>
 <li><p>Rendered templates in the experiments directories</p></li>
 <li><p>Files that would have figures of merit extracted</p></li>
 <li><p>Auxiliary files that an application lists for archival</p></li>
-<li><p>All genreated spack.yaml files</p></li>
+<li><p>All generated spack.yaml files</p></li>
 </ul>
 </dd>
 </dl>
@@ -328,14 +392,14 @@ extracted figures of merit.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="ramble.workspace.html" class="btn btn-neutral float-left" title="ramble.workspace package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="workspace_config.html" class="btn btn-neutral float-right" title="Workspace Configuration File" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="configuration_files.html" class="btn btn-neutral float-right" title="Configuration Files" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
     <p>&#169; Copyright 2022-2023, Google LLC.
-      <span class="lastupdated">Last updated on May 12, 2023.
+      <span class="lastupdated">Last updated on Feb 27, 2024.
       </span></p>
   </div>
 

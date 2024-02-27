@@ -17,10 +17,10 @@ Subpackages
 Submodules
 ----------
 
-ramble.cmd.add module
----------------------
+ramble.cmd.attributes module
+----------------------------
 
-.. automodule:: ramble.cmd.add
+.. automodule:: ramble.cmd.attributes
    :members:
    :undoc-members:
    :show-inheritance:
@@ -113,6 +113,14 @@ ramble.cmd.mirror module
    :undoc-members:
    :show-inheritance:
 
+ramble.cmd.mods module
+----------------------
+
+.. automodule:: ramble.cmd.mods
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 ramble.cmd.on module
 --------------------
 
@@ -121,10 +129,10 @@ ramble.cmd.on module
    :undoc-members:
    :show-inheritance:
 
-ramble.cmd.remove module
+ramble.cmd.python module
 ------------------------
 
-.. automodule:: ramble.cmd.remove
+.. automodule:: ramble.cmd.python
    :members:
    :undoc-members:
    :show-inheritance:
@@ -133,6 +141,22 @@ ramble.cmd.repo module
 ----------------------
 
 .. automodule:: ramble.cmd.repo
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.cmd.results module
+-------------------------
+
+.. automodule:: ramble.cmd.results
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.cmd.software\_definitions module
+---------------------------------------
+
+.. automodule:: ramble.cmd.software_definitions
    :members:
    :undoc-members:
    :show-inheritance:

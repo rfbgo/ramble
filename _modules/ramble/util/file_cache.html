@@ -1,19 +1,23 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="../../../">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ramble.util.file_cache &mdash; Ramble 0.0.1 documentation</title>
-      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../../../_static/graphviz.css" type="text/css" />
+  <title>ramble.util.file_cache &mdash; Ramble 0.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=eafc0fe6" />
+
+  
   <!--[if lt IE 9]>
     <script src="../../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
-        <script src="../../../_static/doctools.js"></script>
-        <script src="../../../_static/sphinx_highlight.js"></script>
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=6c02275b"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" /> 
@@ -31,7 +35,7 @@
             
           </a>
               <div class="version">
-                0.0
+                0.4
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
@@ -41,36 +45,23 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Basics</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basics</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../ramble.html">ramble package</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../configuration_files.html">Configuration Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../workspace.html">Ramble Workspace</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../workspace_config.html">Workspace Configuration File</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html">ramble</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-add">ramble add</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-clean">ramble clean</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-commands">ramble commands</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-config">ramble config</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-debug">ramble debug</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-edit">ramble edit</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-flake8">ramble flake8</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-help">ramble help</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-info">ramble info</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-license">ramble license</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-list">ramble list</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-mirror">ramble mirror</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-on">ramble on</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-remove">ramble remove</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-repo">ramble repo</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-unit-test">ramble unit-test</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../command_index.html#ramble-workspace">ramble workspace</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../success_criteria.html">Success Criteria</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Contributing</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference external" href="https://github.com/GoogleCloudPlatform/ramble#contributing">Contributing Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dev_guides.html">Developer Guides</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">External Resources</span></p>
 <ul>
@@ -102,7 +93,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for ramble.util.file_cache</h1><div class="highlight"><pre>
-<span></span><span class="c1"># Copyright 2022-2023 Google LLC</span>
+<span></span><span class="c1"># Copyright 2022-2024 Google LLC</span>
 <span class="c1">#</span>
 <span class="c1"># Licensed under the Apache License, Version 2.0 &lt;LICENSE-APACHE or</span>
 <span class="c1"># https://www.apache.org/licenses/LICENSE-2.0&gt; or the MIT license</span>
@@ -119,7 +110,9 @@
 <span class="kn">from</span> <span class="nn">ramble.util.lock</span> <span class="kn">import</span> <span class="n">Lock</span><span class="p">,</span> <span class="n">ReadTransaction</span><span class="p">,</span> <span class="n">WriteTransaction</span>
 
 
-<div class="viewcode-block" id="FileCache"><a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache">[docs]</a><span class="k">class</span> <span class="nc">FileCache</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="FileCache">
+<a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache">[docs]</a>
+<span class="k">class</span> <span class="nc">FileCache</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This class manages cached data in the filesystem.</span>
 
 <span class="sd">    - Cache files are fetched and stored by unique keys.  Keys can be relative</span>
@@ -149,7 +142,9 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_locks</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">lock_timeout</span> <span class="o">=</span> <span class="n">timeout</span>
 
-<div class="viewcode-block" id="FileCache.destroy"><a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.destroy">[docs]</a>    <span class="k">def</span> <span class="nf">destroy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="FileCache.destroy">
+<a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.destroy">[docs]</a>
+    <span class="k">def</span> <span class="nf">destroy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove all files under the cache root.&quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">):</span>
             <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
@@ -158,9 +153,13 @@
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="FileCache.cache_path"><a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.cache_path">[docs]</a>    <span class="k">def</span> <span class="nf">cache_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+
+<div class="viewcode-block" id="FileCache.cache_path">
+<a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.cache_path">[docs]</a>
+    <span class="k">def</span> <span class="nf">cache_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Path to the file in the cache for a particular key.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span></div>
+
 
     <span class="k">def</span> <span class="nf">_lock_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Path to the file in the cache for a particular key.&quot;&quot;&quot;</span>
@@ -176,7 +175,9 @@
                                     <span class="n">default_timeout</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lock_timeout</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_locks</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
 
-<div class="viewcode-block" id="FileCache.init_entry"><a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.init_entry">[docs]</a>    <span class="k">def</span> <span class="nf">init_entry</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+<div class="viewcode-block" id="FileCache.init_entry">
+<a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.init_entry">[docs]</a>
+    <span class="k">def</span> <span class="nf">init_entry</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Ensure we can access a cache file. Create a lock for it if needed.</span>
 
 <span class="sd">        Return whether the cache file exists yet or not.</span>
@@ -203,7 +204,10 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">_get_lock</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">exists</span></div>
 
-<div class="viewcode-block" id="FileCache.read_transaction"><a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.read_transaction">[docs]</a>    <span class="k">def</span> <span class="nf">read_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+
+<div class="viewcode-block" id="FileCache.read_transaction">
+<a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.read_transaction">[docs]</a>
+    <span class="k">def</span> <span class="nf">read_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a read transaction on a file cache item.</span>
 
 <span class="sd">        Returns a ReadTransaction context manager and opens the cache file for</span>
@@ -217,7 +221,10 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">_get_lock</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">acquire</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cache_path</span><span class="p">(</span><span class="n">key</span><span class="p">))</span>
         <span class="p">)</span></div>
 
-<div class="viewcode-block" id="FileCache.write_transaction"><a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.write_transaction">[docs]</a>    <span class="k">def</span> <span class="nf">write_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+
+<div class="viewcode-block" id="FileCache.write_transaction">
+<a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.write_transaction">[docs]</a>
+    <span class="k">def</span> <span class="nf">write_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a write transaction on a file cache item.</span>
 
 <span class="sd">        Returns a WriteTransaction context manager that opens a temporary file</span>
@@ -257,7 +264,10 @@
         <span class="k">return</span> <span class="n">WriteTransaction</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_get_lock</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">acquire</span><span class="o">=</span><span class="n">WriteContextManager</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="FileCache.mtime"><a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.mtime">[docs]</a>    <span class="k">def</span> <span class="nf">mtime</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+
+<div class="viewcode-block" id="FileCache.mtime">
+<a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.mtime">[docs]</a>
+    <span class="k">def</span> <span class="nf">mtime</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return modification time of cache file, or 0 if it does not exist.</span>
 
 <span class="sd">        Time is in units returned by os.stat in the mtime field, which is</span>
@@ -270,18 +280,26 @@
             <span class="n">sinfo</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">stat</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cache_path</span><span class="p">(</span><span class="n">key</span><span class="p">))</span>
             <span class="k">return</span> <span class="n">sinfo</span><span class="o">.</span><span class="n">st_mtime</span></div>
 
-<div class="viewcode-block" id="FileCache.remove"><a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.remove">[docs]</a>    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+
+<div class="viewcode-block" id="FileCache.remove">
+<a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.FileCache.remove">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
         <span class="n">lock</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_lock</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">lock</span><span class="o">.</span><span class="n">acquire_write</span><span class="p">()</span>
             <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cache_path</span><span class="p">(</span><span class="n">key</span><span class="p">))</span>
         <span class="k">finally</span><span class="p">:</span>
             <span class="n">lock</span><span class="o">.</span><span class="n">release_write</span><span class="p">()</span>
-        <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_lock_path</span><span class="p">(</span><span class="n">key</span><span class="p">))</span></div></div>
+        <span class="n">os</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_lock_path</span><span class="p">(</span><span class="n">key</span><span class="p">))</span></div>
+</div>
 
 
-<div class="viewcode-block" id="CacheError"><a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.CacheError">[docs]</a><span class="k">class</span> <span class="nc">CacheError</span><span class="p">(</span><span class="n">RambleError</span><span class="p">):</span>
+
+<div class="viewcode-block" id="CacheError">
+<a class="viewcode-back" href="../../../ramble.util.html#ramble.util.file_cache.CacheError">[docs]</a>
+<span class="k">class</span> <span class="nc">CacheError</span><span class="p">(</span><span class="n">RambleError</span><span class="p">):</span>
     <span class="k">pass</span></div>
+
 </pre></div>
 
            </div>
@@ -292,7 +310,7 @@
 
   <div role="contentinfo">
     <p>&#169; Copyright 2022-2023, Google LLC.
-      <span class="lastupdated">Last updated on May 12, 2023.
+      <span class="lastupdated">Last updated on Feb 27, 2024.
       </span></p>
   </div>
 

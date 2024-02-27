@@ -17,6 +17,22 @@ Subpackages
 Submodules
 ----------
 
+ramble.util.colors module
+-------------------------
+
+.. automodule:: ramble.util.colors
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.util.directives module
+-----------------------------
+
+.. automodule:: ramble.util.directives
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 ramble.util.editor module
 -------------------------
 
@@ -25,10 +41,34 @@ ramble.util.editor module
    :undoc-members:
    :show-inheritance:
 
+ramble.util.env module
+----------------------
+
+.. automodule:: ramble.util.env
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.util.executable module
+-----------------------------
+
+.. automodule:: ramble.util.executable
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 ramble.util.file\_cache module
 ------------------------------
 
 .. automodule:: ramble.util.file_cache
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.util.hashing module
+--------------------------
+
+.. automodule:: ramble.util.hashing
    :members:
    :undoc-members:
    :show-inheritance:
@@ -49,6 +89,22 @@ ramble.util.lock module
    :undoc-members:
    :show-inheritance:
 
+ramble.util.logger module
+-------------------------
+
+.. automodule:: ramble.util.logger
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.util.matrices module
+---------------------------
+
+.. automodule:: ramble.util.matrices
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 ramble.util.naming module
 -------------------------
 
@@ -61,6 +117,22 @@ ramble.util.path module
 -----------------------
 
 .. automodule:: ramble.util.path
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.util.spec\_utils module
+------------------------------
+
+.. automodule:: ramble.util.spec_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.util.stats module
+------------------------
+
+.. automodule:: ramble.util.stats
    :members:
    :undoc-members:
    :show-inheritance:

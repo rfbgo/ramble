@@ -25,6 +25,30 @@ ramble.schema.config module
    :undoc-members:
    :show-inheritance:
 
+ramble.schema.env\_vars module
+------------------------------
+
+.. automodule:: ramble.schema.env_vars
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.schema.formatted\_executables module
+-------------------------------------------
+
+.. automodule:: ramble.schema.formatted_executables
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.schema.internals module
+------------------------------
+
+.. automodule:: ramble.schema.internals
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 ramble.schema.licenses module
 -----------------------------
 
@@ -49,6 +73,22 @@ ramble.schema.mirrors module
    :undoc-members:
    :show-inheritance:
 
+ramble.schema.modifier\_repos module
+------------------------------------
+
+.. automodule:: ramble.schema.modifier_repos
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.schema.modifiers module
+------------------------------
+
+.. automodule:: ramble.schema.modifiers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 ramble.schema.repos module
 --------------------------
 
@@ -65,10 +105,42 @@ ramble.schema.spack module
    :undoc-members:
    :show-inheritance:
 
+ramble.schema.success\_criteria module
+--------------------------------------
+
+.. automodule:: ramble.schema.success_criteria
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.schema.types module
+--------------------------
+
+.. automodule:: ramble.schema.types
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.schema.variables module
+------------------------------
+
+.. automodule:: ramble.schema.variables
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 ramble.schema.workspace module
 ------------------------------
 
 .. automodule:: ramble.schema.workspace
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ramble.schema.zips module
+-------------------------
+
+.. automodule:: ramble.schema.zips
    :members:
    :undoc-members:
    :show-inheritance:
