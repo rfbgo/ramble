@@ -47,13 +47,16 @@ class SpackApplication(ApplicationBase):
     register_phase('make_experiments', pipeline='setup',
                    depends_on=['define_package_paths'])
 
+    def init_spack_runner(self):
+            self.spack_runner = ramble.spack_runner.SpackRunner()
+
     def __init__(self, file_path):
         super().__init__(file_path)
 
         self.keywords = ramble.keywords.keywords
 
-        self.spack_runner = ramble.spack_runner.SpackRunner()
         self.application_class = 'SpackApplication'
+        self.spack_runner = None
 
     def _long_print(self):
         out_str = super()._long_print()
@@ -96,6 +99,9 @@ class SpackApplication(ApplicationBase):
             workspace.add_to_cache(cache_tupl)
 
         try:
+            if not self.spack_runner:
+                self.init_spack_runner()
+
             self.spack_runner.set_compiler_config_dir(workspace.auxiliary_software_dir)
             self.spack_runner.set_dry_run(workspace.dry_run)
 
@@ -140,6 +146,8 @@ class SpackApplication(ApplicationBase):
         """
 
         logger.msg('Creating Spack environment')
+        if not self.spack_runner:
+            self.init_spack_runner()
 
         # See if we cached this already, and if so return
         env_path = self.expander.env_path
@@ -221,6 +229,8 @@ class SpackApplication(ApplicationBase):
         """
 
         logger.msg('Concretizing Spack environment')
+        if not self.spack_runner:
+            self.init_spack_runner()
 
         # See if we cached this already, and if so return
         env_path = self.expander.env_path
@@ -254,6 +264,9 @@ class SpackApplication(ApplicationBase):
         # See if we cached this already, and if so return
         env_path = self.expander.env_path
 
+        if not self.spack_runner:
+            self.init_spack_runner()
+
         cache_tupl = ('spack-install', env_path)
         if workspace.check_cache(cache_tupl):
             logger.debug('{} already in cache.'.format(cache_tupl))
@@ -277,6 +290,8 @@ class SpackApplication(ApplicationBase):
 
     def _evaluate_requirements(self, workspace):
         """Evaluate all requirements for this experiment"""
+        if not self.spack_runner:
+            self.init_spack_runner()
 
         for mod_inst in self._modifier_instances:
             for req in mod_inst.all_package_manager_requirements():
@@ -310,6 +325,9 @@ class SpackApplication(ApplicationBase):
         logger.msg('Defining Spack variables')
 
         try:
+            if not self.spack_runner:
+                self.init_spack_runner()
+
             self.spack_runner.set_dry_run(workspace.dry_run)
             self.spack_runner.set_env(self.expander.env_path)
 
@@ -333,6 +351,9 @@ class SpackApplication(ApplicationBase):
         import re
 
         logger.msg('Mirroring software')
+
+        if not self.spack_runner:
+            self.init_spack_runner()
 
         # See if we cached this already, and if so return
         env_path = self.expander.env_path
@@ -401,6 +422,9 @@ class SpackApplication(ApplicationBase):
             workspace.add_to_cache(cache_tupl)
 
         try:
+            if not self.spack_runner:
+                self.init_spack_runner()
+
             self.spack_runner.set_dry_run(workspace.dry_run)
             self.spack_runner.set_env(env_path)
             self.spack_runner.activate()
@@ -415,6 +439,10 @@ class SpackApplication(ApplicationBase):
         """Add software environment information to hash inventory"""
 
         env_path = self.expander.env_path
+
+        if not self.spack_runner:
+            self.init_spack_runner()
+
         self.spack_runner.set_dry_run(workspace.dry_run)
         self.spack_runner.set_env(env_path, require_exists=False)
         self.spack_runner.activate()
@@ -430,6 +458,9 @@ class SpackApplication(ApplicationBase):
 
     def _clean_hash_variables(self, workspace, variables):
         """Perform spack specific cleanup of variables before hashing"""
+
+        if not self.spack_runner:
+            self.init_spack_runner()
 
         self.spack_runner.configure_env(self.expander.expand_var_name(self.keywords.env_path))
         self.spack_runner.activate()
@@ -454,9 +485,15 @@ class SpackApplication(ApplicationBase):
     register_builtin('spack_deactivate', required=False)
 
     def spack_source(self):
+        if not self.spack_runner:
+            self.init_spack_runner()
+
         return self.spack_runner.generate_source_command()
 
     def spack_activate(self):
+        if not self.spack_runner:
+            self.init_spack_runner()
+
         self.spack_runner.configure_env(self.expander.expand_var_name(self.keywords.env_path))
         self.spack_runner.activate()
         cmds = self.spack_runner.generate_activate_command()
@@ -464,4 +501,7 @@ class SpackApplication(ApplicationBase):
         return cmds
 
     def spack_deactivate(self):
+        if not self.spack_runner:
+            self.init_spack_runner()
+
         return self.spack_runner.generate_deactivate_command()
