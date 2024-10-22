@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,12 +6,13 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-import six
 import shlex
 
 import ramble.error
 
-from ramble.schema.types import OUTPUT_CAPTURE
+from ramble.util.output_capture import OUTPUT_CAPTURE
+
+import ramble.util.colors
 
 import spack.util.executable
 from spack.util.path import system_path_filter
@@ -29,6 +30,7 @@ class PrefixedExecutable(spack.util.executable.Executable):
 
     def copy(self):
         from copy import deepcopy
+
         new_exec = deepcopy(self)
         new_exec.returncode = None
         return new_exec
@@ -54,7 +56,7 @@ def which(*args, **kwargs):
     return PrefixedExecutable(exe) if exe else None
 
 
-class CommandExecutable(object):
+class CommandExecutable:
     """CommandExecutable class
     This class is used to represent internal executables in Ramble.
 
@@ -62,8 +64,19 @@ class CommandExecutable(object):
     generally used to group one or more commands together into an executable
     name.
     """
-    def __init__(self, name, template, use_mpi=False, mpi=False, variables={},
-                 redirect='{log_file}', output_capture=OUTPUT_CAPTURE.DEFAULT, **kwargs):
+
+    def __init__(
+        self,
+        name,
+        template,
+        use_mpi=False,
+        mpi=False,
+        variables={},
+        redirect="{log_file}",
+        output_capture=OUTPUT_CAPTURE.DEFAULT,
+        run_in_background=False,
+        **kwargs,
+    ):
         """Create a CommandExecutable instance
 
         Args:
@@ -75,38 +88,50 @@ class CommandExecutable(object):
         - variables (dict): dictionary of variable definitions to use for this executable only
         - redirect: File to redirect output of template into
         - output_capture: Operator to use when capturing output
+        - run_in_background: If true, run the command in background
         """
 
-        if isinstance(template, six.string_types):
+        if isinstance(template, str):
             self.template = [template]
         elif isinstance(template, list):
             self.template = template.copy()
         else:
-            raise CommandExecutableError('Command executable is given an '
-                                         f'invalid template type of {type(template)}')
+            raise CommandExecutableError(
+                "Command executable is given an " f"invalid template type of {type(template)}"
+            )
 
         self.name = name
         self.mpi = use_mpi or mpi
         self.redirect = redirect
         self.output_capture = output_capture
+        self.run_in_background = run_in_background
         self.variables = variables.copy()
 
     def copy(self):
         """Replicate a CommandExecutable instance"""
-        new_inst = type(self)(self.name, self.template, mpi=self.mpi,
-                              redirect=self.redirect,
-                              variables=self.variables,
-                              output_capture=self.output_capture)
+        new_inst = type(self)(
+            self.name,
+            self.template,
+            mpi=self.mpi,
+            redirect=self.redirect,
+            variables=self.variables,
+            output_capture=self.output_capture,
+            run_in_background=self.run_in_background,
+        )
         return new_inst
 
     def __str__(self):
         """String representation of CommandExecutable instance"""
-        self_str = f'exec: {self.name}:\n' + \
-                   f'    template: {str(self.template)}\n' + \
-                   f'    mpi: {self.mpi}\n' +\
-                   f'    variables: {self.variables}\n' +\
-                   f'    redirect: {self.redirect}\n' +\
-                   f'    output_capture: {self.output_capture}\n'
+
+        color_name = ramble.util.colors.section_title(self.name)
+        attrs = ["mpi", "variables", "redirect", "output_capture", "run_in_background"]
+        self_str = f"{color_name}:\n"
+        self_str += f"    {ramble.util.colors.nested_1('template')}:\n"
+        for temp in self.template:
+            self_str += f"    - {temp}:\n"
+        for attr in attrs:
+            color_attr = ramble.util.colors.nested_1(attr)
+            self_str += f"    {color_attr}: {getattr(self, attr)}\n"
 
         return self_str
 

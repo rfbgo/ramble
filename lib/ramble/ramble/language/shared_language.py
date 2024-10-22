@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -10,6 +10,7 @@ import ramble.language.language_base
 import ramble.language.language_helpers
 import ramble.success_criteria
 from ramble.util.logger import logger
+from ramble.util.foms import FomType
 
 
 """This module contains directives directives that are shared between multiple object types
@@ -19,11 +20,11 @@ definition to modify the object, for example:
 
     .. code-block:: python
 
-      class Gromacs(SpackApplication):
+      class Gromacs(ExecutableApplication):
           # Required package directive
-          required_package('zlib')
+          required_package("zlib", package_manager="spack")
 
-In the above example, 'required_package' is a ramble directive
+In the above example, "required_package" is a ramble directive
 
 Directives defined in this module are used by multiple object types, which
 inherit from the SharedMeta class.
@@ -39,7 +40,7 @@ class SharedMeta(ramble.language.language_base.DirectiveMeta):
 shared_directive = SharedMeta.directive
 
 
-@shared_directive('archive_patterns')
+@shared_directive("archive_patterns")
 def archive_pattern(pattern):
     """Adds a file pattern to be archived in addition to figure of merit logs
 
@@ -57,7 +58,7 @@ def archive_pattern(pattern):
     return _execute_archive_pattern
 
 
-@shared_directive('figure_of_merit_contexts')
+@shared_directive("figure_of_merit_contexts")
 def figure_of_merit_context(name, regex, output_format):
     """Defines a context for figures of merit
 
@@ -72,17 +73,21 @@ def figure_of_merit_context(name, regex, output_format):
     """
 
     def _execute_figure_of_merit_context(obj):
-        obj.figure_of_merit_contexts[name] = {
-            'regex': regex,
-            'output_format': output_format
-        }
+        obj.figure_of_merit_contexts[name] = {"regex": regex, "output_format": output_format}
 
     return _execute_figure_of_merit_context
 
 
-@shared_directive('figures_of_merit')
-def figure_of_merit(name, fom_regex, group_name, log_file='{log_file}', units='',
-                    contexts=[]):
+@shared_directive("figures_of_merit")
+def figure_of_merit(
+    name,
+    fom_regex,
+    group_name,
+    log_file="{log_file}",
+    units="",
+    contexts=[],
+    fom_type: FomType = FomType.UNDEFINED,
+):
     """Adds a figure of merit to track for this object
 
     Defines a new figure of merit.
@@ -93,41 +98,52 @@ def figure_of_merit(name, fom_regex, group_name, log_file='{log_file}', units=''
       fom_regex: A regular expression using named groups to extract the FOM
       group_name: The name of the group that the FOM should be pulled from
       units: The units associated with the FOM
+      contexts: A list of contexts that the FOM is applicable to
+      fom_type: The type of figure of merit
     """
 
     def _execute_figure_of_merit(obj):
         obj.figures_of_merit[name] = {
-            'log_file': log_file,
-            'regex': fom_regex,
-            'group_name': group_name,
-            'units': units,
-            'contexts': contexts
+            "log_file": log_file,
+            "regex": fom_regex,
+            "group_name": group_name,
+            "units": units,
+            "contexts": contexts,
+            "fom_type": fom_type,
         }
 
     return _execute_figure_of_merit
 
 
-@shared_directive('default_compilers')
-def default_compiler(name, spack_spec, compiler_spec=None, compiler=None):
-    """Defines the default compiler that will be used with this object
+@shared_directive("compilers")
+def define_compiler(name, pkg_spec, compiler_spec=None, compiler=None, package_manager="*"):
+    """Defines the compiler that will be used with this object
 
     Adds a new compiler spec to this object. Software specs should
     reference a compiler that has been added.
+
+    Args:
+        name (str): Name of compiler package
+        pkg_spec (str): Package spec to install compiler
+        compiler_spec (str): Compiler spec (if different from pkg_spec)
+        compiler (str): Package name to use for compilation
+        package_manager (str): Glob supported pattern to match package managers
+                               this compiler applies to
     """
 
-    def _execute_default_compiler(obj):
-        if hasattr(obj, 'uses_spack') and getattr(obj, 'uses_spack'):
-            obj.default_compilers[name] = {
-                'spack_spec': spack_spec,
-                'compiler_spec': compiler_spec,
-                'compiler': compiler
-            }
+    def _execute_define_compiler(obj):
+        obj.compilers[name] = {
+            "pkg_spec": pkg_spec,
+            "compiler_spec": compiler_spec,
+            "compiler": compiler,
+            "package_manager": package_manager,
+        }
 
-    return _execute_default_compiler
+    return _execute_define_compiler
 
 
-@shared_directive('software_specs')
-def software_spec(name, spack_spec, compiler_spec=None, compiler=None):
+@shared_directive("software_specs")
+def software_spec(name, pkg_spec, compiler_spec=None, compiler=None, package_manager="*"):
     """Defines a new software spec needed for this object.
 
     Adds a new software spec (for spack to use) that this object
@@ -138,51 +154,81 @@ def software_spec(name, spack_spec, compiler_spec=None, compiler=None):
     Specs can be described as an mpi spec, which means they
     will depend on the MPI library within the resulting spack
     environment.
+
+    Args:
+        name (str): Name of package
+        pkg_spec (str): Package spec to install package
+        compiler_spec (str): Spec to use if this package will be used as a
+                             compiler for another package
+        compiler (str): Package name to use as compiler for compiling this package
+        package_manager (str): Glob supported pattern to match package managers
+                               this package applies to
     """
 
     def _execute_software_spec(obj):
-        if hasattr(obj, 'uses_spack') and getattr(obj, 'uses_spack'):
-
-            # Define the spec
-            obj.software_specs[name] = {
-                'spack_spec': spack_spec,
-                'compiler_spec': compiler_spec,
-                'compiler': compiler
-            }
+        # Define the spec
+        obj.software_specs[name] = {
+            "pkg_spec": pkg_spec,
+            "compiler_spec": compiler_spec,
+            "compiler": compiler,
+            "package_manager": package_manager,
+        }
 
     return _execute_software_spec
 
 
-@shared_directive('package_manager_configs')
-def package_manager_config(name, config, **kwargs):
+@shared_directive("package_manager_configs")
+def package_manager_config(name, config, package_manager="*", **kwargs):
     """Defines a config option to set within a package manager
 
     Define a new config which will be passed to a package manager. The
     resulting experiment instance will pass the config to the package manager,
     which will control the logic of applying it.
+
+    Args:
+        name (str): Name of this configuration
+        config (str): Configuration option to set
+        package_manager (str): Name of the package manager this config should be used with
     """
 
     def _execute_package_manager_config(obj):
-        obj.package_manager_configs[name] = config
+        obj.package_manager_configs[name] = {
+            "config": config,
+            "package_manager": package_manager,
+        }
 
     return _execute_package_manager_config
 
 
-@shared_directive('required_packages')
-def required_package(name):
+@shared_directive("required_packages")
+def required_package(name, package_manager="*"):
     """Defines a new spack package that is required for this object
     to function properly.
+
+    Args:
+        name (str): Name of required package
+        package_manager (str): Glob package manager name to apply this required package to
     """
 
     def _execute_required_package(obj):
-        obj.required_packages[name] = True
+        obj.required_packages[name] = {
+            "package_manager": package_manager,
+        }
 
     return _execute_required_package
 
 
-@shared_directive('success_criteria')
-def success_criteria(name, mode, match=None, file='{log_file}',
-                     fom_name=None, fom_context='null', formula=None):
+@shared_directive("success_criteria")
+def success_criteria(
+    name,
+    mode,
+    match=None,
+    file="{log_file}",
+    fom_name=None,
+    fom_context="null",
+    formula=None,
+    anti_match=None,
+):
     """Defines a success criteria used by experiments of this object
 
     Adds a new success criteria to this object definition.
@@ -202,27 +248,30 @@ def success_criteria(name, mode, match=None, file='{log_file}',
                    in. Accepts globbing.
       formula: For mode='fom_comparison'. Formula to use to evaluate success.
                '{value}' keyword is set as the value of the FOM.
+      anti_match: For mode='string'. Value to check indicate failure.
+                  This setting and `match` are mutually exclusive.
     """
 
     def _execute_success_criteria(obj):
         valid_modes = ramble.success_criteria.SuccessCriteria._valid_modes
         if mode not in valid_modes:
-            logger.die(f'Mode {mode} is not valid. Valid values are {valid_modes}')
+            logger.die(f"Mode {mode} is not valid. Valid values are {valid_modes}")
 
         obj.success_criteria[name] = {
-            'mode': mode,
-            'match': match,
-            'file': file,
-            'fom_name': fom_name,
-            'fom_context': fom_context,
-            'formula': formula
+            "mode": mode,
+            "match": match,
+            "anti_match": anti_match,
+            "file": file,
+            "fom_name": fom_name,
+            "fom_context": fom_context,
+            "formula": formula,
         }
 
     return _execute_success_criteria
 
 
-@shared_directive('builtins')
-def register_builtin(name, required=True, injection_method='prepend'):
+@shared_directive("builtins")
+def register_builtin(name, required=True, injection_method="prepend", depends_on=[]):
     """Register a builtin
 
     Builtins are methods that return lists of strings. These methods represent
@@ -236,7 +285,10 @@ def register_builtin(name, required=True, injection_method='prepend'):
     `modifier_builtin::modifier_name::method_name`.
 
     Application modifiers are named:
-    `builtin::method_name`
+    `builtin::method_name`.
+
+    Package manager builtins are named:
+    `package_manager_builtin::package_manager_name::method_name`.
 
     As an example, if the following builtin was defined:
 
@@ -263,22 +315,99 @@ def register_builtin(name, required=True, injection_method='prepend'):
     - 'prepend' -- This builtin will be injected at the beginning of the executable list
     - 'append' -- This builtin will be injected at the end of the executable list
     """
-    supported_injection_methods = ['prepend', 'append']
+    supported_injection_methods = ["prepend", "append"]
 
     def _store_builtin(obj):
         if injection_method not in supported_injection_methods:
             raise ramble.language.language_base.DirectiveError(
-                f'Object {obj.name} has an invalid '
-                f'injection method of {injection_method}.\n'
-                f'Valid methods are {str(supported_injection_methods)}'
+                f"Object {obj.name} defines builtin {name} with an invalid "
+                f"injection method of {injection_method}.\n"
+                f"Valid methods are {str(supported_injection_methods)}"
             )
 
         builtin_name = obj._builtin_name.format(obj_name=obj.name, name=name)
 
-        obj.builtins[builtin_name] = {'name': name,
-                                      'required': required,
-                                      'injection_method': injection_method}
+        obj.builtins[builtin_name] = {
+            "name": name,
+            "required": required,
+            "injection_method": injection_method,
+            "depends_on": depends_on.copy(),
+        }
+
     return _store_builtin
+
+
+@shared_directive("phase_definitions")
+def register_phase(name, pipeline=None, run_before=[], run_after=[]):
+    """Register a phase
+
+    Phases are portions of a pipeline that will execute when
+    executing a full pipeline.
+
+    Registering a phase allows an object to know what the phases
+    dependencies are, to ensure the execution order is correct.
+
+    If called multiple times, the dependencies are combined together. Only one
+    instance of a phase will show up in the resulting dependency list for a phase.
+
+    Args:
+    - name: The name of the phase. Phases are functions named '_<phase>'.
+    - pipeline: The name of the pipeline this phase should be registered into.
+    - run_before: A list of phase names this phase should run before
+    - run_after: A list of phase names this phase should run after
+    """
+
+    def _execute_register_phase(obj):
+        import ramble.util.graph
+
+        if pipeline not in obj._pipelines:
+            raise ramble.language.language_base.DirectiveError(
+                "Directive register_phase was "
+                f'given an invalid pipeline "{pipeline}"\n'
+                "Available pipelines are: "
+                f" {obj._pipelines}"
+            )
+
+        if not isinstance(run_before, list):
+            raise ramble.language.language_base.DirectiveError(
+                "Directive register_phase was "
+                "given an invalid type for "
+                "the run_before attribute in object "
+                f"{obj.name}"
+            )
+
+        if not isinstance(run_after, list):
+            raise ramble.language.language_base.DirectiveError(
+                "Directive register_phase was "
+                "given an invalid type for "
+                "the run_after attribute in object "
+                f"{obj.name}"
+            )
+
+        if not hasattr(obj, f"_{name}"):
+            raise ramble.language.language_base.DirectiveError(
+                "Directive register_phase was "
+                f"given an undefined phase {name} "
+                f"in object {obj.name}"
+            )
+
+        if pipeline not in obj.phase_definitions:
+            obj.phase_definitions[pipeline] = {}
+
+        if name in obj.phase_definitions[pipeline]:
+            phase_node = obj.phase_definitions[pipeline][name]
+        else:
+            phase_node = ramble.util.graph.GraphNode(name)
+
+        for before in run_before:
+            phase_node.order_before(before)
+
+        for after in run_after:
+            phase_node.order_after(after)
+
+        obj.phase_definitions[pipeline][name] = phase_node
+
+    return _execute_register_phase
 
 
 @shared_directive(dicts=())
@@ -311,3 +440,21 @@ def tags(*values: str):
         obj.tags = list(sorted(set(tags_from_base + list(values))))
 
     return _execute_tag
+
+
+@shared_directive(dicts=())
+def target_shells(shell_support_pattern=None):
+    """Directive to specify supported shells.
+
+    If not specified, i.e., not directly specified or inherited from the base,
+    then it assumes all shells are supported.
+
+    Args:
+        shell_support_pattern: The glob pattern that is used to match with the configured shell
+    """
+
+    def _execute_target_shells(obj):
+        if shell_support_pattern is not None:
+            obj.shell_support_pattern = shell_support_pattern
+
+    return _execute_target_shells

@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -17,14 +17,14 @@ import ramble.schema.licenses
 
 #: Properties for inclusion in other schemas
 properties = {
-    'env_vars': ramble.schema.licenses.env_var_actions,
+    "env_vars": ramble.schema.licenses.env_var_actions,
 }
 
 #: Full schema with metadata
 schema = {
-    '$schema': 'http://json-schema.org/schema#',
-    'title': 'Ramble environment variable configuration file schema',
-    'type': 'object',
-    'additionalProperties': False,
-    'properties': properties
+    "$schema": "http://json-schema.org/schema#",
+    "title": "Ramble environment variable configuration file schema",
+    "type": "object",
+    "additionalProperties": False,
+    "properties": properties,
 }

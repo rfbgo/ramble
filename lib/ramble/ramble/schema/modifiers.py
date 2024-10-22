@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -12,35 +12,31 @@
    :lines: 12-
 """  # noqa E501
 
-section_name = 'modifiers'
+section_name = "modifiers"
 
 #: Properties for inclusion in other schemas
 properties = {
     section_name: {
-        'type': 'array',
-        'default': [],
-        'items': {
-            'type': 'object',
-            'default': {},
-            'properties': {
-                'name': {'type': 'string'},
-                'mode': {'type': 'string'},
-                'on_executable': {
-                    'type': 'array',
-                    'default': [],
-                    'items': {'type': 'string'}
-                }
+        "type": "array",
+        "default": [],
+        "items": {
+            "type": "object",
+            "default": {},
+            "properties": {
+                "name": {"type": "string"},
+                "mode": {"type": "string"},
+                "on_executable": {"type": "array", "default": [], "items": {"type": "string"}},
             },
-            'additionalProperties': False
-        }
+            "additionalProperties": False,
+        },
     }
 }
 
 #: Full schema with metadata
 schema = {
-    '$schema': 'http://json-schema.org/schema#',
-    'title': 'Ramble application configuration file schema',
-    'type': 'object',
-    'additionalProperties': False,
-    'properties': properties
+    "$schema": "http://json-schema.org/schema#",
+    "title": "Ramble application configuration file schema",
+    "type": "object",
+    "additionalProperties": False,
+    "properties": properties,
 }

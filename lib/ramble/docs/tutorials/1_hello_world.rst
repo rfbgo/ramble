@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -21,7 +21,7 @@ Installation
 
 To install Ramble, see the :doc:`../getting_started` guide.
 
-**NOTE**: This tutorial does not require ``spack`` to be installed or configured.
+**NOTE**: This tutorial does not require a package manager to be installed or configured.
 
 Ramble Basics
 =============
@@ -48,6 +48,7 @@ filter available application definitions. For example:
 
 might output the following:
 
+.. rst-class:: hide-copy
 .. code-block:: console
 
     ==> 10 applications
@@ -57,14 +58,19 @@ The ``ramble list`` command also accepts regular expressions. For example:
 
 .. code-block:: console
 
-    $ ramble list h*
+    $ ramble list "h*"
 
 might output the following:
 
+.. rst-class:: hide-copy
 .. code-block:: console
 
     ==> 5 applications
     hmmer  hostname  hpcc  hpcg  hpl
+
+**NOTE**: The quotes around ``h*`` in the previous command avoid a potential
+issue where your shell matches files that begin with the later ``h``, can
+ramble prints no applications.
 
 Additionally, applications can be filtered by their tags, e.g.
 
@@ -134,6 +140,13 @@ Ramble would create an anonymous workspace for you in ``${PWD}/hello_world``
 for more information on named and anonymous workspaces, see
 :ref:`Ramble workspace documentation<ramble-workspaces>`.
 
+For convenience, the workspace creation and activation can also be combined
+in one command with the activate flag (``-a``):
+
+.. code-block:: console
+
+    $ ramble workspace create hello_world -a
+
 Configure the Workspace
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -158,27 +171,10 @@ To begin, you should edit the ``ramble.yaml`` file to set up the configuration
 for your experiments. For this tutorial, replace the default yaml text with the
 following contents:
 
-.. code-block:: yaml
+.. literalinclude:: ../../../../examples/tutorial_1_config.yaml
+   :language: YAML
 
-    ramble:
-      variables:
-        processes_per_node: 1
-        mpi_command: ''
-        batch_submit: '{execute_experiment}'
-      applications:
-        hostname: # Application name, from `ramble list`
-          workloads:
-            local: # Workload name from application, in `ramble info <app>`
-              experiments:
-                test: # Arbitrary experiment name
-                  variables:
-                    n_ranks: '1'
-      spack:
-        concretized: true
-        packages: {}
-        environments: {}
-
-Note that since the ``hostname`` application does not rely on spack, the spack
+Note that since the ``hostname`` application does not rely on a package manager, the software
 dictionary has empty ``packages`` and ``environments`` dictionaries.
 
 The second file you should edit is the ``execute_experiment.tpl`` template file.
@@ -197,7 +193,7 @@ in the active workspace using:
     $ ramble workspace setup
 
 This command will create experiment directories, download and expand input files,
-and install the required software stack (and generate spack environments for
+and install the required software stack (and generate software environments for
 each workload).
 
 It can take a bit to run depending on if you need to build new software and how

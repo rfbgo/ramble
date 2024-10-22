@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -34,8 +34,9 @@ def define_directive_methods(obj_inst):
 
     The '_language_classes' attribute is defined in ApplicationBase and ModifierBase.
     """
-    if not hasattr(obj_inst, "_directive_classes") or \
-            not hasattr(obj_inst, "_directive_functions"):
+    if not hasattr(obj_inst, "_directive_classes") or not hasattr(
+        obj_inst, "_directive_functions"
+    ):
         return
 
     for directive, directive_class in obj_inst._directive_classes.items():
@@ -55,6 +56,8 @@ def wrap_named_directive(obj_inst, name):
     Create a wrapper method that executes a directive, to inject the
     `(self)` argument to simplify use of directives as class methods
     """
+
     def _execute_directive(*args, directive_name=name, **kwargs):
         obj_inst._directive_functions[directive_name](*args, **kwargs)(obj_inst)
+
     return _execute_directive

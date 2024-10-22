@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -13,7 +13,7 @@ steps:
       - fetch
       - '--unshallow'
     id: ramble-clone
-  - name: us-central1-docker.pkg.dev/$PROJECT_ID/ramble-repo/ramble-centos7:latest
+  - name: us-central1-docker.pkg.dev/$PROJECT_ID/ramble-repo/ramble-${_BASE_IMG}-${_BASE_VER}-spack${_SPACK_REF}-python${_PYTHON_VER}:latest
     args:
       - '-c'
       - |
@@ -21,15 +21,23 @@ steps:
 
         git branch develop origin/develop
 
-        export PATH=$$(. /opt/spack/share/spack/setup-env.sh && spack location -i miniconda3)/bin:$${PATH}
-
         . /opt/spack/share/spack/setup-env.sh
+
+        spack load py-pip ^python
+
+        pip install -r /workspace/requirements-dev.txt
+
+        export SPACK_PYTHON=`which python3`
+
         . /workspace/share/ramble/setup-env.sh
 
-        ramble flake8 -U
+        echo "Spack version is $(spack --version)"
+        echo "Python version is $(python3 --version)"
+
+        ramble style -U
         # $$ characters are required for cloud-build:
         # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values
-        flake_err=$$?
+        style_err=$$?
 
         ramble commands --update-completion
         git diff --exit-code &> /dev/null
@@ -37,13 +45,17 @@ steps:
         # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values
         commands_err=$$?
 
+        # Enforce up-to-date python syntax
+        pre-commit run pyupgrade --all-files --verbose
+        pyupgrade_err=$$?
+
         ramble license verify
         # $$ characters are required for cloud-build:
         # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values
         license_err=$$?
 
         # Test removing a dependency
-        conda uninstall -qy pytest
+        pip uninstall -y pytest
 
         ramble help
         # $$ characters are required for cloud-build:
@@ -58,9 +70,9 @@ steps:
 
         # $$ characters are required for cloud-build:
         # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values
-        if [ $$flake_err -gt 0 ]; then
-          echo "Flake error = $$flake_err"
-          echo " ***** Flake8 tests failed"
+        if [ $$style_err -gt 0 ]; then
+          echo "Style error = $$style_err"
+          echo " ***** Style tests failed"
           error=1
         fi
 
@@ -82,12 +94,22 @@ steps:
           error=1
         fi
 
+        if [ $$pyupgrade_err -gt 0 ]; then
+          echo "pyupgrade check error = $$pyupgrade_err"
+          echo " ***** pyupgrade check failed"
+          error=1
+        fi
+
         # $$ characters are required for cloud-build:
         # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values
         exit $$error
     id: ramble-style-tests
     entrypoint: /bin/bash
-
+substitutions:
+  _SPACK_REF: v0.21.2
+  _PYTHON_VER: 3.11.6
+  _BASE_IMG: centos
+  _BASE_VER: '7'
 timeout: 600s
 options:
   machineType: N1_HIGHCPU_8

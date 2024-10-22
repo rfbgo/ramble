@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -21,15 +21,16 @@ from ramble.test.dry_run_helpers import search_files_for_string
 
 
 # everything here uses the mock_workspace_path
-pytestmark = pytest.mark.usefixtures('mutable_config',
-                                     'mutable_mock_workspace_path')
+pytestmark = pytest.mark.usefixtures("mutable_config", "mutable_mock_workspace_path")
 
-workspace = RambleCommand('workspace')
+workspace = RambleCommand("workspace")
 
 
 def test_nested_compilers_are_installed(mutable_config, mutable_mock_workspace_path, capsys):
     test_config = """
 ramble:
+  variants:
+    package_manager: spack
   variables:
     mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
     batch_submit: 'batch_submit {execute_experiment}'
@@ -44,22 +45,21 @@ ramble:
             test{n_nodes}_{env_name}:
               variables:
                 n_nodes: '1'
-  spack:
-    concretized: true
+  software:
     packages:
       gcc8:
-        spack_spec: gcc@8.5.0
+        pkg_spec: gcc@8.5.0
       gcc9:
-        spack_spec: gcc@9.3.0
+        pkg_spec: gcc@9.3.0
         compiler: gcc8
       gcc10:
-        spack_spec: gcc@10.1.0
+        pkg_spec: gcc@10.1.0
         compiler: gcc9
       intel:
-        spack_spec: intel-mpi@2018.4.274
+        pkg_spec: intel-mpi@2018.4.274
         compiler: gcc10
       wrf:
-        spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem ~pnetcdf
+        pkg_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem ~pnetcdf
         compiler: gcc10
     environments:
       wrfv4:
@@ -72,13 +72,13 @@ ramble:
     setup_cls = ramble.pipeline.pipeline_class(setup_type)
     filters = ramble.filters.Filters()
 
-    workspace_name = 'test_nested_compilers_are_installed'
+    workspace_name = "test_nested_compilers_are_installed"
     with ramble.workspace.create(workspace_name) as ws:
         ws.write()
 
         config_path = os.path.join(ws.config_dir, ramble.workspace.config_file_name)
 
-        with open(config_path, 'w+') as f:
+        with open(config_path, "w+") as f:
             f.write(test_config)
 
         ws.dry_run = True
@@ -91,7 +91,7 @@ ramble:
         gcc9_str = "gcc@9.3.0"
         gcc10_str = "gcc@10.1.0"
 
-        out_files = glob.glob(os.path.join(ws.log_dir, '**', '*.out'), recursive=True)
+        out_files = glob.glob(os.path.join(ws.log_dir, "**", "*.out"), recursive=True)
 
         assert search_files_for_string(out_files, gcc8_str) is True
         assert search_files_for_string(out_files, gcc9_str) is True

@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -17,10 +17,9 @@ from ramble.main import RambleCommand
 
 
 # everything here uses the mock_workspace_path
-pytestmark = pytest.mark.usefixtures('mutable_config',
-                                     'mutable_mock_workspace_path')
+pytestmark = pytest.mark.usefixtures("mutable_config", "mutable_mock_workspace_path")
 
-workspace = RambleCommand('workspace')
+workspace = RambleCommand("workspace")
 
 
 def test_custom_executables(mutable_config, mutable_mock_workspace_path, mock_applications):
@@ -46,6 +45,7 @@ ramble:
                     use_mpi: false
                     redirect: '{log_file}'
                     output_capture: '>>'
+                    run_in_background: true
                   before_all:
                     template:
                     - 'echo "before all"'
@@ -66,8 +66,8 @@ ramble:
                 - baz
                 executable_injection:
                 - name: before_all
-                  order: before
                 - name: after_all
+                  order: after
                 - name: before_env_vars
                   order: before
                   relative_to: builtin::env_vars
@@ -81,31 +81,31 @@ ramble:
                 set:
                   MY_VAR: 'TEST'
                   OTHER_ENV_VAR: 'ANOTHER_TEST'
-  spack:
-    concretized: true
+  software:
     packages: {}
     environments: {}
 """
-    workspace_name = 'test_custom_executables'
+    workspace_name = "test_custom_executables"
     with ramble.workspace.create(workspace_name) as ws:
         ws.write()
 
         config_path = os.path.join(ws.config_dir, ramble.workspace.config_file_name)
 
-        with open(config_path, 'w+') as f:
+        with open(config_path, "w+") as f:
             f.write(test_config)
         ws._re_read()
 
-        workspace('setup', '--dry-run', global_args=['-w', workspace_name])
+        workspace("setup", "--dry-run", global_args=["-w", workspace_name])
 
         experiment_root = ws.experiment_dir
-        exp_dir = os.path.join(experiment_root, 'interleved-env-vars', 'test_wl3', 'simple_test')
-        exp_script = os.path.join(exp_dir, 'execute_experiment')
+        exp_dir = os.path.join(experiment_root, "interleved-env-vars", "test_wl3", "simple_test")
+        exp_script = os.path.join(exp_dir, "execute_experiment")
 
         import re
-        custom_regex = re.compile('lscpu >>')
-        export_regex = re.compile(r'export MY_VAR=TEST')
-        cmd_regex = re.compile('foo >>')
+
+        custom_regex = re.compile(r"^lscpu >> .* &$")
+        export_regex = re.compile(r"export MY_VAR=TEST")
+        cmd_regex = re.compile("foo >>")
 
         inject_order_regex = [
             re.compile('echo "before all"'),
@@ -115,7 +115,7 @@ ramble:
         ]
 
         # Assert command order is: lscpu -> export -> foo
-        with open(exp_script, 'r') as f:
+        with open(exp_script) as f:
             custom_found = False
             cmd_found = False
             export_found = False

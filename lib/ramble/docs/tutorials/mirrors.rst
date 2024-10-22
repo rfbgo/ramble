@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -46,6 +46,8 @@ Write the following configuration into the file, save, and exit:
 .. code-block:: yaml
 
     ramble:
+      variants:
+        package_manager: spack
       env_vars:
         set:
           OMP_NUM_THREADS: '{n_threads}'
@@ -64,17 +66,18 @@ Write the following configuration into the file, save, and exit:
                   variables:
                     n_nodes: 1
                     processes_per_node: 30
-      spack:
-        concretized: false
+      software:
         packages: {}
         environments: {}
 
-Run ``ramble workspace concretize`` to fill in the spack section. The result
+Run ``ramble workspace concretize`` to fill in the software section. The result
 will look something like this:
 
 .. code-block:: yaml
 
     ramble:
+      variants:
+        package_manager: spack
       env_vars:
         set:
           OMP_NUM_THREADS: '{n_threads}'
@@ -93,16 +96,15 @@ will look something like this:
                   variables:
                     n_nodes: 1
                     processes_per_node: 30
-      spack:
-        concretized: true
+      software:
         packages:
           gcc9:
-            spack_spec: gcc@9.3.0
+            pkg_spec: gcc@9.3.0
           intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
+            pkg_spec: intel-oneapi-mpi@2021.11.0
             compiler: gcc9
           wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
+            pkg_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
               ~pnetcdf
             compiler: gcc9
         environments:
@@ -126,9 +128,9 @@ this mirror in the first place.
     $ ramble workspace mirror -d $HOME/wrfv4_mirror
 
     ==>     Executing phase mirror_inputs
-    ==>     Executing phase create_spack_env
-    ==> Concretized intel-mpi@2018.4.274%gcc@<gcc-version>
-     -   <hash>   intel-mpi@2018.4.274%gcc@<version>_etc.
+    ==>     Executing phase software_create_env
+    ==> Concretized intel-oneapi-mpi@2021.11.0%gcc@<gcc-version>
+     -   <hash>   intel-oneapi-mpi@2021.11.0%gcc@<version>_etc.
      -   <etc>        ^(short list of software prerequisistes for intel-mpi)
 
     ==> Concretized wrf@4.2%gcc@<version> <wrf options>
@@ -136,15 +138,15 @@ this mirror in the first place.
 
     ==>     Executing phase mirror_software
     ==>     Executing phase mirror_inputs
-    ==>     Executing phase create_spack_env
+    ==>     Executing phase software_create_env
     ==> Created environment in <workspace_dirs path>/wrfv4_mirror_test/software/wrfv4.CONUS_12km
     ==> You can activate this environment with:
     ==>   spack env activate <workspace_dirs path>/wrfv4_mirror_test/software/wrfv4.CONUS_12km
     ==> Concretized wrf@4.2%gcc@<version> <wrf options>
      -   (long list of software prerequisites for wrf@4.2)
 
-    ==> Concretized intel-mpi@2018.4.274%gcc@<gcc-version>
-     -   <hash>   intel-mpi@2018.4.274%gcc@<version>_etc.
+    ==> Concretized intel-oneapi-mpi@2021.11.0%gcc@<gcc-version>
+     -   <hash>   intel-oneapi-mpi@2021.11.0%gcc@<version>_etc.
      -   <etc>        ^(short list of software prerequisistes for intel-mpi)
 
     ==>     Executing phase mirror_software
@@ -516,9 +518,14 @@ For example, using the  mirror directories we created above,
 
 .. code-block:: console
 
-    $ ramble mirror add --scope=[site,user] $HOME/wrfv4_mirror/inputs
+    $ ramble mirror add --scope=site ramble_mirror $HOME/wrfv4_mirror/inputs
 
-    $ spack mirror add $HOME/wrfv4_mirror/software
+    $ spack mirror add spack_mirror $HOME/wrfv4_mirror/software
+
+**NOTE**: The ``--scope`` argument controls at what level Ramble is configured to use this mirror. The default scope
+is ``user`` which places the config within the ``~/.ramble`` directory, and it only applies to the user that executed
+this comment. Using ``--scope=site`` applies the config to the installation directory for Ramble, and all users that
+use this same installation would have the config option applied to them.
 
 To validate that the mirrors were installed correctly, try something like the following,
 

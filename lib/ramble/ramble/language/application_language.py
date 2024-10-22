@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,22 +6,23 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
+import os
+import ramble.workload
 import ramble.language.language_base
 from ramble.language.language_base import DirectiveError
 import ramble.language.shared_language
-from ramble.schema.types import OUTPUT_CAPTURE
 import ramble.language.language_helpers
 import ramble.success_criteria
 
 
-"""This package contains directives that can be used within a package.
+"""This package contains directives that can be used within an application.
 
-Directives are functions that can be called inside a package
-definition to modify the package, for example:
+Directives are functions that can be called inside an application
+definition to modify then application, for example:
 
     .. code-block:: python
 
-      class Gromacs(SpackApplication):
+      class Gromacs(ExecutableApplication):
           # Workload directive:
           workload('water_bare', executables=['pre-process', 'execute-gen'],
                input='water_bare_hbonds')
@@ -52,9 +53,10 @@ class ApplicationMeta(ramble.language.shared_language.SharedMeta):
 application_directive = ApplicationMeta.directive
 
 
-@application_directive('workloads')
-def workload(name, executables=None, executable=None, input=None,
-             inputs=None, tags=None, **kwargs):
+@application_directive("workloads")
+def workload(
+    name, executables=None, executable=None, input=None, inputs=None, tags=None, **kwargs
+):
     """Adds a workload to this application
 
     Defines a new workload that can be used within the context of
@@ -70,33 +72,48 @@ def workload(name, executables=None, executable=None, input=None,
     """
 
     def _execute_workload(app):
-        app.workloads[name] = {
-            'executables': [],
-            'inputs': [],
-            'tags': [],
-        }
+        all_execs = ramble.language.language_helpers.require_definition(
+            executable, executables, app.executables, "executable", "executables", "workload"
+        )
 
-        all_execs = ramble.language.language_helpers.require_definition(executable,
-                                                                        executables,
-                                                                        'executable',
-                                                                        'executables',
-                                                                        'workload')
+        all_inputs = ramble.language.language_helpers.merge_definitions(
+            input, inputs, app.inputs, "input", "inputs", "workload"
+        )
 
-        app.workloads[name]['executables'] = all_execs.copy()
-
-        all_inputs = ramble.language.language_helpers.merge_definitions(input, inputs)
-
-        app.workloads[name]['inputs'] = all_inputs.copy()
-
-        if tags:
-            app.workloads[name]['tags'] = tags.copy()
+        app.workloads[name] = ramble.workload.Workload(name, all_execs, all_inputs, tags)
 
     return _execute_workload
 
 
-@application_directive('executables')
-def executable(name, template, use_mpi=False, variables={}, redirect='{log_file}',
-               output_capture=OUTPUT_CAPTURE.DEFAULT, **kwargs):
+@application_directive("workload_groups")
+def workload_group(name, workloads=[], mode=None, **kwargs):
+    """Adds a workload group to this application
+
+    Defines a new workload group that can be used within the context of its
+    application.
+
+    Args:
+        name: The name of the group
+        workloads: A list of workloads to be grouped
+    """
+
+    def _execute_workload_groups(app):
+        if mode == "append":
+            app.workload_groups[name].update(set(workloads))
+        else:
+            app.workload_groups[name] = set(workloads)
+
+        # Apply any existing variables in the group to the workload
+        for workload in workloads:
+            if name in app.workload_group_vars:
+                for var in app.workload_group_vars[name]:
+                    app.workloads[workload].add_variable(var)
+
+    return _execute_workload_groups
+
+
+@application_directive("executables")
+def executable(name, template, **kwargs):
     """Adds an executable to this application
 
     Defines a new executable that can be used to configure workloads and
@@ -104,31 +121,42 @@ def executable(name, template, use_mpi=False, variables={}, redirect='{log_file}
 
     Executables may or may not use MPI.
 
-    Args:
-        template: The template command this executable should generate from
-        use_mpi: (Boolean) determines if this executable should be
-                 wrapped with an `mpirun` like command or not.
+    Required Args:
+        name (str): Name of the executable
+        template (list[str] or str): The template command this executable should generate from
+
+    Optional Args:
+        use_mpi or mpi: (Boolean) determines if this executable should be
+                        wrapped with an `mpirun` like command or not.
 
         variables (dict): dictionary of variable definitions to use for this executable only
         redirect (Optional): Sets the path for outputs to be written to.
                              defaults to {log_file}
         output_capture (Optional): Declare which ouptu (stdout, stderr, both) to
                                    capture. Defaults to stdout
-
+        run_in_background (Optional): Declare if the command should run in the background.
+                                      Defaults to False
     """
 
     def _execute_executable(app):
         from ramble.util.executable import CommandExecutable
-        app.executables[name] = CommandExecutable(
-            name=name, template=template, use_mpi=use_mpi, redirect=redirect,
-            output_capture=output_capture)
+
+        app.executables[name] = CommandExecutable(name=name, template=template, **kwargs)
 
     return _execute_executable
 
 
-@application_directive('inputs')
-def input_file(name, url, description, target_dir='{input_name}', sha256=None, extension=None,
-               expand=True, **kwargs):
+@application_directive("inputs")
+def input_file(
+    name,
+    url,
+    description,
+    target_dir=os.path.join("{workload_input_dir}", "{input_name}"),
+    sha256=None,
+    extension=None,
+    expand=True,
+    **kwargs,
+):
     """Adds an input file definition to this application
 
     Defines a new input file.
@@ -139,7 +167,8 @@ def input_file(name, url, description, target_dir='{input_name}', sha256=None, e
         url: Path to the input file / archive
         description: Description of this input file
         target_dir (Optional): The directory where the archive will be
-                               expanded. Defaults to 'input'
+                               expanded. Defaults to the '{workload_input_dir}'
+                               + os.sep + '{input_name}'
         sha256 (Optional): The expected sha256 checksum for the input file
         extension (Optional): The extension to use for the input, if it isn't part of the
                               file name.
@@ -148,20 +177,30 @@ def input_file(name, url, description, target_dir='{input_name}', sha256=None, e
 
     def _execute_input_file(app):
         app.inputs[name] = {
-            'url': url,
-            'description': description,
-            'target_dir': target_dir,
-            'sha256': sha256,
-            'extension': extension,
-            'expand': expand
+            "url": url,
+            "description": description,
+            "target_dir": target_dir,
+            "sha256": sha256,
+            "extension": extension,
+            "expand": expand,
         }
 
     return _execute_input_file
 
 
-@application_directive('workload_variables')
-def workload_variable(name, default, description, values=None, workload=None,
-                      workloads=None, expandable=True, **kwargs):
+@application_directive("workload_group_vars")
+def workload_variable(
+    name,
+    default,
+    description,
+    values=None,
+    workload=None,
+    workloads=None,
+    workload_group=None,
+    expandable: bool = True,
+    track_used: bool = True,
+    **kwargs,
+):
     """Define a new variable to be used in experiments
 
     Defines a new variable that can be defined within the
@@ -169,60 +208,82 @@ def workload_variable(name, default, description, values=None, workload=None,
     an experiment.
 
     These are specific to each workload.
+
+    Args:
+        name (str): Name of variable to define
+        default: Default value of variable definition
+        description (str): Description of variable's purpose
+        values (list): Optional list of suggested values for this variable
+        workload (str): Single workload this variable is used in
+        workloads (list): List of modes this variable is used in
+        workload_group (str): Name of workload group this variable is used in
+        expandable (bool): True if the variable should be expanded, False if not.
+        track_used (bool): True if the variable should be tracked as used,
+                           False if not. Can help with allowing lists without vecotizing
+                           experiments.
     """
 
     def _execute_workload_variable(app):
-        all_workloads = ramble.language.language_helpers.require_definition(workload,
-                                                                            workloads,
-                                                                            'workload',
-                                                                            'workloads',
-                                                                            'workload_variable')
+        # Always apply passes workload/workloads
+        all_workloads = ramble.language.language_helpers.merge_definitions(
+            workload, workloads, app.workloads, "workload", "workloads", "workload_variable"
+        )
+
+        workload_var = ramble.workload.WorkloadVariable(
+            name,
+            default=default,
+            description=description,
+            values=values,
+            expandable=expandable,
+            **kwargs,
+        )
 
         for wl_name in all_workloads:
-            if wl_name not in app.workload_variables:
-                app.workload_variables[wl_name] = {}
+            app.workloads[wl_name].add_variable(workload_var.copy())
 
-            app.workload_variables[wl_name][name] = {
-                'default': default,
-                'description': description,
-                'expandable': expandable
-            }
-            if values:
-                app.workload_variables[wl_name][name]['values'] = values
+        if workload_group is not None:
+            workload_group_list = app.workload_groups[workload_group]
+
+            if workload_group not in app.workload_group_vars:
+                app.workload_group_vars[workload_group] = []
+
+            # Track which vars we add to, to allow us to re-apply during inheritance
+            app.workload_group_vars[workload_group].append(workload_var.copy())
+
+            for wl_name in workload_group_list:
+                # Apply the variable
+                app.workloads[wl_name].add_variable(workload_var.copy())
+
+        if not all_workloads and workload_group is None:
+            raise DirectiveError("A workload or workload group is required")
 
     return _execute_workload_variable
 
 
-@application_directive('environment_variables')
-def environment_variable(name, value, description, workload=None,
-                         workloads=None, **kwargs):
+@application_directive(dicts=())
+def environment_variable(name, value, description, workload=None, workloads=None, **kwargs):
     """Define an environment variable to be used in experiments
 
     These can be specific to workloads.
     """
 
     def _execute_environment_variable(app):
-        all_workloads = ramble.language.language_helpers.require_definition(workload,
-                                                                            workloads,
-                                                                            'workload',
-                                                                            'workloads',
-                                                                            'environment_variable')
+        all_workloads = ramble.language.language_helpers.require_definition(
+            workload, workloads, app.workloads, "workload", "workloads", "environment_variable"
+        )
 
         for wl_name in all_workloads:
-            if wl_name not in app.environment_variables:
-                app.environment_variables[wl_name] = {}
-
-            app.environment_variables[wl_name][name] = {
-                'value': value,
-                'action': 'set',
-                'description': description,
-            }
+            app.workloads[wl_name].add_environment_variable(
+                ramble.workload.WorkloadEnvironmentVariable(
+                    name, value=value, description=description
+                )
+            )
 
     return _execute_environment_variable
 
 
-@application_directive('phase_definitions')
-def register_phase(name, pipeline=None, depends_on=[]):
+@application_directive("phase_definitions")
+def register_phase(name, pipeline=None, run_before=[], run_after=[]):
     """Register a phase
 
     Phases are portions of a pipeline that will execute when
@@ -237,30 +298,58 @@ def register_phase(name, pipeline=None, depends_on=[]):
     Args:
     - name: The name of the phase. Phases are functions named '_<phase>'.
     - pipeline: The name of the pipeline this phase should be registered into.
-    - depends_on: A list of phase names this phase depends on
+    - run_before: A list of phase names this phase should run before
+    - run_after: A list of phase names this phase should run after
     """
 
     def _execute_register_phase(app):
-        if pipeline not in app._pipelines:
-            raise DirectiveError('Directive register_phase was '
-                                 f'given an invalid pipeline "{pipeline}"\n'
-                                 'Available pipelines are: '
-                                 f' {app._pipelines}')
+        import ramble.util.graph
 
-        if not isinstance(depends_on, list):
-            raise DirectiveError('Directive register_phase was '
-                                 'given an invalid type for '
-                                 'the depends_on attribute in application '
-                                 f'{app.name}')
+        if pipeline not in app._pipelines:
+            raise DirectiveError(
+                "Directive register_phase was "
+                f'given an invalid pipeline "{pipeline}"\n'
+                "Available pipelines are: "
+                f" {app._pipelines}"
+            )
+
+        if not isinstance(run_before, list):
+            raise DirectiveError(
+                "Directive register_phase was "
+                "given an invalid type for "
+                "the run_before attribute in application "
+                f"{app.name}"
+            )
+
+        if not isinstance(run_after, list):
+            raise DirectiveError(
+                "Directive register_phase was "
+                "given an invalid type for "
+                "the run_after attribute in application "
+                f"{app.name}"
+            )
+
+        if not hasattr(app, f"_{name}"):
+            raise DirectiveError(
+                "Directive register_phase was "
+                f"given an undefined phase {name} "
+                f"in application {app.name}"
+            )
 
         if pipeline not in app.phase_definitions:
             app.phase_definitions[pipeline] = {}
 
-        if name not in app.phase_definitions[pipeline]:
-            app.phase_definitions[pipeline][name] = []
+        if name in app.phase_definitions[pipeline]:
+            phase_node = app.phase_definitions[pipeline][name]
+        else:
+            phase_node = ramble.util.graph.GraphNode(name, attribute=pipeline)
 
-        for dep in depends_on:
-            if dep not in app.phase_definitions[pipeline][name]:
-                app.phase_definitions[pipeline][name].append(dep)
+        for before in run_before:
+            phase_node.order_before(before)
+
+        for after in run_after:
+            phase_node.order_after(after)
+
+        app.phase_definitions[pipeline][name] = phase_node
 
     return _execute_register_phase

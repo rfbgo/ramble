@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,17 +6,19 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-from ramble.modkit import *  # noqa: F403
+from ramble.modkit import *
 
 
 class AppendEnvVarModPaths(BasicModifier):
     """Define a modifier with only an environment variable modification using
     the append method and a colon separator"""
+
     name = "append-env-var-mod-paths"
 
-    tags('test')
+    tags("test")
 
-    mode('test', description='This is a test mode')
+    mode("test", description="This is a test mode")
 
-    env_var_modification('test_var', modification='test_val', method='append',
-                         mode='test')
+    env_var_modification(
+        "test_var", modification="test_val", method="append", mode="test"
+    )

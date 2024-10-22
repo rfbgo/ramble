@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,7 +6,6 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-from __future__ import print_function
 
 import os
 import platform
@@ -28,51 +27,47 @@ level = "long"
 
 
 def setup_parser(subparser):
-    sp = subparser.add_subparsers(metavar='SUBCOMMAND', dest='debug_command')
-    sp.add_parser('report', help='print information useful for bug reports')
+    sp = subparser.add_subparsers(metavar="SUBCOMMAND", dest="debug_command")
+    sp.add_parser("report", help="print information useful for bug reports")
 
 
 def _debug_tarball_suffix():
     now = datetime.now()
-    suffix = now.strftime('%Y-%m-%d-%H%M%S')
+    suffix = now.strftime("%Y-%m-%d-%H%M%S")
 
-    git = which('git')
+    git = which("git")
     if not git:
-        return 'nobranch-nogit-%s' % suffix
+        return "nobranch-nogit-%s" % suffix
 
     with working_dir(ramble.paths.prefix):
-        if not os.path.isdir('.git'):
-            return 'nobranch.nogit.%s' % suffix
+        if not os.path.isdir(".git"):
+            return "nobranch.nogit.%s" % suffix
 
         # Get symbolic branch name and strip any special chars (mainly '/')
-        symbolic = git(
-            'rev-parse', '--abbrev-ref', '--short', 'HEAD', output=str).strip()
-        symbolic = re.sub(r'[^\w.-]', '-', symbolic)
+        symbolic = git("rev-parse", "--abbrev-ref", "--short", "HEAD", output=str).strip()
+        symbolic = re.sub(r"[^\w.-]", "-", symbolic)
 
         # Get the commit hash too.
-        commit = git(
-            'rev-parse', '--short', 'HEAD', output=str).strip()
+        commit = git("rev-parse", "--short", "HEAD", output=str).strip()
 
         if symbolic == commit:
-            return "nobranch.%s.%s" % (commit, suffix)
+            return f"nobranch.{commit}.{suffix}"
         else:
-            return "%s.%s.%s" % (symbolic, commit, suffix)
+            return f"{symbolic}.{commit}.{suffix}"
 
 
 def report(args):
     host_platform = spack.platforms.host()
-    host_os = host_platform.operating_system('frontend')
-    host_target = host_platform.target('frontend')
-    architecture = spack.spec.ArchSpec(
-        (str(host_platform), str(host_os), str(host_target))
-    )
-    print('* **Ramble:**', get_version())
-    print('* **Python:**', platform.python_version())
-    print('* **Platform:**', architecture)
+    host_os = host_platform.operating_system("frontend")
+    host_target = host_platform.target("frontend")
+    architecture = spack.spec.ArchSpec((str(host_platform), str(host_os), str(host_target)))
+    print("* **Ramble:**", get_version())
+    print("* **Python:**", platform.python_version())
+    print("* **Platform:**", architecture)
 
 
 def debug(parser, args):
     action = {
-        'report': report,
+        "report": report,
     }
     action[args.debug_command](args)

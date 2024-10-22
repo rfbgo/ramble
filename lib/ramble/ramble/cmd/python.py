@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -106,7 +106,7 @@ def ipython_interpreter(args):
     elif args.python_command:
         IPython.start_ipython(argv=["-c", args.python_command])
     else:
-        header = "Ramble version %s\nPython %s, %s %s" % (
+        header = "Ramble version {}\nPython {}, {} {}".format(
             ramble.ramble_version,
             platform.python_version(),
             platform.system(),

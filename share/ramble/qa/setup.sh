@@ -1,4 +1,5 @@
-# Copyright 2022-2024 Google LLC
+#!/bin/bash -e
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -14,7 +15,7 @@
 #
 
 QA_DIR="$(dirname ${BASH_SOURCE[0]})"
-export RAMBLE_ROOT=$(readlink -f "$QA_DIR/../../..")
+export RAMBLE_ROOT=$(realpath "$QA_DIR/../../..")
 
 # Source the setup script
 . "$RAMBLE_ROOT/share/ramble/setup-env.sh"

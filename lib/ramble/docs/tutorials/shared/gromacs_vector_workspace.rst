@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -61,6 +61,9 @@ To begin, you should edit the ``ramble.yaml`` file to set up the configuration
 for your experiments. For this tutorial, replace the default yaml text with the
 contents of ``$RAMBLE_ROOT/examples/vector_matrix_gromacs_config.yaml``:
 
+**NOTE**: This workspace utilizes the ``spack`` package manager. As a result, it
+requires ``spack`` is installed and available in your path. Modifications to
+the ``package_manager`` variant will change this behavior.
 
 .. literalinclude:: ../../../../examples/vector_matrix_gromacs_config.yaml
    :language: YAML

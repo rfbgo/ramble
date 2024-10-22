@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -12,83 +12,96 @@
    :lines: 12-
 """  # noqa E501
 
-import ramble.schema.variables
-import ramble.schema.applications
-import ramble.schema.zips
+import ramble.namespace
+
+namespace = ramble.namespace.namespace()
+
 
 #: Properties for inclusion in other schemas
 properties = {
-    'spack': {
-        'type': 'object',
-        'properties': {
-            'concretized': {
-                'type': 'boolean',
-                'default': False
-            },
-            'variables': ramble.schema.variables.variables_def,
-            'zips': ramble.schema.zips.zips_def,
-            'packages': {
-                'type': 'object',
-                'additionalProperties': {
-                    'type': 'object',
-                    'properties': {
-                        'spack_spec': {'type': 'string'},
-                        'compiler_spec': {
-                            'type': 'string',
-                            'default': None,
+    "spack": {
+        "type": "object",
+        "properties": {
+            "packages": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "pkg_spec": {"type": "string"},
+                        "compiler_spec": {
+                            "type": "string",
+                            "default": None,
                         },
-                        'compiler': {
-                            'type': 'string',
-                            'default': None,
+                        "compiler": {
+                            "type": "string",
+                            "default": None,
                         },
-                        'variables': ramble.schema.variables.variables_def,
-                        'zips': ramble.schema.zips.zips_def,
-                        'matrix': ramble.schema.applications.matrix_def,
-                        'matrices': ramble.schema.applications.matrices_def,
-                        'exclude': ramble.schema.applications.exclude_def,
                     },
-                    'additionalProperties': False,
-                    'default': {}
+                    "additionalProperties": {"type": "string"},
+                    "default": {},
                 },
             },
-            'environments': {
-                'type': 'object',
-                'properties': {},
-                'default': {},
-                'additionalProperties': {
-                    'type': 'object',
-                    'properties': {
-                        'external_spack_env': {
-                            'type': 'string',
-                            'default': None,
+            "environments": {
+                "type": "object",
+                "properties": {},
+                "default": {},
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "external_spack_env": {
+                            "type": "string",
+                            "default": None,
                         },
-                        'packages': {
-                            'type': 'array',
-                            'items': {'type': 'string'},
-                            'default': []
+                        namespace.external_env: {
+                            "type": "string",
+                            "default": None,
                         },
-                        'variables': ramble.schema.variables.variables_def,
-                        'zips': ramble.schema.zips.zips_def,
-                        'matrix': ramble.schema.applications.matrix_def,
-                        'matrices': ramble.schema.applications.matrices_def,
-                        'exclude': ramble.schema.applications.exclude_def,
+                        "packages": {"type": "array", "items": {"type": "string"}, "default": []},
                     },
-                    'additionalProperties': False,
-                    'default': {}
-                }
-            }
+                    "additionalProperties": False,
+                    "default": {},
+                },
+            },
         },
-        'default': {},
-        'additionalProperties': False,
+        "default": {},
+        "additionalProperties": False,
     }
 }
 
 
 #: Full schema with metadata
 schema = {
-    '$schema': 'http://json-schema.org/schema#',
-    'title': 'Spack software configuration file schema',
-    'type': 'object',
-    'additionalProperties': False,
-    'properties': properties,
+    "$schema": "http://json-schema.org/schema#",
+    "title": "Spack software configuration file schema",
+    "type": "object",
+    "additionalProperties": False,
+    "properties": properties,
 }
+
+
+def update(data):
+    changed = False
+
+    pkg_keymap = {
+        "spack_spec": "pkg_spec",
+    }
+
+    if "packages" in data:
+        for pkg_name in data["packages"]:
+
+            for key, newkey in pkg_keymap.items():
+                if key in data["packages"][pkg_name] and newkey not in data["packages"][pkg_name]:
+                    changed = True
+                    data["packages"][pkg_name][newkey] = data["packages"][pkg_name][key]
+                    del data["packages"][pkg_name][key]
+
+    if "environments" in data:
+        for env_name in data["environments"]:
+            if "external_spack_env" in data["environments"][env_name]:
+                changed = True
+                data["environments"][env_name][namespace.external_env] = data["environments"][
+                    env_name
+                ]["external_spack_env"]
+                del data["environments"][env_name]["external_spack_env"]
+
+    return changed

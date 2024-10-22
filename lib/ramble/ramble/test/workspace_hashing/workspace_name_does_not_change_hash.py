@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -17,15 +17,14 @@ from ramble.main import RambleCommand
 
 
 # everything here uses the mock_workspace_path
-pytestmark = pytest.mark.usefixtures('mutable_config',
-                                     'mutable_mock_workspace_path')
+pytestmark = pytest.mark.usefixtures("mutable_config", "mutable_mock_workspace_path")
 
-workspace = RambleCommand('workspace')
+workspace = RambleCommand("workspace")
 
 
-def test_workspace_name_does_not_change_hash(mutable_config,
-                                             mutable_mock_workspace_path,
-                                             mock_applications):
+def test_workspace_name_does_not_change_hash(
+    mutable_config, mutable_mock_workspace_path, mock_applications
+):
     test_config = """
 ramble:
   variables:
@@ -45,31 +44,30 @@ ramble:
               env_vars:
                 set:
                   MY_VAR: 'TEST'
-  spack:
-    concretized: true
+  software:
     packages: {}
     environments: {}
 """
-    workspace1_name = 'test_workspace1'
-    workspace2_name = 'test_workspace2'
+    workspace1_name = "test_workspace1"
+    workspace2_name = "test_workspace2"
     with ramble.workspace.create(workspace1_name) as ws1:
         ws1.write()
 
         config_path = os.path.join(ws1.config_dir, ramble.workspace.config_file_name)
 
-        with open(config_path, 'w+') as f:
+        with open(config_path, "w+") as f:
             f.write(test_config)
         ws1._re_read()
-        workspace('setup', '--dry-run', global_args=['-w', workspace1_name])
+        workspace("setup", "--dry-run", global_args=["-w", workspace1_name])
 
         with ramble.workspace.create(workspace2_name) as ws2:
             ws2.write()
 
             config_path = os.path.join(ws2.config_dir, ramble.workspace.config_file_name)
 
-            with open(config_path, 'w+') as f:
+            with open(config_path, "w+") as f:
                 f.write(test_config)
             ws2._re_read()
-            workspace('setup', '--dry-run', global_args=['-w', workspace2_name])
+            workspace("setup", "--dry-run", global_args=["-w", workspace2_name])
 
             assert ws1.workspace_hash == ws2.workspace_hash

@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -21,4 +21,4 @@ class ExecutableApplication(ApplicationBase):
 
     def __init__(self, file_path):
         super().__init__(file_path)
-        self.application_class = 'ExecutableApplication'
+        self.application_class = "ExecutableApplication"

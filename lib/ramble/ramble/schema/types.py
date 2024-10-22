@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -8,30 +8,12 @@
 
 """Base types for building schema files from"""
 
+string_or_num_list = [{"type": "string"}, {"type": "number"}]
 
-class OUTPUT_CAPTURE:
-    STDERR = "2>"
-    STDOUT = ">>"
-    ALL = "&>"
-    DEFAULT = STDOUT
+string_or_num = {"anyOf": string_or_num_list}
 
-
-string_or_num_list = [{'type': 'string'}, {'type': 'number'}]
-
-string_or_num = {
-    'anyOf': string_or_num_list
-}
-
-array_of_strings_or_nums = {
-    'type': 'array',
-    'default': [],
-    'items': string_or_num
-}
+array_of_strings_or_nums = {"type": "array", "default": [], "items": string_or_num}
 
 array_or_scalar_of_strings_or_nums = {
-    'anyOf':
-        [
-            *string_or_num_list,
-            {'type': 'array', 'default': [], 'items': string_or_num}
-        ]
+    "anyOf": [*string_or_num_list, {"type": "array", "default": [], "items": string_or_num}]
 }

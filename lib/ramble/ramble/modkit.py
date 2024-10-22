@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -26,4 +26,6 @@ from ramble.spec import Spec
 import ramble.language.modifier_language
 from ramble.language.modifier_language import *
 from ramble.language.shared_language import *
-from ramble.schema.types import OUTPUT_CAPTURE
+from ramble.util.output_capture import OUTPUT_CAPTURE
+
+from ramble.util.file_util import get_file_path

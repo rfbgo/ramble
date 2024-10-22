@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -14,7 +14,18 @@ from ramble.app.builtin.mock.basic import Basic as BaseBasic
 class BasicInherited(BaseBasic):
     name = "basic-inherited"
 
-    input_file('inherited_input', url='file:///tmp/inherited_file.log',
-               description='Again, not a file', extension='.log')
+    input_file(
+        "inherited_input",
+        url="file:///tmp/inherited_file.log",
+        description="Again, not a file",
+        extension=".log",
+    )
 
-    workload('test_wl3', executable='foo', input='inherited_input')
+    workload("test_wl3", executable="foo", input="inherited_input")
+
+    workload_variable(
+        "my_var",
+        default="1.0",
+        description="Shadowed Example var",
+        workload="test_wl",
+    )

@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -265,16 +265,16 @@ complete -o bashdefault -o default -F _bash_completion_ramble ramble
 _ramble() {
     if $list_options
     then
-        RAMBLE_COMPREPLY="-h --help -H --all-help --color -c --config -C --config-scope -d --debug --disable-passthrough -N --disable-logger -P --disable-progress-bar --timestamp --pdb -w --workspace -D --workspace-dir -W --no-workspace --use-workspace-repo -k --insecure -l --enable-locks -L --disable-locks -m --mock -p --profile --sorted-profile --lines -v --verbose --stacktrace -V --version --print-shell-vars"
+        RAMBLE_COMPREPLY="-h --help -H --all-help --color -c --config -C --config-scope -d --debug --disable-passthrough -N --disable-logger -P --disable-progress-bar --timestamp --pdb -w --workspace -D --workspace-dir -W --no-workspace --use-workspace-repo -k --insecure -l --enable-locks -L --disable-locks -m --mock --mock-applications --mock-modifiers --mock-package-managers --mock-base-applications --mock-base-modifiers --mock-base-package-managers -p --profile --sorted-profile --lines -v --verbose --stacktrace -V --version --print-shell-vars"
     else
-        RAMBLE_COMPREPLY="attributes clean commands config debug edit flake8 help info license list mirror mods on python repo results software-definitions unit-test workspace"
+        RAMBLE_COMPREPLY="attributes clean commands config debug deployment edit flake8 help info license list mirror mods on python repo results software-definitions style unit-test workspace"
     fi
 }
 
 _ramble_attributes() {
     if $list_options
     then
-        RAMBLE_COMPREPLY="-h --help --defined --undefined -a --all --by-attribute --applications --modifiers --maintainers --tags"
+        RAMBLE_COMPREPLY="-h --help --defined --undefined -a --all --by-attribute --applications --modifiers --package_managers --base_applications --base_modifiers --base_package_managers --maintainers --tags"
     else
         RAMBLE_COMREPLY=""
     fi
@@ -391,12 +391,29 @@ _ramble_debug_report() {
     RAMBLE_COMPREPLY="-h --help"
 }
 
+_ramble_deployment() {
+    if $list_options
+    then
+        RAMBLE_COMPREPLY="-h --help"
+    else
+        RAMBLE_COMPREPLY="push pull"
+    fi
+}
+
+_ramble_deployment_push() {
+    RAMBLE_COMPREPLY="-h --help --tar-archive -t --deployment-name -d --upload-url -u --phases --include-phase-dependencies --where --exclude-where --filter-tags"
+}
+
+_ramble_deployment_pull() {
+    RAMBLE_COMPREPLY="-h --help --deployment-path -p"
+}
+
 _ramble_edit() {
     if $list_options
     then
-        RAMBLE_COMPREPLY="-h --help -a --application-type -c --command -d --docs -t --test -m --module -r --repo -N --namespace"
+        RAMBLE_COMPREPLY="-h --help --type -c --command -d --docs -t --test -m --module -r --repo -N --namespace"
     else
-        _all_applications
+        RAMBLE_COMREPLY=""
     fi
 }
 
@@ -421,9 +438,9 @@ _ramble_help() {
 _ramble_info() {
     if $list_options
     then
-        RAMBLE_COMPREPLY="-h --help"
+        RAMBLE_COMPREPLY="-h --help --type --format --pattern -p --overview -o --verbose -v --all --attributes --attrs"
     else
-        _all_applications
+        RAMBLE_COMREPLY=""
     fi
 }
 
@@ -432,7 +449,7 @@ _ramble_license() {
     then
         RAMBLE_COMPREPLY="-h --help"
     else
-        RAMBLE_COMPREPLY="list-files verify"
+        RAMBLE_COMPREPLY="list-files verify update-copyright-year"
     fi
 }
 
@@ -441,13 +458,17 @@ _ramble_license_list_files() {
 }
 
 _ramble_license_verify() {
-    RAMBLE_COMPREPLY="-h --help --root"
+    RAMBLE_COMPREPLY="-h --help --root --modified -m"
+}
+
+_ramble_license_update_copyright_year() {
+    RAMBLE_COMPREPLY="-h --help"
 }
 
 _ramble_list() {
     if $list_options
     then
-        RAMBLE_COMPREPLY="-h --help -d --search-description --format --update -t --tags"
+        RAMBLE_COMPREPLY="-h --help -d --search-description --format --update -t --tags --type"
     else
         _all_applications
     fi
@@ -507,43 +528,11 @@ _ramble_mirror_list() {
 }
 
 _ramble_mods() {
-    if $list_options
-    then
-        RAMBLE_COMPREPLY="-h --help"
-    else
-        RAMBLE_COMPREPLY="list ls info"
-    fi
-}
-
-_ramble_mods_list() {
-    if $list_options
-    then
-        RAMBLE_COMPREPLY="-h --help -d --search-description --format --update -t --tags"
-    else
-        _all_applications
-    fi
-}
-
-_ramble_mods_ls() {
-    if $list_options
-    then
-        RAMBLE_COMPREPLY="-h --help -d --search-description --format --update -t --tags"
-    else
-        _all_applications
-    fi
-}
-
-_ramble_mods_info() {
-    if $list_options
-    then
-        RAMBLE_COMPREPLY="-h --help"
-    else
-        RAMBLE_COMREPLY=""
-    fi
+    RAMBLE_COMPREPLY="-h --help"
 }
 
 _ramble_on() {
-    RAMBLE_COMPREPLY="-h --help --executor --where --exclude-where --filter-tags"
+    RAMBLE_COMPREPLY="-h --help --executor --enable-per-experiment-prints --suppress-run-header --where --exclude-where --filter-tags"
 }
 
 _ramble_python() {
@@ -569,7 +558,7 @@ _ramble_repo_create() {
     then
         RAMBLE_COMPREPLY="-h --help -d --subdirectory -t --type"
     else
-        _repos
+        RAMBLE_COMREPLY=""
     fi
 }
 
@@ -609,7 +598,7 @@ _ramble_results() {
     then
         RAMBLE_COMPREPLY="-h --help"
     else
-        RAMBLE_COMPREPLY="upload"
+        RAMBLE_COMPREPLY="upload report"
     fi
 }
 
@@ -622,8 +611,21 @@ _ramble_results_upload() {
     fi
 }
 
+_ramble_results_report() {
+    RAMBLE_COMPREPLY="-h --help --workspace --strong-scaling --weak-scaling --multi-line --pandas-where --compare --foms -n --normalize --logx --logy --split-by -f --file"
+}
+
 _ramble_software_definitions() {
     RAMBLE_COMPREPLY="-h --help -s --summary -c --conflicts -e --error-on-conflict"
+}
+
+_ramble_style() {
+    if $list_options
+    then
+        RAMBLE_COMPREPLY="-h --help -b --base -a --all -o --output -r --root-relative -U --no-untracked -f --fix -k --keep-temp -t --tool -s --skip"
+    else
+        RAMBLE_COMREPLY=""
+    fi
 }
 
 _ramble_unit_test() {
@@ -640,7 +642,7 @@ _ramble_workspace() {
     then
         RAMBLE_COMPREPLY="-h --help"
     else
-        RAMBLE_COMPREPLY="activate archive deactivate create concretize setup analyze push-to-cache info edit mirror list ls remove rm"
+        RAMBLE_COMPREPLY="activate archive deactivate create concretize setup analyze push-to-cache info edit mirror list ls remove rm generate-config"
     fi
 }
 
@@ -664,14 +666,14 @@ _ramble_workspace_deactivate() {
 _ramble_workspace_create() {
     if $list_options
     then
-        RAMBLE_COMPREPLY="-h --help -c --config -t --template_execute -d --dir --software-dir --inputs-dir"
+        RAMBLE_COMPREPLY="-h --help -c --config -t --template_execute -d --dir --software-dir --inputs-dir -a --activate"
     else
         RAMBLE_COMREPLY=""
     fi
 }
 
 _ramble_workspace_concretize() {
-    RAMBLE_COMPREPLY="-h --help"
+    RAMBLE_COMPREPLY="-h --help -f --force-concretize --simplify"
 }
 
 _ramble_workspace_setup() {
@@ -679,7 +681,7 @@ _ramble_workspace_setup() {
 }
 
 _ramble_workspace_analyze() {
-    RAMBLE_COMPREPLY="-h --help -f --formats -u --upload --always-print-foms --dry-run --phases --include-phase-dependencies --where --exclude-where --filter-tags"
+    RAMBLE_COMPREPLY="-h --help -f --formats -u --upload -p --print-results -s --summary-only --phases --include-phase-dependencies --where --exclude-where --filter-tags"
 }
 
 _ramble_workspace_push_to_cache() {
@@ -691,7 +693,7 @@ _ramble_workspace_info() {
 }
 
 _ramble_workspace_edit() {
-    RAMBLE_COMPREPLY="-h --help -c --config_only -t --template_only -p --print-file"
+    RAMBLE_COMPREPLY="-h --help -c --config_only -t --template_only -l --license_only -p --print-file"
 }
 
 _ramble_workspace_mirror() {
@@ -711,7 +713,7 @@ _ramble_workspace_remove() {
     then
         RAMBLE_COMPREPLY="-h --help -y --yes-to-all"
     else
-        RAMBLE_COMREPLY=""
+        _workspaces
     fi
 }
 
@@ -720,6 +722,15 @@ _ramble_workspace_rm() {
     then
         RAMBLE_COMPREPLY="-h --help -y --yes-to-all"
     else
-        RAMBLE_COMREPLY=""
+        _workspaces
+    fi
+}
+
+_ramble_workspace_generate_config() {
+    if $list_options
+    then
+        RAMBLE_COMPREPLY="-h --help --workload-filter --wf --variable-filter --vf --variable-definition -v --experiment-name -e --package-manager -p --dry-run --print --overwrite --include-default-variables -i --workload-name-variable -w --zip -z --matrix -m"
+    else
+        _all_applications
     fi
 }

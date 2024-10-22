@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,20 +6,45 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-from ramble.modkit import *  # noqa: F403
+from ramble.modkit import *
 
 
 class SuccessCriteria(BasicModifier):
     """Define a modifier with a success criteria"""
+
     name = "success-criteria"
 
-    mode('test', description='This is a test mode')
+    mode("test", description="This is a test mode")
 
-    success_criteria('status', mode='string', match='.*Experiment status: SUCCESS', file='{log_file}')
+    figure_of_merit(
+        "experiment status",
+        fom_regex=r".*Experiment status:\s+(?P<status>[\S_]+)\s*",
+        group_name="status",
+        units="",
+    )
 
-    variable_modification('experiment_status', modification='Experiment status: SUCCESS', method='set', mode='test')
+    success_criteria(
+        "success_criteria_status_check",
+        mode="fom_comparison",
+        fom_name="experiment status",
+        formula="'{value}' == 'SUCCESS'",
+    )
 
-    register_builtin('echo_status', required=True)
+    success_criteria(
+        "status",
+        mode="string",
+        match=".*Experiment status: SUCCESS",
+        file="{log_file}",
+    )
+
+    variable_modification(
+        "experiment_status",
+        modification="Experiment status: SUCCESS",
+        method="set",
+        mode="test",
+    )
+
+    register_builtin("echo_status", required=True)
 
     def echo_status(self):
         return ['echo "Experiment status: {experiment_status}" >> {log_file}']

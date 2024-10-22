@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -17,9 +17,6 @@ import sys
 import traceback
 from datetime import datetime, timedelta
 from typing import List, Tuple
-
-import six
-from six import string_types
 
 from llnl.util.compat import MutableMapping, MutableSequence, zip_longest
 
@@ -202,12 +199,9 @@ def memoized(func):
             return ret
         except TypeError as e:
             # TypeError is raised when indexing into a dict if the key is unhashable.
-            raise six.raise_from(
-                UnhashableArguments(
-                    "args + kwargs '{}' was not hashable for function '{}'"
-                    .format(key, func.__name__),
-                ),
-                e)
+            raise UnhashableArguments(
+                "args + kwargs '{}' was not hashable for function '{}'".format(key, func.__name__),
+            ) from e
 
     return _memoized_function
 

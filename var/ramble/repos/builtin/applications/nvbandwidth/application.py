@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -9,27 +9,35 @@
 from ramble.appkit import *
 
 
-class Nvbandwidth(SpackApplication):
-    '''Define the nvbandwidth benchmark'''
-    name = 'nvbandwidth'
+class Nvbandwidth(ExecutableApplication):
+    """Define the nvbandwidth benchmark"""
 
-    maintainers('rfbgo')
+    name = "nvbandwidth"
 
-    tags('synthetic-benchmarks')
+    maintainers("rfbgo")
 
-    software_spec('nvbandwidth', spack_spec='nvbandwidth')
+    tags("synthetic-benchmarks")
 
-    required_package('nvbandwidth')
+    software_spec(
+        "nvbandwidth", pkg_spec="nvbandwidth", package_manager="spack*"
+    )
 
-    workload('all_benchmarks', executable='nvbandwidth')
+    required_package("nvbandwidth", package_manager="spack*")
 
-    workload_variable('transfer-size', default='1m',
-                      description='Transfer Size',
-                      workloads=['multi-file', 'single-file'])
+    workload("all_benchmarks", executable="nvbandwidth")
 
-    executable(name='nvbandwidth', template='nvbandwidth', use_mpi=False)
+    workload_variable(
+        "transfer-size",
+        default="1m",
+        description="Transfer Size",
+        workloads=["all_benchmarks"],
+    )
 
-    figure_of_merit('SUM {metric}',
-                    fom_regex=r'SUM\s+(?P<metric>\w+)\s+(?P<value>\d+\.\d+)',
-                    group_name='value',
-                    units='GB/s')
+    executable(name="nvbandwidth", template="nvbandwidth", use_mpi=False)
+
+    figure_of_merit(
+        "SUM {metric}",
+        fom_regex=r"SUM\s+(?P<metric>\w+)\s+(?P<value>\d+\.\d+)",
+        group_name="value",
+        units="GB/s",
+    )

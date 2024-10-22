@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -65,7 +65,7 @@ To discover which modifiers are available, execute:
 
 .. code-block:: console
 
-    $ ramble mods list
+    $ ramble list --type modifiers
 
 Which might output the following:
 
@@ -77,12 +77,12 @@ Which might output the following:
 This shows there are four modifiers in this installation of Ramble. Two very
 general modifiers in this list are ``lscpu`` and ``intel-aps``. Modifiers are
 allowed to behave in different ways. Their functionality should be documented
-at a high-level through the ``ramble mods info`` command. To get information
+at a high-level through the ``ramble info --type modifiers`` command. To get information
 about the ``lscpu`` modifier, execute:
 
 .. code-block:: console
 
-    $ ramble mods info lscpu
+    $ ramble info --type modifiers lscpu
 
 This modifier adds the execution of ``lscpu`` to each experiment in a workspace
 (to capture additional platform level details, such as the CPU model), and
@@ -122,44 +122,9 @@ And add the following lines, at the workspace scope:
 
 The resulting configuration file should look like the following.
 
-.. code-block:: YAML
 
-    ramble:
-      env_vars:
-        set:
-          OMP_NUM_THREADS: '{n_threads}'
-      variables:
-        processes_per_node: 16
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-      modifiers:
-      - name: lscpu
-      applications:
-        wrfv4:
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}:
-                  variables:
-                    n_nodes: [1, 2]
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
+.. literalinclude:: ../../../../examples/tutorial_10_lscpu_config.yaml
+   :language: YAML
 
 The ``modifiers`` dictionary can be defined at any scope ``variables`` can be
 defined at. Defined ``modifiers`` are inherited by all experiments at lower
@@ -182,17 +147,17 @@ modifier.
 Advanced Modifiers
 -----------------
 
-Some modifiers have additionally functionality, which can include requiring
+Some modifiers have additional functionality, which can include requiring
 specific software packages to be present. An example of this is the
 ``intel-aps`` modifier, which applies Intel's
-`Application Performan Snapshot<https://www.intel.com/content/www/us/en/docs/vtune-profiler/user-guide-application-snapshot-linux/2023-0/introducing-application-performance-snapshot.html>`_
+`Application Performance Snapshot <https://www.intel.com/content/www/us/en/docs/vtune-profiler/user-guide-application-snapshot-linux/2023-0/introducing-application-performance-snapshot.html>`_
 to a workspace's experiments.
 
 To get information about the ``intel-aps`` modifier, execute:
 
 .. code-block:: console
 
-    $ ramble mods info intel-aps
+    $ ramble info --type modifiers intel-aps
 
 In the output from this command, you should see a ``mode`` named ``mpi``. One
 additional difference relateive to ``lscpu`` is that the ``Software Specs:``
@@ -216,45 +181,8 @@ To the list of modifiers. This will cause both ``lscpu`` and ``intel-aps`` to
 be applied to all of the experiments. The resulting configuration file should
 look like the following:
 
-.. code-block:: YAML
-
-    ramble:
-      env_vars:
-        set:
-          OMP_NUM_THREADS: '{n_threads}'
-      variables:
-        processes_per_node: 16
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-      modifiers:
-      - name: lscpu
-      - name: intel-aps
-      applications:
-        wrfv4:
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}:
-                  variables:
-                    n_nodes: [1, 2]
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
+.. literalinclude:: ../../../../examples/tutorial_10_aps_error_config.yaml
+   :language: YAML
 
 To test some aspects of the workspace configuration before spending time
 performing a real setup, use:
@@ -286,49 +214,8 @@ And write a Spack package definition for ``intel-oneapi-vtune``. After the
 package is defined, add the package to the ``wrfv4`` environment. The resulting
 configuration file should look like the following:
 
-.. code-block:: YAML
-
-    ramble:
-      env_vars:
-        set:
-          OMP_NUM_THREADS: '{n_threads}'
-      variables:
-        processes_per_node: 16
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-      modifiers:
-      - name: lscpu
-      - name: intel-aps
-      applications:
-        wrfv4:
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}:
-                  variables:
-                    n_nodes: [1, 2]
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          aps:
-            spack_spec: intel-oneapi-vtune
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
-            - aps
-
+.. literalinclude:: ../../../../examples/tutorial_10_aps_final_config.yaml
+   :language: YAML
 
 .. include:: shared/wrf_execute.rst
 
@@ -342,3 +229,18 @@ following:
  * Socket(s) - From ``lscpu``
  * MPI Time - From ``intel-aps``
  * Disk I/O Time - From ``intel-aps``
+
+Clean the Workspace
+-------------------
+
+Once you are finished with the tutorial content, make sure you deactivate your workspace:
+
+.. code-block:: console
+
+    $ ramble workspace deactivate
+
+Additionally, you can remove the workspace and all of its content with:
+
+.. code-block:: console
+
+    $ ramble workspace remove modifiers_wrf

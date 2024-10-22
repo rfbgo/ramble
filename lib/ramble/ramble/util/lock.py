@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -25,28 +25,29 @@ class Lock(llnl.util.lock.Lock):
     ``llnl.util.lock`` so that all the lock API calls will succeed, but
     the actual locking mechanism can be disabled via ``_enable_locks``.
     """
+
     def __init__(self, *args, **kwargs):
-        super(Lock, self).__init__(*args, **kwargs)
-        self._enable = ramble.config.get('config:locks', True)
+        super().__init__(*args, **kwargs)
+        self._enable = ramble.config.get("config:locks", True)
 
     def _lock(self, op, timeout=0):
         if self._enable:
-            return super(Lock, self)._lock(op, timeout)
+            return super()._lock(op, timeout)
         else:
             return 0, 0
 
     def _unlock(self):
         """Unlock call that always succeeds."""
         if self._enable:
-            super(Lock, self)._unlock()
+            super()._unlock()
 
     def _debug(self, *args):
         if self._enable:
-            super(Lock, self)._debug(*args)
+            super()._debug(*args)
 
     def cleanup(self, *args):
         if self._enable:
-            super(Lock, self).cleanup(*args)
+            super().cleanup(*args)
 
 
 def check_lock_safety(path):
@@ -67,15 +68,15 @@ def check_lock_safety(path):
         writable = None
         if (mode & stat.S_IWGRP) and (uid != gid):
             # ramble is group-writeable and the group is not the owner
-            writable = 'group'
-        elif (mode & stat.S_IWOTH):
+            writable = "group"
+        elif mode & stat.S_IWOTH:
             # ramble is world-writeable
-            writable = 'world'
+            writable = "world"
 
         if writable:
-            msg = "Refusing to disable locks: ramble is {0}-writable.".format(
-                writable)
+            msg = f"Refusing to disable locks: ramble is {writable}-writable."
             long_msg = (
                 "Running a shared ramble without locks is unsafe. You must "
-                "restrict permissions on {0} or enable locks.").format(path)
+                "restrict permissions on {} or enable locks."
+            ).format(path)
             raise ramble.error.RambleError(msg, long_msg)

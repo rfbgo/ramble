@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,13 +6,14 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-from ramble.modkit import *  # noqa: F403
+from ramble.modkit import *
 
 
 class Unmaintained1(BasicModifier):
     """Define an unmaintained modifier"""
+
     name = "test-mod"
 
-    tags('test')
+    tags("test")
 
-    mode('test', description='This is a test mode')
+    mode("test", description="This is a test mode")

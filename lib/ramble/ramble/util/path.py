@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -15,6 +15,7 @@ import re
 import getpass
 import subprocess
 import tempfile
+import urllib.parse
 
 from llnl.util.lang import memoized
 
@@ -22,16 +23,13 @@ import ramble.paths
 from ramble.util.logger import logger
 
 
-__all__ = [
-    'substitute_config_variables',
-    'substitute_path_variables',
-    'canonicalize_path']
+__all__ = ["substitute_config_variables", "substitute_path_variables", "canonicalize_path"]
 
 # Substitutions to perform
 replacements = {
-    'ramble': ramble.paths.prefix,
-    'user': getpass.getuser(),
-    'tempdir': tempfile.gettempdir(),
+    "ramble": ramble.paths.prefix,
+    "user": getpass.getuser(),
+    "tempdir": tempfile.gettempdir(),
 }
 
 # This is intended to be longer than the part of the install path
@@ -53,13 +51,13 @@ def get_system_path_max():
     # Choose a conservative default
     sys_max_path_length = 256
     try:
-        path_max_proc  = subprocess.Popen(['getconf', 'PATH_MAX', '/'],
-                                          stdout=subprocess.PIPE,
-                                          stderr=subprocess.STDOUT)
+        path_max_proc = subprocess.Popen(
+            ["getconf", "PATH_MAX", "/"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        )
         proc_output = str(path_max_proc.communicate()[0].decode())
         sys_max_path_length = int(proc_output)
     except (ValueError, subprocess.CalledProcessError, OSError):
-        logger.msg(f'Unable to find system max path length, using: {sys_max_path_length}')
+        logger.msg(f"Unable to find system max path length, using: {sys_max_path_length}")
 
     return sys_max_path_length
 
@@ -77,16 +75,15 @@ def substitute_config_variables(path, local_replacements={}):
     use either ``$var`` or ``${var}`` syntax for the variables.
 
     """
+
     # Look up replacements for re.sub in the replacements dict.
     def repl(match):
-        m = match.group(0).strip('${}')
+        m = match.group(0).strip("${}")
         lower_key = m.lower()
-        return replacements.get(lower_key,
-                                local_replacements.get(lower_key,
-                                                       match.group(0)))
+        return replacements.get(lower_key, local_replacements.get(lower_key, match.group(0)))
 
     # Replace $var or ${var}.
-    return re.sub(r'(\$\w+\b|\$\{\w+\})', repl, path)
+    return re.sub(r"(\$\w+\b|\$\{\w+\})", repl, path)
 
 
 def substitute_path_variables(path, local_replacements={}):
@@ -102,4 +99,12 @@ def canonicalize_path(path):
     path = substitute_path_variables(path)
     path = os.path.abspath(path)
 
+    return path
+
+
+def get_maybe_local_path(path):
+    """Convert a scheme-less path to absolute local path"""
+    parsed = urllib.parse.urlparse(path)
+    if not parsed.scheme:
+        return os.path.abspath(path)
     return path

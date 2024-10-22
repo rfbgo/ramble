@@ -1,4 +1,14 @@
+# Copyright 2022-2024 The Ramble Authors
+# 
+# Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+# https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+# <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your
+# option. This file may not be copied, modified, or distributed
+# except according to those terms.
+
 ramble:
+  variants:
+    package_manager: spack
   env_vars:
     set:
       OMP_NUM_THREADS: '{n_threads}'
@@ -37,20 +47,19 @@ ramble:
                 n_threads: '1'
                 size: '0003'
                 type: 'rf'
-  spack:
-    concretized: true
+  software:
     packages:
       gcc9:
-        spack_spec: gcc@9.4.0 target=x86_64
+        pkg_spec: gcc@9.4.0 target=x86_64
         compiler_spec: gcc@9.4.0
-      impi2018:
-        spack_spec: intel-mpi@2018.4.274 target=x86_64
+      impi2021:
+        pkg_spec: intel-oneapi-mpi@2021.11.0 target=x86_64
         compiler: gcc9
       gromacs:
-        spack_spec: gromacs@2021.6
+        pkg_spec: gromacs@2021.6
         compiler: gcc9
     environments:
       gromacs:
         packages:
         - gromacs
-        - impi2018
+        - impi2021

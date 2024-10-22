@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -11,29 +11,23 @@ directives, which are to allow functions to be invoked at class level
 """
 
 import functools
-import sys
-
-from six import string_types
 
 import llnl.util.lang
 import llnl.util.tty.color
 
 import ramble.error
 
-if sys.version_info >= (3, 3):
-    from collections.abc import Sequence  # novm
-else:
-    from collections import Sequence
+from collections.abc import Sequence  # novm
 
 
-__all__ = ['DirectiveMeta', 'DirectiveError']
+__all__ = ["DirectiveMeta", "DirectiveError"]
 
 
 #: These are variant names used by ramble internally; applications can't use
 #: them
 reserved_names = []
 
-namespaces = ['ramble.app', 'ramble.mod']
+namespaces = ["ramble.app", "ramble.mod", "ramble.pkg_man", "ramble.package_manager"]
 
 
 class DirectiveMeta(type):
@@ -76,7 +70,7 @@ class DirectiveMeta(type):
             )
             DirectiveMeta._directives_to_be_executed = []
 
-        return super(DirectiveMeta, cls).__new__(cls, name, bases, attr_dict)
+        return super().__new__(cls, name, bases, attr_dict)
 
     def __init__(cls, name, bases, attr_dict):
         # The instance is being initialized: if it is a package we must ensure
@@ -94,8 +88,9 @@ class DirectiveMeta(type):
                 setattr(cls, d, {})
 
             directive_attrs = {
-                '_directive_functions': {},
-                '_directive_classes': {}
+                "_directive_functions": {},
+                "_directive_classes": {},
+                "_directive_names": DirectiveMeta._directive_names.copy(),
             }
 
             for attr in directive_attrs.keys():
@@ -113,15 +108,15 @@ class DirectiveMeta(type):
             # directives by clearing out the queue they're appended to
             DirectiveMeta._directives_to_be_executed = []
 
-        super(DirectiveMeta, cls).__init__(name, bases, attr_dict)
+        super().__init__(name, bases, attr_dict)
 
     @classmethod
     def directive(cls, dicts=None):
         """Decorator for Ramble directives.
 
-        Ramble directives allow you to modify a package while it is being
+        Ramble directives allow you to modify an object while it is being
         defined, e.g. to add version or dependency information.  Directives are
-        one of the key pieces of Ramble's application "language", which is
+        one of the key pieces of Ramble's object "language", which is
         embedded in python.
 
         Here's an example directive:
@@ -159,8 +154,8 @@ class DirectiveMeta(type):
         the core.
 
         """
-        if isinstance(dicts, string_types):
-            dicts = (dicts, )
+        if isinstance(dicts, str):
+            dicts = (dicts,)
 
         if not isinstance(dicts, Sequence):
             message = "dicts arg must be list, tuple, or string. Found {0}"
@@ -186,8 +181,7 @@ class DirectiveMeta(type):
                             remove_directives(a)
                     else:
                         # Remove directives args from the exec queue
-                        remove = next(
-                            (d for d in directives if d is arg), None)
+                        remove = next((d for d in directives if d is arg), None)
                         if remove is not None:
                             directives.remove(remove)
 
@@ -203,7 +197,7 @@ class DirectiveMeta(type):
                 # ...so if it is not a sequence make it so
                 values = result
                 if not isinstance(values, Sequence):
-                    values = (values, )
+                    values = (values,)
 
                 DirectiveMeta._directives_to_be_executed.extend(values)
 

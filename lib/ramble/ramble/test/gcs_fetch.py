@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -32,7 +32,7 @@ def test_gcsfetchstrategy_bad_url(tmpdir, _fetch_method):
         fetcher = ramble.fetch_strategy.GCSFetchStrategy(url="file:///does-not-exist")
         assert fetcher is not None
 
-        with ramble.stage.InputStage(fetcher, name='test', path=testpath) as stage:
+        with ramble.stage.InputStage(fetcher, name="test", path=testpath) as stage:
             assert stage is not None
             assert fetcher.archive_file is None
             with pytest.raises(ramble.fetch_strategy.FetchError):
@@ -52,9 +52,9 @@ def test_gcsfetchstrategy_downloaded(tmpdir, _fetch_method):
             def archive_file(self):
                 return archive
 
-        url = "gcs:///{0}".format(archive)
+        url = f"gcs:///{archive}"
         fetcher = Archived_GCSFS(url=url)
-        with ramble.stage.InputStage(fetcher, name='test', path=testpath):
+        with ramble.stage.InputStage(fetcher, name="test", path=testpath):
             fetcher.fetch()
 
 
@@ -70,11 +70,11 @@ def test_gcsfetchstrategy_download(tmpdir, _fetch_method):
 
         with ramble.config.override("config:url_fetch_method", _fetch_method):
             fetcher = ramble.fetch_strategy.GCSFetchStrategy(url=path)
-            with ramble.stage.InputStage(fetcher, name='test', path=testpath):
+            with ramble.stage.InputStage(fetcher, name="test", path=testpath):
                 fetcher.fetch()
     except google_api_core_exceptions.Forbidden as e:
-        pytest.skip('%s' % e)
+        pytest.skip("%s" % e)
     except google_auth_exceptions.RefreshError as e:
-        pytest.skip('%s' % e)
+        pytest.skip("%s" % e)
     except google_auth_exceptions.DefaultCredentialsError as e:
-        pytest.skip('%s' % e)
+        pytest.skip("%s" % e)

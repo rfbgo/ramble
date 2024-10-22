@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -46,24 +46,24 @@ environments:
         gcc9:
           Rendered Packages:
             gcc9:
-              Spack spec: gcc@9.4.0 target=x86_64
+              Spec: gcc@9.4.0 target=x86_64
               Compiler spec: gcc@9.4.0
-        impi2018:
+        impi2021:
           Rendered Packages:
-            impi2018:
-              Spack spec: intel-mpi@2018.4.274 target=x86_64
+            impi2021:
+              Spec: intel-oneapi-mpi@2021.11.0 target=x86_64
               Compiler: gcc9
         gromacs:
           Rendered Packages:
             gromacs:
-              Spack spec: gromacs@2021.6
+              Spec: gromacs@2021.6
               Compiler: gcc9
       Environments:
         gromacs:
           Rendered Environments:
             gromacs Packages:
               - gromacs
-              - impi2018
+              - impi2021
 
 
 Currently, this command outputs every package and software environment
@@ -79,23 +79,22 @@ The relevant portion of the workspace configuration file is:
 
 .. code-block:: YAML
 
-    spack:
-      concretized: true
+    software:
       packages:
         gcc9:
-          spack_spec: gcc@9.4.0 target=x86_64
+          pkg_spec: gcc@9.4.0 target=x86_64
           compiler_spec: gcc@9.4.0
-        impi2018:
-          spack_spec: intel-mpi@2018.4.274 target=x86_64
+        impi2021:
+          pkg_spec: intel-oneapi-mpi@2021.11.0 target=x86_64
           compiler: gcc9
         gromacs:
-          spack_spec: gromacs@2021.6
+          pkg_spec: gromacs@2021.6
           compiler: gcc9
       environments:
         gromacs:
           packages:
           - gromacs
-          - impi2018
+          - impi2021
 
 In this configuration, the ``packages`` block defines software packages that
 can be used to build experiment environments out of. The ``environments`` block
@@ -106,18 +105,20 @@ Each environment has a ``packages`` block, which contains a list of package
 names that are defined in the higher level ``packages`` block.
 
 These are further documented in the
-:ref:`Spack configuration section<spack-config>` documentation.
+:ref:`Software configuration section<software-config>` documentation.
 
 Changing Software Definitions
 -----------------------------
 
-As the GROMACS application definition inherits from the ``SpackApplication``
-base class, it is expected to use Spack as its package manager. When changing
-the software definitions in a workspace, many options are available to you. For
-example, you could modify the compiler used for building GROMACS (as defined on
-line 45), or you could modify the MPI used for these experiments (as seen on
-line 53). However, we will explore changing aspects of GROMACS itself (such as
-its version or variants). 
+In this workspace, we have ``variants:package_manager:spack`` which injects the
+use of the ``spack`` package manager. You are able to change the package
+manager through this variant option, however the remainder of this tutorial
+will assume the package manager is ``spack``. When changing the software
+definitions in a workspace, many options are available to you. For example, you
+could modify the compiler used for building GROMACS (as defined on line 45), or
+you could modify the MPI used for these experiments (as seen on line 53).
+However, we will explore changing aspects of GROMACS itself (such as its
+version or variants). 
 
 **NOTE:** It is important to note that changing aspects of
 compilation could result in build-time errors that need to be resolved before
@@ -170,11 +171,11 @@ Adding Package Variants
 -----------------------
 
 So far, we have only explored changing the version a package used. More
-complicated changes to the Spack specs can be made by adding variant
-definitions. This can be directly added to the ``spack_spec`` lines within the
+complicated changes to the package specs can be made by adding variant
+definitions. This can be directly added to the ``pkg_spec`` lines within the
 package definitions in a workspace's ``ramble.yaml``.
 
-The ``spack_spec`` attribute can be parameterized with variable definitions
+The ``pkg_spec`` attribute can be parameterized with variable definitions
 also, to allow a wide range of variants to be explored with a single
 configuration.
 
@@ -200,6 +201,30 @@ your workspace through:
     $ ramble workspace info
     or;
     $ ramble workspace setup --dry-run
+
+
+Changing Package Managers
+-------------------------
+
+The experiments in this tutorial assumed the use of ``spack`` as your package
+manager. Ramble provides an option to change the package manager used in
+experiments. The workspace used contains the following lines:
+
+.. code-block:: yaml
+
+  variants:
+    package_manager: spack
+
+This tells Ramble which package manager object to use when constructing the
+experiments. The available package managers can be viewed using:
+
+.. code-block:: console
+
+  $ ramble list --type package_managers
+
+In addition to any of these package managers, experiments can set
+``variants:package_manager`` to either ``None`` or ``null`` to disable package
+managers for the experiment.
 
 Cleaning the Workspace
 ----------------------

@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -18,15 +18,14 @@ from ramble.main import RambleCommand
 
 
 # everything here uses the mock_workspace_path
-pytestmark = pytest.mark.usefixtures('mutable_config',
-                                     'mutable_mock_workspace_path')
+pytestmark = pytest.mark.usefixtures("mutable_config", "mutable_mock_workspace_path")
 
-workspace = RambleCommand('workspace')
+workspace = RambleCommand("workspace")
 
 
-def test_workspace_setup_creates_inventory(mutable_config,
-                                           mutable_mock_workspace_path,
-                                           mock_applications):
+def test_workspace_setup_creates_inventory(
+    mutable_config, mutable_mock_workspace_path, mock_applications
+):
     test_config = """
 ramble:
   variables:
@@ -46,30 +45,31 @@ ramble:
               env_vars:
                 set:
                   MY_VAR: 'TEST'
-  spack:
-    concretized: true
+  software:
     packages: {}
     environments: {}
 """
-    workspace_name = 'test_workspace_setup_creates_inventory'
+    workspace_name = "test_workspace_setup_creates_inventory"
     with ramble.workspace.create(workspace_name) as ws:
         ws.write()
 
         config_path = os.path.join(ws.config_dir, ramble.workspace.config_file_name)
 
-        with open(config_path, 'w+') as f:
+        with open(config_path, "w+") as f:
             f.write(test_config)
         ws._re_read()
-        workspace('setup', '--dry-run', global_args=['-w', workspace_name])
+        workspace("setup", "--dry-run", global_args=["-w", workspace_name])
 
-        assert os.path.exists(os.path.join(ws.root,
-                                           ramble.workspace.Workspace.inventory_file_name))
-        assert os.path.exists(os.path.join(ws.root,
-                                           ramble.workspace.Workspace.hash_file_name))
         assert os.path.exists(
-            os.path.join(ws.experiment_dir,
-                         'basic',
-                         'test_wl',
-                         'simple_test',
-                         ramble.application.ApplicationBase._inventory_file_name)
+            os.path.join(ws.root, ramble.workspace.Workspace.inventory_file_name)
+        )
+        assert os.path.exists(os.path.join(ws.root, ramble.workspace.Workspace.hash_file_name))
+        assert os.path.exists(
+            os.path.join(
+                ws.experiment_dir,
+                "basic",
+                "test_wl",
+                "simple_test",
+                ramble.application.ApplicationBase._inventory_file_name,
+            )
         )

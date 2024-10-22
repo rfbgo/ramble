@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,7 +6,9 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-from ramble.modkit import *  # noqa: F403
+import os
+
+from ramble.modkit import *
 
 
 class GcpMetadata(BasicModifier):
@@ -14,21 +16,29 @@ class GcpMetadata(BasicModifier):
 
     This mod can capture useful metadata (such as node type and VM image) for
     GCP VMs
+
+    Requires a definition for the `hostlist` variable, to be able to capture
+    per-node metadata.
     """
 
     name = "GcpMetadata"
 
-    tags('gcp-metadata')
-    maintainers('rfbgo')
+    tags("gcp-metadata")
+    maintainers("rfbgo")
 
-    mode('standard', description='Standard execution mode')
-    default_mode('standard')
+    mode("standard", description="Standard execution mode")
+    default_mode("standard")
 
-    executable_modifier('gcp_metadata_exec')
+    software_spec("pdsh", pkg_spec="pdsh", package_manager="spack*")
+
+    required_variable("hostlist")
+
+    executable_modifier("gcp_metadata_exec")
 
     def gcp_metadata_exec(self, executable_name, executable, app_inst=None):
         from ramble.util.executable import CommandExecutable
-        if hasattr(self, '_already_applied'):
+
+        if hasattr(self, "_already_applied"):
             return [], []
 
         self._already_applied = True
@@ -36,46 +46,180 @@ class GcpMetadata(BasicModifier):
         post_cmds = []
         pre_cmds = []
 
+        pre_cmds.append(
+            CommandExecutable(
+                "save-old-loglevel",
+                template=[
+                    'old_pdsh_args="$PDSH_SSH_ARGS_APPEND"',
+                    'export PDSH_SSH_ARGS_APPEND="-q"',
+                ],
+            )
+        )
+
         payloads = [
-            # end point, use_mpi
-            ('machine-type', False),
-            ('image', False),
-            ('hostname', False),
-            ('id', True),  # True since we want the gid of every node
+            # type, end point, per_node
+            ("instance", "machine-type", False),
+            ("instance", "image", False),
+            ("instance", "hostname", False),
+            (
+                "instance",
+                "id",
+                True,
+            ),  # True since we want the gid of every node
+            ("project", "numeric-project-id", False),
+            ("instance", "attributes/physical_host", True),
         ]
 
-        for end_point, use_mpi in payloads:
+        for type, end_point, per_node in payloads:
+            prefix = ""
+            suffix = ""
+            if per_node:
+                prefix = "pdsh -N -w {hostlist} '"
+                suffix = "'"
+            log_name = end_point.split("/")[-1]
             pre_cmds.append(
-                CommandExecutable('machine-type',
-                                  template=[
-                                      f'curl -s -w "\\n" "http://metadata.google.internal/computeMetadata/v1/instance/{end_point}" -H "Metadata-Flavor: Google"'
-                                  ],
-                                  mpi=use_mpi,
-                                  redirect=f'{{experiment_run_dir}}/gcp-metadata.{end_point}.log',
-                                  output_capture='>'
-                                  )
+                CommandExecutable(
+                    "machine-type",
+                    template=[
+                        # Fail silently (-f) to avoid jamming the log (say with 404 html)
+                        # This is especially pertinent to /attribute/physical_host,
+                        # which is only available for VMs with placement policy.
+                        f'{prefix} curl -s -f -w "\\n" "http://metadata.google.internal/computeMetadata/v1/{type}/{end_point}" -H "Metadata-Flavor: Google" {suffix}'
+                    ],
+                    mpi=False,
+                    redirect=f"{{experiment_run_dir}}/gcp-metadata.{log_name}.log",
+                    output_capture=">",
+                )
             )
+
+        pre_cmds.append(
+            CommandExecutable(
+                "restore-old-loglevel",
+                template=['export PDSH_SSH_ARGS_APPEND="$old_pdsh_args"'],
+            )
+        )
 
         return pre_cmds, post_cmds
 
-    def _prepare_analysis(self, workspace):
-        import os.path
+    def get_vm_id_list(self):
         ids = set()
-        file_name = self.expander.expand_var('{experiment_run_dir}/gcp-metadata.id.log')
-
+        exp_run_dir = self.expander.expand_var_name("experiment_run_dir")
+        file_name = os.path.join(exp_run_dir, "gcp-metadata.id.log")
         if os.path.isfile(file_name):
-            with open(file_name, 'r') as f:
+            with open(file_name) as f:
                 for cur_id in f.readlines():
-                    ids.add(cur_id.strip())
+                    cur_id = cur_id.strip()
+                    if cur_id.isnumeric():
+                        ids.add(cur_id)
+        return sorted(ids)
 
-            with open(self.expander.expand_var('{experiment_run_dir}/gcp-metadata.id_list.log'), 'w+') as f:
+    def _process_id_list(self):
+        ids = self.get_vm_id_list()
+
+        if ids:
+            with open(
+                self.expander.expand_var(
+                    "{experiment_run_dir}/gcp-metadata.id_list.log"
+                ),
+                "w+",
+            ) as f:
                 f.write(", ".join(sorted(ids)))
 
-    figure_of_merit('machine-type', fom_regex=r'.*machineTypes/(?P<machine>.*)', group_name='machine', log_file='{experiment_run_dir}/gcp-metadata.machine-type.log')
-    figure_of_merit('image', fom_regex=r'(?P<image>.*global/images.*)', group_name='image', log_file='{experiment_run_dir}/gcp-metadata.image.log')
+    def _process_physical_hosts(self, workspace):
+        run_dir = self.expander.expand_var("{experiment_run_dir}")
+        log_path = get_file_path(
+            os.path.join(
+                run_dir,
+                "gcp-metadata.physical_host.log",
+            ),
+            workspace,
+        )
+        if not os.path.isfile(log_path):
+            return
+
+        level0_groups = set()
+        level1_groups = set()
+        level2_groups = set()
+        all_hosts = set()
+
+        with open(log_path) as f:
+            for raw_host in f.readlines():
+                physical_host = raw_host[1:].strip()
+                tty.debug(f"  Host line: {physical_host}")
+                all_hosts.add(physical_host)
+                levels = physical_host.split("/")
+                tty.debug(f"   Levels: {levels}")
+                if len(levels) == 3:
+                    level0_groups.add(levels[0])
+                    level1_groups.add(levels[1])
+                    level2_groups.add(levels[2])
+
+        with open(
+            os.path.join(run_dir, "gcp-metadata.topology_summary.log"),
+            "w+",
+        ) as f:
+            if len(level0_groups) > 0:
+                f.write(f"Level 0 groups = {len(level0_groups)}\n")
+                f.write(f"Level 1 groups = {len(level1_groups)}\n")
+                f.write(f"Level 2 groups = {len(level2_groups)}\n")
+                f.write(f'All hosts = {",".join(all_hosts)}\n')
+
+    def _prepare_analysis(self, workspace):
+        self._process_id_list()
+        self._process_physical_hosts(workspace)
+
+    figure_of_merit(
+        "machine-type",
+        fom_regex=r".*machineTypes/(?P<machine>.*)",
+        group_name="machine",
+        log_file="{experiment_run_dir}/gcp-metadata.machine-type.log",
+        fom_type=FomType.INFO,
+    )
+    figure_of_merit(
+        "image",
+        fom_regex=r"(?P<image>.*global/images.*)",
+        group_name="image",
+        log_file="{experiment_run_dir}/gcp-metadata.image.log",
+        fom_type=FomType.INFO,
+    )
 
     # This is intentionally left singular, to get the hostname of the "parent" or "root" process
-    figure_of_merit('ghostname', fom_regex=r'(?P<ghostname>.*internal)', group_name='ghostname', log_file='{experiment_run_dir}/gcp-metadata.hostname.log')
+    figure_of_merit(
+        "ghostname",
+        fom_regex=r"(?P<ghostname>.*internal)",
+        group_name="ghostname",
+        log_file="{experiment_run_dir}/gcp-metadata.hostname.log",
+        fom_type=FomType.INFO,
+    )
 
     # This returns a list of all known gids in the job
-    figure_of_merit('gids', fom_regex=r'(?P<gid>.*)', group_name='gid', log_file='{experiment_run_dir}/gcp-metadata.id_list.log')
+    figure_of_merit(
+        "gids",
+        fom_regex=r"(?P<gid>.*)",
+        group_name="gid",
+        log_file="{experiment_run_dir}/gcp-metadata.id_list.log",
+        fom_type=FomType.INFO,
+    )
+
+    figure_of_merit(
+        "project-id",
+        fom_regex=r"(?P<numeric_project_id>\d+)",
+        group_name="numeric_project_id",
+        log_file="{experiment_run_dir}/gcp-metadata.numeric-project-id.log",
+    )
+
+    figure_of_merit(
+        "Level {level_num} Groups",
+        fom_regex="Level (?P<level_num>[0-9]) groups = (?P<num_groups>[0-9]+)",
+        log_file="{experiment_run_dir}/gcp-metadata.topology_summary.log",
+        group_name="num_groups",
+        units="",
+    )
+
+    figure_of_merit(
+        "All Hosts",
+        fom_regex="All hosts = (?P<hostlist>.*)",
+        log_file="{experiment_run_dir}/gcp-metadata.topology_summary.log",
+        group_name="hostlist",
+        units="",
+    )

@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -9,6 +9,7 @@
 import json
 import sys
 import math
+from enum import Enum
 
 import ramble.config
 from ramble.util.logger import logger
@@ -17,48 +18,51 @@ from ramble.config import ConfigError
 
 default_node_type_val = "Not Specified"
 
+uploader_types = Enum("uploader_types", ["BigQuery", "PrintOnly"])
 
-class Uploader():
+
+class Uploader:
     # TODO: should the class store the base uri?
     def perform_upload(self, uri, data):
         # TODO: move content checking to __init__ ?
         if not uri:
-            raise ValueError(
-                f"{self.__class__} requires {uri} argument.")
+            raise ValueError(f"{self.__class__} requires {uri} argument.")
         if not data:
-            raise ValueError(
-                f"{self.__class__} requires %{data} argument.")
+            raise ValueError(f"{self.__class__} requires %{data} argument.")
         pass
 
 
 def get_user():
-    config_user = ramble.config.get('config:user')
+    config_user = ramble.config.get("config:user")
     if config_user:
         return config_user
     else:
         import getpass
+
         return getpass.getuser()
 
 
-class Experiment():
+class Experiment:
     """
     Class representation of experiment data
     """
+
     def __init__(self, name, workspace_hash, data, timestamp):
         self.name = name
         self.foms = []
         self.id = None  # This is essentially the hash
         self.data = data
-        self.application_name = data['application_name']
-        self.workspace_name = data['RAMBLE_VARIABLES']['workspace_name']
+        self.application_name = data["application_name"]
+        self.workspace_name = data["RAMBLE_VARIABLES"]["workspace_name"]
         self.workspace_hash = workspace_hash
-        self.workload_name = data['workload_name']
+        self.workload_name = data["workload_name"]
         self.bulk_hash = None  # proxy for workspace or "uploaded with"
-        self.n_nodes = data['n_nodes']
-        self.processes_per_node = data['processes_per_node']
-        self.n_ranks = data['n_ranks']
-        self.n_threads = data['n_threads']
+        self.n_nodes = data["n_nodes"]
+        self.processes_per_node = data["processes_per_node"]
+        self.n_ranks = data["n_ranks"]
+        self.n_threads = data["n_threads"]
         self.node_type = default_node_type_val
+        self.status = data["RAMBLE_STATUS"]
         self.user = get_user()
 
         # FIXME: this is no longer strictly needed since it is just a concat of known properties
@@ -66,7 +70,7 @@ class Experiment():
             workspace_name=self.workspace_name,
             application=self.application_name,
             workload=self.workload_name,
-            date=timestamp
+            date=timestamp,
         )
 
         self.bulk_hash = exps_hash
@@ -94,10 +98,11 @@ class Experiment():
 
         # deep copy so the assignment below doesn't affect the foms array
         import copy
+
         j = copy.deepcopy(self.__dict__)
 
-        j['foms'] = json.dumps(self.foms)
-        j['data'] = json.dumps(self.data)
+        j["foms"] = json.dumps(self.foms)
+        j["data"] = json.dumps(self.data)
         return j
 
 
@@ -109,12 +114,12 @@ def determine_node_type(experiment, contexts):
     Second prio is more general data like CPU type
     """
     for context in contexts:
-        for fom in context['foms']:
-            if 'machine-type' in fom['name']:
-                experiment.node_type = fom['value']
+        for fom in context["foms"]:
+            if "machine-type" in fom["name"]:
+                experiment.node_type = fom["value"]
                 continue
-            elif 'Model name' in fom['name']:
-                experiment.node_type = fom['value']
+            elif "Model name" in fom["name"]:
+                experiment.node_type = fom["value"]
                 continue
 
         # Termination condition
@@ -123,32 +128,31 @@ def determine_node_type(experiment, contexts):
 
 
 def upload_results(results):
-    if ramble.config.get('config:upload'):
-        # Read upload type and push it there
-        if ramble.config.get('config:upload:type') == 'BigQuery':  # TODO: enum?
-            try:
-                formatted_data = ramble.experimental.uploader.format_data(results)
-            except KeyError:
-                logger.die("Error parsing file: Does not contain valid data to upload.")
-            # TODO: strategy object?
+    uploader_type = ramble.config.get("config:upload:type")
+    if uploader_type is None:
+        raise ConfigError("No upload type (config:upload:type) in config.")
+    if not hasattr(uploader_types, uploader_type):
+        raise ConfigError(f"Upload type {uploader_type} is not valid.")
+    uploader_type = getattr(uploader_types, uploader_type)
 
-            uploader = BigQueryUploader()
+    uri = ramble.config.get("config:upload:uri")
+    if not uri:
+        raise ConfigError("No upload URI (config:upload:uri) in config.")
 
-            uri = ramble.config.get('config:upload:uri')
-            if not uri:
-                logger.die('No upload URI (config:upload:uri) in config.')
+    try:
+        formatted_data = format_data(results)
+    except (KeyError, TypeError) as e:
+        raise ConfigError("Error parsing file: Does not contain valid data to upload.") from e
+    if len(formatted_data) == 0:
+        logger.warn("No data to upload")
+        return
 
-            logger.msg(f'Uploading Results to {uri}')
-
-            if len(formatted_data) == 0:
-                logger.warn('No data to upload')
-            else:
-                uploader.perform_upload(uri, formatted_data)
-        else:
-            raise ConfigError("Unknown config:upload:type value")
-
+    logger.msg(f"Uploading results to {uri} with {uploader_type} uploader")
+    if uploader_type == uploader_types.BigQuery:
+        uploader = BigQueryUploader()
     else:
-        raise ConfigError("Missing correct config:upload parameters")
+        uploader = PrintOnlyUploader()
+    uploader.perform_upload(uri, formatted_data)
 
 
 def format_data(data_in):
@@ -178,43 +182,69 @@ def format_data(data_in):
     # numberic/float and string FOM values
 
     from datetime import datetime
+
     current_dateTime = datetime.now()
 
-    for exp in data_in['experiments']:
-        if exp['RAMBLE_STATUS'] == 'SUCCESS':
-            e = Experiment(exp['name'], data_in['workspace_hash'], exp, current_dateTime)
+    for exp in data_in["experiments"]:
+
+        upload_failed = ramble.config.get("config:upload:push_failed")
+
+        if exp["RAMBLE_STATUS"] == "SUCCESS" or upload_failed:
+            e = Experiment(exp["name"], data_in["workspace_hash"], exp, current_dateTime)
             results.append(e)
             # experiment_id = exp.hash()
             # 'experiment_id': experiment_id,
-            for context in exp['CONTEXTS']:
-                for fom in context['foms']:
+            for context in exp["CONTEXTS"]:
+                for fom in context["foms"]:
                     # TODO: check on value to make sure it's a number
                     e.foms.append(
                         {
-                            'name': fom['name'],
-                            'value': fom['value'],
-                            'unit': fom['units'],
-                            'origin': fom['origin'],
-                            'origin_type': fom['origin_type'],
-                            'context': context['name'],
+                            "name": fom["name"],
+                            "value": fom["value"],
+                            "unit": fom["units"],
+                            "origin": fom["origin"],
+                            "origin_type": fom["origin_type"],
+                            "context": context["name"],
                         }
                     )
 
             # Explicitly try to pull out node type, if the run provided enough data
-            determine_node_type(e, exp['CONTEXTS'])
+            determine_node_type(e, exp["CONTEXTS"])
 
     return results
 
 
+def _prepare_data(results, uri):
+    # It is expected that the user will create these tables outside of this
+    # tooling
+    exp_table_id = f"{uri}.experiments"
+    fom_table_id = f"{uri}.foms"
+
+    exps_to_insert = []
+    foms_to_insert = []
+
+    for experiment in results:
+        exps_to_insert.append(experiment.to_json())
+
+        for fom in experiment.foms:
+            fom_data = fom
+            fom_data["experiment_id"] = experiment.get_hash()
+            fom_data["experiment_name"] = experiment.name
+            foms_to_insert.append(fom_data)
+
+    return exp_table_id, exps_to_insert, fom_table_id, foms_to_insert
+
+
 class BigQueryUploader(Uploader):
-    """Class to handle upload of FOMs to BigQuery
-    """
+    """Class to handle upload of FOMs to BigQuery"""
 
     """
     Attempt to chunk the upload into acceptable size chunks, per BigQuery requirements
     """
+
     def chunked_upload(self, table_id, data):
         from google.cloud import bigquery
+
         client = bigquery.Client()
         error = None
         approx_max_request = 1000000.0  # 1MB
@@ -243,22 +273,7 @@ class BigQueryUploader(Uploader):
 
     def insert_data(self, uri: str, results) -> None:
 
-        # It is expected that the user will create these tables outside of this
-        # tooling
-        exp_table_id = "{uri}.{table_name}".format(uri=uri, table_name="experiments")
-        fom_table_id = "{uri}.{table_name}".format(uri=uri, table_name="foms")
-
-        exps_to_insert = []
-        foms_to_insert = []
-
-        for experiment in results:
-            exps_to_insert.append(experiment.to_json())
-
-            for fom in experiment.foms:
-                fom_data = fom
-                fom_data['experiment_id'] = experiment.get_hash()
-                fom_data['experiment_name'] = experiment.name
-                foms_to_insert.append(fom_data)
+        exp_table_id, exps_to_insert, fom_table_id, foms_to_insert = _prepare_data(results, uri)
 
         logger.debug("Experiments to insert:")
         logger.debug(exps_to_insert)
@@ -271,7 +286,7 @@ class BigQueryUploader(Uploader):
             logger.msg("Upload FOMs...")
             errors2 = self.chunked_upload(fom_table_id, foms_to_insert)
 
-        for errors, name in zip([errors1, errors2], ['exp', 'fom']):
+        for errors, name in zip([errors1, errors2], ["exp", "fom"]):
             if errors == []:
                 logger.msg(f"New rows have been added in {name}")
             else:
@@ -286,14 +301,14 @@ class BigQueryUploader(Uploader):
         self.insert_data(uri, results)
 
     # def get_max_current_id(uri, table):
-        # TODO: Generating an id based on the max in use id is dangerous, and
-        # technically gives a race condition in parallel, and should be done in
-        # a more graceful and scalable way..  like hashing the experiment? or
-        # generating a known unique id for it
-        # query = "SELECT MAX(id) FROM `{uri}.{table}` LIMIT 1".format(uri=uri, table=table)
-        # query_job = client.query(query)
-        # results = query_job.result()  # Waits for job to complete.
-        # return results[0]
+    # TODO: Generating an id based on the max in use id is dangerous, and
+    # technically gives a race condition in parallel, and should be done in
+    # a more graceful and scalable way..  like hashing the experiment? or
+    # generating a known unique id for it
+    # query = "SELECT MAX(id) FROM `{uri}.{table}` LIMIT 1".format(uri=uri, table=table)
+    # query_job = client.query(query)
+    # results = query_job.result()  # Waits for job to complete.
+    # return results[0]
 
     def get_experiment_id(experiment):
         # get_max_current_id(...) # Warning: dangerous..
@@ -301,3 +316,18 @@ class BigQueryUploader(Uploader):
         # This should be stable per machine/python version, but is not
         # guaranteed to be globally stable
         return hash(json.dumps(experiment, sort_keys=True))
+
+
+class PrintOnlyUploader(Uploader):
+    """An uploader that only prints out formatted data without actually uploading."""
+
+    def perform_upload(self, uri, results):
+        super().perform_upload(uri, results)
+        exp_table_id, exps_to_insert, fom_table_id, foms_to_insert = _prepare_data(results, uri)
+        logger.info("NOTE: The PrintOnly uploader only logs, but does not upload any data.")
+        logger.info(f"{len(exps_to_insert)} experiment(s) would be uploaded to {exp_table_id}:")
+        for exp in exps_to_insert:
+            logger.info(f"  {exp}")
+        logger.info(f"{len(foms_to_insert)} fom(s) would be uploaded to {fom_table_id}:")
+        for fom in foms_to_insert:
+            logger.info(f"  {fom}")

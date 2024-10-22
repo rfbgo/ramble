@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -12,7 +12,7 @@ import ramble.util.matrices
 import spack.util.spack_yaml as syaml
 
 
-class Context(object):
+class Context:
     """Class to represent a context
 
     This class contains variable definitions to store any individual context
@@ -26,6 +26,7 @@ class Context(object):
         """
         self.env_variables = []
         self.variables = syaml.syaml_dict()
+        self.variants = syaml.syaml_dict()
         self.internals = {}
         self.templates = None
         self.formatted_executables = {}
@@ -42,12 +43,16 @@ class Context(object):
     def merge_context(self, in_context):
         """Merges another Context into this Context."""
 
-        internal_sections = [namespace.custom_executables,
-                             namespace.executables,
-                             namespace.executable_injection]
+        internal_sections = [
+            namespace.custom_executables,
+            namespace.executables,
+            namespace.executable_injection,
+        ]
 
         if in_context.variables:
             self.variables.update(in_context.variables)
+        if in_context.variants:
+            self.variants.update(in_context.variants)
         if in_context.env_variables:
             self.env_variables.append(in_context.env_variables)
         if in_context.internals:
@@ -63,10 +68,10 @@ class Context(object):
                         if internal_section not in self.internals:
                             self.internals[internal_section] = []
                         self.internals[internal_section].extend(
-                            in_context.internals[internal_section])
-                    else:
-                        self.internals[internal_section] = \
                             in_context.internals[internal_section]
+                        )
+                    else:
+                        self.internals[internal_section] = in_context.internals[internal_section]
         if in_context.chained_experiments:
             for chained_exp in in_context.chained_experiments:
                 self.chained_experiments.append(chained_exp.copy())
@@ -90,13 +95,14 @@ class Context(object):
 
 
 def create_context_from_dict(context_name, in_dict):
-    """Creates a new Context object from a dictionary of variables
+    """Creates a new Context object from an input dictionary
 
     Dictionaries should follow the below format:
 
     in_dict = {
         'env_vars': [],
         'variables': {},
+        'variants': {},
         'internals': {},
         'template': '',
         'chained_experiments': [],
@@ -126,6 +132,9 @@ def create_context_from_dict(context_name, in_dict):
     if namespace.variables in in_dict:
         new_context.variables = in_dict[namespace.variables]
 
+    if namespace.variants in in_dict:
+        new_context.variants = in_dict[namespace.variants]
+
     if namespace.internals in in_dict:
         new_context.internals = in_dict[namespace.internals]
 
@@ -148,9 +157,7 @@ def create_context_from_dict(context_name, in_dict):
         new_context.tags = in_dict[namespace.tags].copy()
 
     new_context.matrices = ramble.util.matrices.extract_matrices(
-        'experiment creation',
-        context_name,
-        in_dict
+        "experiment creation", context_name, in_dict
     )
 
     if namespace.n_repeats in in_dict:

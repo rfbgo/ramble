@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -37,10 +37,20 @@ Now you can activate the workspace and view its default configuration.
 .. code-block:: console
 
     $ ramble workspace activate basic_gromacs
-    $ ramble workspace info
+
+Alternatively, the workspace creation and activation can be combined in one command
+with the activate flag (``-a``):
+
+.. code-block:: console
+
+    $ ramble workspace create basic_gromacs -a
 
 You can use the ``ramble workspace info`` command after editing configuration
 files to see how ramble would use the changes you made.
+
+.. code-block:: console
+
+    $ ramble workspace info
 
 Configure the Workspace
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,12 +71,15 @@ To begin, you should edit the ``ramble.yaml`` file to set up the configuration
 for your experiments. For this tutorial, replace the default yaml text with the
 contents of ``$RAMBLE_ROOT/examples/basic_gromacs_config.yaml``:
 
+**NOTE**: This workspace utilizes the ``spack`` package manager. As a result, it
+requires ``spack`` is installed and available in your path. Modifications to
+the ``package_manager`` variant will change this behavior.
 
 .. literalinclude:: ../../../../examples/basic_gromacs_config.yaml
    :language: YAML
 
 Note that specifying compilers that Spack doesn't have installed may take a while.
-To see available compilers, use ``spack compilers`` or see `Spack documentation
+To see available compilers, use ``spack compilers`` or see `Spack's documentation
 <https://spack.readthedocs.io/en/latest/getting_started.html#spack-compilers>`_
 for more information.
 

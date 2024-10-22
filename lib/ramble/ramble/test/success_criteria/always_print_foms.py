@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -17,16 +17,13 @@ from ramble.main import RambleCommand
 
 
 # everything here uses the mock_workspace_path
-pytestmark = pytest.mark.usefixtures('mutable_config',
-                                     'mutable_mock_workspace_path')
+pytestmark = pytest.mark.usefixtures("mutable_config", "mutable_mock_workspace_path")
 
-workspace = RambleCommand('workspace')
-ramble_on = RambleCommand('on')
+workspace = RambleCommand("workspace")
+ramble_on = RambleCommand("on")
 
 
-def test_always_print_foms(mutable_config,
-                           mutable_mock_workspace_path,
-                           mock_applications):
+def test_always_print_foms(mutable_config, mutable_mock_workspace_path, mock_applications):
     test_config = """
 ramble:
   variables:
@@ -42,26 +39,25 @@ ramble:
             simple_test:
               variables:
                 n_nodes: 1
-  spack:
-    concretized: true
+  software:
     packages: {}
     environments: {}
 """
-    workspace_name = 'test_always_print_foms'
+    workspace_name = "test_always_print_foms"
     with ramble.workspace.create(workspace_name) as ws:
         ws.write()
 
         config_path = os.path.join(ws.config_dir, ramble.workspace.config_file_name)
 
-        with open(config_path, 'w+') as f:
+        with open(config_path, "w+") as f:
             f.write(test_config)
         ws._re_read()
 
-        workspace('setup', global_args=['-w', workspace_name])
-        ramble_on(global_args=['-w', workspace_name])
-        workspace('analyze', '--always-print-foms', global_args=['-w', workspace_name])
+        workspace("setup", global_args=["-w", workspace_name])
+        ramble_on(global_args=["-w", workspace_name])
+        workspace("analyze", global_args=["-w", workspace_name])
 
-        with open(os.path.join(ws.root, 'results.latest.txt'), 'r') as f:
+        with open(os.path.join(ws.root, "results.latest.txt")) as f:
             data = f.read()
-            assert 'FAILED' in data
-            assert '0.9 s' in data
+            assert "FAILED" in data
+            assert "0.9 s" in data

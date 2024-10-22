@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -14,20 +14,21 @@ import ramble.workspace
 from ramble.main import RambleCommand
 
 # everything here uses the mock_workspace_path
-pytestmark = pytest.mark.usefixtures('mutable_config',
-                                     'mutable_mock_workspace_path')
+pytestmark = pytest.mark.usefixtures("mutable_config", "mutable_mock_workspace_path")
 
-workspace = RambleCommand('workspace')
+workspace = RambleCommand("workspace")
 
 
 def test_concretize_does_not_set_required(mutable_config, mutable_mock_workspace_path):
     """
     Verify that concretizing an application with required set to True
-    does not insert a required statement into spack spec.
+    does not insert a required statement into software dict.
     """
 
     test_config = """
 ramble:
+  variants:
+    package_manager: spack
   variables:
     mpi_command: 'mpirun'
     batch_submit: '{execute_experiment}'
@@ -67,21 +68,20 @@ ramble:
                 n_nodes: ['1', '2', '4', '8', '16']
               matrix:
               - n_nodes
-  spack:
-    concretized: false
+  software:
     packages: {}
     environments: {}
 """
 
     import re
 
-    workspace_name = 'test_concretize_does_not_set_required'
+    workspace_name = "test_concretize_does_not_set_required"
     with ramble.workspace.create(workspace_name) as ws:
         ws.write()
 
         config_path = os.path.join(ws.config_dir, ramble.workspace.config_file_name)
 
-        with open(config_path, 'w+') as f:
+        with open(config_path, "w+") as f:
             f.write(test_config)
 
         ws._re_read()
@@ -91,9 +91,9 @@ ramble:
         ws._re_read()
 
         req_test = True
-        with open(config_path, 'r') as f:
+        with open(config_path) as f:
             for line in f.readlines():
-                if re.match(r'^[^#]*required', line):
+                if re.match(r"^[^#]*required", line):
                     req_test = False
                     break
             assert req_test

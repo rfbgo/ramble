@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -106,54 +106,8 @@ Within this file, use the example above to define two new executables
 in the ``end_time`` executable definition. The resulting file should look like
 the following:
 
-.. code-block:: YAML
-
-    ramble:
-      env_vars:
-        set:
-          OMP_NUM_THREADS: '{n_threads}'
-      variables:
-        processes_per_node: 16
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-      applications:
-        wrfv4:
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}:
-                  internals:
-                    custom_executables:
-                      start_time:
-                        template:
-                        - 'date +%s'
-                        redirect: '{experiment_run_dir}/start_time'
-                        use_mpi: false
-                      end_time:
-                        template:
-                        - 'date +%s'
-                        redirect: '{experiment_run_dir}/end_time'
-                        use_mpi: false
-                  variables:
-                    n_nodes: [1, 2]
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
+.. literalinclude:: ../../../../examples/tutorial_11_new_exec_config.yaml
+   :language: YAML
 
 Defining Executable Order
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -176,16 +130,36 @@ experiments, execute:
 
 .. code-block:: console
 
-    $ ramble info wrfv4
+    $ ramble info --attrs workloads -v -p "CONUS_12km" wrfv4
 
-
-And examine the section under the ``Workload: CONUS_12km`` header. The
+This prints the information for the ``CONUS_12km`` workload in the wrfv4 application definition.
 ``Executables:`` definition lists the order of executables used for this
 workload. As an example, you might see the following:
 
 .. code-block:: console
 
-    Executables: ['builtin::env_vars', 'builtin::spack_source', 'builtin::spack_activate', 'cleanup', 'copy', 'fix_12km', 'execute']
+    Executables: ['cleanup', 'copy', 'fix_12km', 'execute']
+
+Some executables are provided through the ``builtin`` functionality. These are
+executable commands that are injected by default from the object definitions.
+To be able to see these, you can execute:
+
+.. code-block:: console
+
+    $ ramble info --attrs builtins -v wrfv4
+
+This command should print something like the following:
+
+.. code-block:: console
+
+  ############
+  # builtins #
+  ############
+  builtin::env_vars:
+      name: env_vars
+      required: True
+      injection_method: prepend
+      depends_on: []
 
 Now, edit the workspace configuration file with:
 
@@ -203,64 +177,8 @@ For the purposes of this tutorial, add ``start_time`` directly before
 ``execute`` and ``end_time`` directly after ``execute``. The resulting
 configuration file should look like the following:
 
-.. code-block:: YAML
-
-    ramble:
-      env_vars:
-        set:
-          OMP_NUM_THREADS: '{n_threads}'
-      variables:
-        processes_per_node: 16
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-      applications:
-        wrfv4:
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}:
-                  internals:
-                    custom_executables:
-                      start_time:
-                        template:
-                        - 'date +%s'
-                        redirect: '{experiment_run_dir}/start_time'
-                        use_mpi: false
-                      end_time:
-                        template:
-                        - 'date +%s'
-                        redirect: '{experiment_run_dir}/end_time'
-                        use_mpi: false
-                    executables:
-                    - builtin::env_vars
-                    - builtin::spack_source
-                    - builtin::spack_activate
-                    - cleanup
-                    - copy
-                    - fix_12km
-                    - start_time
-                    - execute
-                    - end_time
-                  variables:
-                    n_nodes: [1, 2]
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
+.. literalinclude:: ../../../../examples/tutorial_11_exec_order_config.yaml
+   :language: YAML
 
 **NOTE** Omitting any executables from the ``executables`` list will
 prevent it from being used in the generated experiments.
@@ -283,6 +201,7 @@ As an example, the following YAML could replace the ``executables`` section of
 your existing configuration with the following:
 
 .. code-block:: YAML
+
    executable_injection:
    - name: start_time
      order: before
@@ -301,62 +220,26 @@ Replace the ``executables`` block with the ``executable_injection`` block
 presented above.  The resulting configuration file should look like the
 following:
 
-.. code-block:: YAML
-
-    ramble:
-      variables:
-        processes_per_node: 4
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-      applications:
-        wrfv4:
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}:
-                  internals:
-                    custom_executables:
-                      start_time:
-                        template:
-                        - 'date +%s'
-                        redirect: '{experiment_run_dir}/start_time'
-                        use_mpi: false
-                      end_time:
-                        template:
-                        - 'date +%s'
-                        redirect: '{experiment_run_dir}/end_time'
-                        use_mpi: false
-                    executable_injection:
-                    - name: start_time
-                      order: before
-                      relative_to: execute
-                    - name: end_time
-                      order: after
-                      relative_to: execute
-                  variables:
-                    n_nodes: [1, 2, 4]
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
-
+.. literalinclude:: ../../../../examples/tutorial_11_exec_injection_config.yaml
+   :language: YAML
 
 .. include:: shared/wrf_execute.rst
 
 Examining the experiment run directories, you should see ``start_time`` and
 ``end_time`` in the same places as they were when you ran the explicitly
 defined order experiments.
+
+Clean the Workspace
+-------------------
+
+Once you are finished with the tutorial content, make sure you deactivate your workspace:
+
+.. code-block:: console
+
+    $ ramble workspace deactivate
+
+Additionally, you can remove the workspace and all of its content with:
+
+.. code-block:: console
+
+    $ ramble workspace remove internals_wrf

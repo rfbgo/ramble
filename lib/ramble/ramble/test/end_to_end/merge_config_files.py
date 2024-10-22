@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -17,11 +17,10 @@ from ramble.main import RambleCommand
 
 
 # everything here uses the mock_workspace_path
-pytestmark = pytest.mark.usefixtures('mutable_config',
-                                     'mutable_mock_workspace_path')
+pytestmark = pytest.mark.usefixtures("mutable_config", "mutable_mock_workspace_path")
 
-workspace = RambleCommand('workspace')
-config = RambleCommand('config')
+workspace = RambleCommand("workspace")
+config = RambleCommand("config")
 
 
 def test_merge_config_files(mutable_config, mutable_mock_workspace_path, mock_applications):
@@ -36,12 +35,11 @@ applications:
               n_ranks: '1'
 """
 
-    test_spack = """
-spack:
-  concretized: true
+    test_software = """
+software:
   packages:
     zlib:
-      spack_spec: zlib@1.2.12
+      pkg_spec: zlib@1.2.12
   environments:
     zlib:
       packages:
@@ -49,45 +47,67 @@ spack:
 """
     test_config = """
 ramble:
+  variants:
+    package_manager: spack
   variables:
     mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
     batch_submit: 'batch_submit {execute_experiment}'
     processes_per_node: '16'
     n_threads: '1'
   applications: {}
-  spack:
-    concretized: false
+  software:
     packages: {}
     environments: {}
 """
-    workspace_name = 'test_merge_config_files'
+    test_licenses = """
+licenses:
+  zlib:
+    set:
+      TEST_LICENSE: 'port@server'
+"""
+    workspace_name = "test_merge_config_files"
     with ramble.workspace.create(workspace_name) as ws:
         ws.write()
 
         config_path = os.path.join(ws.config_dir, ramble.workspace.config_file_name)
 
-        with open(config_path, 'w+') as f:
+        with open(config_path, "w+") as f:
             f.write(test_config)
 
         ws._re_read()
 
-        applications_file = os.path.join(ws.root, 'applications_test.yaml')
-        spack_file = os.path.join(ws.root, 'spack_test.yaml')
+        applications_file = os.path.join(ws.root, "applications_test.yaml")
+        software_file = os.path.join(ws.root, "software_test.yaml")
+        licenses_file = os.path.join(ws.root, "licenses.yaml")
 
-        with open(applications_file, 'w+') as f:
+        with open(applications_file, "w+") as f:
             f.write(test_applications)
 
-        with open(spack_file, 'w+') as f:
-            f.write(test_spack)
+        with open(software_file, "w+") as f:
+            f.write(test_software)
 
-        config('add', '-f', applications_file, global_args=['-w', workspace_name])
-        config('add', '-f', spack_file, global_args=['-w', workspace_name])
+        with open(licenses_file, "w") as f:
+            f.write(test_licenses)
+
+        config("add", "-f", applications_file, global_args=["-w", workspace_name])
+        config("add", "-f", software_file, global_args=["-w", workspace_name])
+        config("add", "-f", licenses_file, global_args=["-w", workspace_name])
 
         ws._re_read()
 
-        with open(config_path, 'r') as f:
+        with open(config_path) as f:
             data = f.read()
-            assert 'ensure_installed' in data
-            assert 'test_experiment' in data
-            assert 'zlib' in data
-            assert 'spack_spec: zlib@1.2.12' in data
+
+            assert "ensure_installed" in data
+            assert "test_experiment" in data
+            assert "zlib" in data
+            assert "pkg_spec: zlib@1.2.12" in data
+            assert "licenses" in data
+            assert "TEST_LICENSE: port@server" in data
+
+        workspace("setup", "--dry-run", global_args=["-w", workspace_name])
+        exec_file = os.path.join(
+            ws.experiment_dir, "zlib", "ensure_installed", "test_experiment", "execute_experiment"
+        )
+        with open(exec_file) as f:
+            assert "license.inc" in f.read()

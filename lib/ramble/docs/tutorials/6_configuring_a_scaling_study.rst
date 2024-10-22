@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -54,10 +54,13 @@ you want to execute. To begin with, select a workload from the output of:
 
 .. code-block:: console
 
-    $ ramble info wrfv4
+    $ ramble info --attrs workloads wrfv4
 
 For the purposes of this tutorial, the ``CONUS_12km`` workload is recommended
 because it is less computationally expensive than the ``CONUS_2p5km`` workload.
+
+**NOTE**: To get more detailed information about the workload definitions, you
+can use ``ramble info --attrs workloads -v wrfv4``.
 
 Configure Experiment Definitions
 --------------------------------
@@ -144,7 +147,7 @@ define additional important details such as how many MPI ranks you want in each
 experiment (defined by the ``n_ranks`` variable), or how many MPI ranks should
 execute on each node (defined by the ``processes_per_node`` variable). You
 should add these details as workspace variables within your configuration file.
-For the purposes of this tutorial, we will assume 4 MPI ranks per node and that
+For the purposes of this tutorial, we will assume 16 MPI ranks per node and that
 the number of MPI ranks total will be the number of MPI ranks per node
 multiplied by the number of nodes.
 
@@ -159,12 +162,14 @@ MPI implementation you wish to use, but good default might be
 ``mpirun -n {n_ranks}``. If you would like to add ``hostfile`` and ``ppn``
 flags, feel free to do so here.
 
-Your configuration file might look like the
-following after adding this information:
+Your configuration file might look like the following after adding this
+information:
 
 .. code-block:: YAML
 
     ramble:
+      variants:
+        package_manager: spack
       env_vars:
         set:
           OMP_NUM_THREADS: '{n_threads}'
@@ -199,46 +204,13 @@ suggested starting place for the experiments. To apply this to your workspace, u
 
     $ ramble workspace concretize
 
-This will fill out the ``spack`` dictionary within your workspace configuration
+This will fill out the ``software`` dictionary within your workspace configuration
 file. After executing this command, your workspace configuration file might
 look like the following:
 
-.. code-block:: YAML
 
-    ramble:
-      env_vars:
-        set:
-          OMP_NUM_THREADS: '{n_threads}'
-      variables:
-        processes_per_node: 16
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-      applications:
-        wrfv4:
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}:
-                  variables:
-                    n_nodes: [1, 2]
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
+.. literalinclude:: ../../../../examples/tutorial_6_config.yaml
+   :language: YAML
 
 At this point, you have fully described experiments that can be executed.
 However, your system might not have the correct compiler (and building a
@@ -253,3 +225,20 @@ you see fit, and make sure the ``gcc9`` references under ``intel-mpi`` and
 Ramble also supports uploading the analyzed data to online databases, using
 ``ramble workspace analyze --upload``. We will not cover this functionality in
 detail here, but it is very useful for production experiments.
+
+Cleaning the Workspace
+----------------------
+
+After you are finished with the content of this tutorial, make sure you
+deactivate your workspace using:
+
+.. code-block:: console
+
+    $ ramble workspace deactivate
+
+If you no longer need the workspace materials, remove the entire workspace
+with:
+
+.. code-block:: console
+
+    $ ramble workspace remove scaling_wrf

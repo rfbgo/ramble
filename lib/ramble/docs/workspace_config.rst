@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -17,17 +17,14 @@ workspace has a configuration file stored at ``$workspace/configs/ramble.yaml``.
 
 This document will describe the syntax for writing a workspace configuration file.
 
-Within the ``ramble.yaml`` file, there are two top level dictionairies.
+Within the ``ramble.yaml`` file, all content lives under the top level ``ramble`` dictionary:
 
 .. code-block:: console
 
    ramble:
      ...
-   spack:
-     ...
 
-Each of these dictionaries is used to control different aspects of the Ramble
-workspace.
+This dictionary is used to control all of the aspects of the Ramble workspace.
 
 -----------------
 Ramble Dictionary
@@ -150,9 +147,21 @@ Supported math operators are:
 * ``-`` (subtraction)
 * ``*`` (multiplication)
 * ``/`` (division)
+* ``//`` (floor division)
 * ``**`` (exponent)
+* ``^`` (bitwise exclusive or)
+* ``-`` (unary subtraction)
+* ``==`` (equal)
+* ``!=`` (not equal)
+* ``>`` (greater than)
+* ``>=`` (greator or equal than)
+* ``<`` (less than)
+* ``<=`` (less or equal than)
+* ``and`` (logical and)
+* ``or`` (logical or)
+* ``%`` (modulo)
 
-Support functions are:
+Supported functions are:
 
 * ``str()`` (explicit string cast)
 * ``int()`` (explicit integer cast)
@@ -163,6 +172,13 @@ Support functions are:
 * ``floor()`` (floor of input)
 * ``range()`` (construct range, see :ref:`ramble vector logic<ramble-vector-logic>` for more information)
 * ``simplify_str()`` (convert input string to only alphanumerical characters and dashes)
+* ``randrange`` (from `random.randrange`)
+* ``randint`` (from `random.randint`)
+* ``re_search(regex, str)`` (determine if ``str`` contains pattern ``regex``, based on ``re.search``)
+
+Additionally, string slicing is supported:
+
+* ``str[start:end:step]`` (string slicing)
 
 .. _ramble-escaped-variables:
 
@@ -173,7 +189,7 @@ Escaped Variables
 When referring to variables in Ramble, sometimes it is useful to be able to
 escape curly braces to prevent the expander from fully expanding the variable
 reference. Curly braces that are prefixed with a back slash (i.e. ``\{`` or
-``\}``) will be ignored by the expander.
+``\}``) will be replaced with an unexpanded curly brace by Ramble's expander.
 
 Each time the variable is expanded, the escaped curly braces will be replaced
 with unescaped curly braces (i.e. ``\{`` will expand to ``{``). Additional back
@@ -371,6 +387,32 @@ Below is an example showing how to define explicit zips:
 
 Which would result in eight experiments, crossing the ``n_nodes`` variable with
 the zip of ``partition`` and ``processes_per_node``.
+
+.. _ramble-experiment-variants:
+
+
+^^^^^^^^^^^^^^^
+Variant Control
+^^^^^^^^^^^^^^^
+
+Within a workspace configuration file, experiments are able to define variants.
+Variants are able to manipulate specific aspects of experiments and
+applications. More information on these configuration options can be seen in
+the :ref:`Variants Configuration Section<variants-config>` documentation. To
+begin with, the only variant that can be specific is the ``package_manager``.
+
+The ``package_manager`` variant is used to define which package manager is used
+to configure and execute the experiments. To select ``spack`` as the package
+manager, the following block can be added to any scope that variables can be
+defined in.
+
+.. code-block:: yaml
+
+  variants:
+    package_manager: spack
+
+For more information about controlling package managers see the
+:ref:`package manager documentation <package-manager-control>`.
 
 
 .. _ramble-experiment-exclusion:
@@ -707,6 +749,39 @@ These tags are propagated into a workspace's results file, and can be used to
 filter pipeline commands, as show in the
 :ref:`filtering experiments documentation <filter-experiments>`.
 
+.. _workspace_including_external_files:
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Including External Configuration Files
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Ramble workspace configuration files support referring to external
+configuration files. This allows a workspace to be composed of external files
+and directories.
+
+.. code-block::
+   YAML
+
+  ramble:
+    include:
+    - /absolute/path/to/applications.yaml
+    - $workspace_root/directory/in/workspace/
+
+Supported path variables include:
+
+ * ``$workspace_root`` - Root directory of workspace
+ * ``$workspace`` - Root directory of workspace
+ * ``$workspace_configs`` - Configs directory in workspace
+ * ``$workspace_software`` - Software directory in workspace
+ * ``$workspace_logs`` - Logs directory in workspace
+ * ``$workspace_inputs`` - Experiments directory in workspace
+ * ``$workspace_shared`` - Shared directory in workspace
+ * ``$workspace_archives`` - Archives directory in workspace
+ * ``$workspace_deployments`` - Deployments directory in workspace
+
+For more information, see the relevant portion of Spack's documentation on
+`including configurations <https://spack.readthedocs.io/en/latest/environments.html#included-configurations>`_.
+
 .. _workspace_internals:
 
 ^^^^^^^^^^^^^^^^^^^^^
@@ -875,7 +950,7 @@ Ramble automatically generates definitions for the following variables:
 * ``workload_name`` - Set to the name of the workload within the application
 * ``experiment_name`` - Set to the name of the experiment
 * ``env_name`` - By default defined as ``{application_name}``. Can be
-  overridden to control the spack definition to use.
+  overridden to control the software environment to use.
 * ``application_run_dir`` - Absolute path to
   ``$workspace_root/experiments/{application_name}``
 * ``workload_run_dir`` - Absolute path to
@@ -903,25 +978,34 @@ Ramble automatically generates definitions for the following variables:
   absolute path to: ``{experiment_run_dir}/<template_name>`` where
   ``<template_name>`` is the filename of the template, without the extension.
 
-""""""""""""""""""""""""""""""""""
-Spack Specific Generated Variables
-""""""""""""""""""""""""""""""""""
-When using spack applications, Ramble also generates the following variables:
+""""""""""""""""""""""""""""""""""""""""""""
+Package Manager Specific Generated Variables
+""""""""""""""""""""""""""""""""""""""""""""
+Ramble also generates or requires the following variables, depending on the
+package manager used:
 
-* ``<software_spec_name>`` - Set to the equivalent of ``spack location -i
-  <spec>`` for packages defined in a ramble ``spec_name`` package set.
-  ``<software_spec_name>`` is set to the name of the package as defined in the
-  ``spack:packages`` dictionary.
+* ``<software_spec_name>_path`` - Set to the installation location for the package
+  for all packages defined in an experiment's environment definition.
+  ``<software_spec_name>`` is the name of the package as defined in the
+  ``software:packages`` dictionary.
+
+When the package manager is ``spack`` this is the equivalent to the output of
+``spack location -i`` for each install spec.
+
+Any applications that have required packages require path variables to be
+defined when a package manager is not used.
 
 As an example:
 
 .. code-block:: yaml
 
     ramble:
-      spack:
+      variants:
+        package_manager: spack
+      software:
         packages:
           grm:
-            spack_spec: gromacs@2023.1
+            pkg_spec: gromacs@2023.1
         environments:
           grm_env:
             packages:
@@ -930,7 +1014,7 @@ As an example:
 Defines a software environment named ``grm_env``. The default environment used
 has the same name as the application the experiment is generated from. In
 experiments which use this ``grm_env`` environment, a variable is defined
-named: ``gromacs``, as that is the package named defined by the ``spack_spec``
+named: ``gromacs``, as that is the package named defined by the ``pkg_spec``
 attribute of the ``grm`` package definition. This variable contains the path to
 the installation location for the ``gromacs`` package.
 
@@ -939,24 +1023,24 @@ actually performing the setup of a workspace. When a ``--dry-run`` is
 performed, these paths are not populated.
 
 
-----------------
-Spack Dictionary
-----------------
+-------------------
+Software Dictionary
+-------------------
 
-Within a ramble.yaml file, the ``spack:`` dictionary controls the software
+Within a ramble.yaml file, the ``software:`` dictionary controls the software
 stack installation that ramble performs. This configuration section is defined
-in the :ref:`Spack section<spack-config>` documentation.
+in the :ref:`Software section<software-config>` documentation.
 a packages dictionary, and an environments dictionary.
 
 The ``ramble workspace concretize`` command can help construct a functional
-spack dictionary based on the experiments listed.
+software dictionary based on the experiments listed.
 
 It is important to note that packages and environments that are not used by an
 experiment are not installed.
 
 Application definition files can define one or more ``software_spec``
 directives, which are packages the application might need to run properly.
-Additionally, spack packages can be marked as required through the
+Additionally, packages can be marked as required through the
 ``required_package`` directive.
 
 -------------------------------------------
@@ -987,6 +1071,8 @@ Below is an example of running a Gromacs experiment in both MPICH and OpenMPI:
 .. code-block:: yaml
 
     ramble:
+      variants:
+        package_manager: spack
       variables:
         batch_submit: '{execute_experiment}'
         mpi_command:
@@ -1002,18 +1088,18 @@ Below is an example of running a Gromacs experiment in both MPICH and OpenMPI:
                     n_ranks: '1'
                     n_nodes: '1'
                     env_name: ['gromacs-mpich', 'gromacs-ompi']
-    spack:
+    software:
       packages:
         gcc9:
-          spack_spec: gcc@9.3.0 target=x86_64
+          pkg_spec: gcc@9.3.0 target=x86_64
         mpich:
-          spack_spec: mpich@4.0.2 target=x86_64
+          pkg_spec: mpich@4.0.2 target=x86_64
           compiler: gcc9
         ompi:
-          spack_spec: openmpi@4.1.4 target=x86_64
+          pkg_spec: openmpi@4.1.4 target=x86_64
           compiler: gcc9
         gromacs:
-          spack_spec: gromacs@2022.4
+          pkg_spec: gromacs@2022.4
           compiler: gcc9
       environments:
         gromacs-{mpi}:
@@ -1048,6 +1134,8 @@ variable can be used to submit the same experiment to multiple batch systems.
 .. code-block:: yaml
 
     ramble:
+      variants:
+        package_manager: spack
       variables:
         mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
         batch_system:
@@ -1065,20 +1153,20 @@ variable can be used to submit the same experiment to multiple batch systems.
                   variables:
                     n_ranks: '1'
                     n_nodes: '1'
-    spack:
+    software:
       packages:
         gcc9:
-          spack_spec: gcc@9.3.0 target=x86_64
-        impi2018:
-          spack_spec: intel-mpi@2018.4.274 target=x86_64
+          pkg_spec: gcc@9.3.0 target=x86_64
+        impi2021:
+          pkg_spec: intel-oneapi-mpi@2021.11.0 target=x86_64
           compiler: gcc9
         gromacs:
-          spack_spec: gromacs@2022.4
+          pkg_spec: gromacs@2022.4
           compiler: gcc9
       environments:
         gromacs:
           packages:
-          - impi2018
+          - impi2021
           - gromacs
 
 The above example overrides the generated ``batch_submit`` variable to change
@@ -1164,7 +1252,7 @@ In the above example, the chained experiment would have a namespace of:
 ``hostname.serial.test_exp2.chain.0.hostname.serial.test_exp1``
 
 The ``name`` attribute can use `globbing
-syntax<https://docs.python.org/3/library/fnmatch.html#module-fnmatch>` to chain
+syntax<https://docs.python.org/3/library/fnmatch.html#module-fnmatch>`_ to chain
 multiple experiments at once.
 
 The ``order`` keyword is optional. Valid options include:
@@ -1182,7 +1270,7 @@ The ``variables`` keyword is optional. It can be used to override the
 definition of variables from the chained experiment if needed.
 
 Once the experiments are defined, the final order of the chain can be viewed using
-``ramble workspace info -v``.
+``ramble workspace info -vvv``.
 
 **NOTE** When using the ``experiment_index`` variable, all experiments in a
 chain share the same value. This ensures the resulting experiment will be

@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -87,47 +87,9 @@ allowing us to use the platform definitions from the above YAML.
 Edit your workspace configuration file to include the ``platform_config`` from
 the above section. The result should look like the following:
 
-.. code-block:: YAML
 
-    ramble:
-      env_vars:
-        set:
-          OMP_NUM_THREADS: '{n_threads}'
-      variables:
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-        platform: ['platform1', 'platform2', 'platform3']
-        processes_per_node: ['16', '18', '20']
-      zips:
-        platform_config:
-        - platform
-        - processes_per_node
-      applications:
-        wrfv4:
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}:
-                  variables:
-                    n_nodes: [1, 2]
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
+.. literalinclude:: ../../../../examples/tutorial_7_base_config.yaml
+   :language: YAML
 
 Define an Experiment Matrix
 ---------------------------
@@ -172,53 +134,11 @@ example:
     - platform_config
     - n_nodes
 
-Would result in 6 experiments. Adding this to you workspace configuration, you
+Would result in 6 experiments. Adding this to your workspace configuration, you
 should have the following in your ``ramble.yaml``:
 
-.. code-block:: YAML
-
-    ramble:
-      env_vars:
-        set:
-          OMP_NUM_THREADS: '{n_threads}'
-      variables:
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-        platform: ['platform1', 'platform2', 'platform3']
-        processes_per_node: ['16', '18', '20']
-      zips:
-        platform_config:
-        - platform
-        - processes_per_node
-      applications:
-        wrfv4:
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}:
-                  variables:
-                    n_nodes: [1, 2]
-                  matrix:
-                  - platform_config
-                  - n_nodes
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
+.. literalinclude:: ../../../../examples/tutorial_7_matrix_config.yaml
+   :language: YAML
 
 At this stage, running:
 
@@ -238,50 +158,9 @@ name template to include either ``platform`` or ``processes_per_node``. The
 below example will use ``platform``, but you are free to experiment with these.
 Your final configuration file should look something like:
 
-.. code-block:: YAML
 
-    ramble:
-      env_vars:
-        set:
-          OMP_NUM_THREADS: '{n_threads}'
-      variables:
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-        platform: ['platform1', 'platform2', 'platform3']
-        processes_per_node: ['16', '18', '20']
-      zips:
-        platform_config:
-        - platform
-        - processes_per_node
-      applications:
-        wrfv4:
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}_{platform}:
-                  variables:
-                    n_nodes: [1, 2]
-                  matrix:
-                  - platform_config
-                  - n_nodes
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
+.. literalinclude:: ../../../../examples/tutorial_7_final_config.yaml
+   :language: YAML
 
 .. include:: shared/wrf_execute.rst
 

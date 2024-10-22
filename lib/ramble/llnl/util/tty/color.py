@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -67,8 +67,6 @@ from __future__ import unicode_literals
 import re
 import sys
 from contextlib import contextmanager
-
-import six
 
 
 class ColorParseError(Exception):
@@ -253,7 +251,7 @@ def cescape(string):
     Returns:
         (str): the string with color codes escaped
     """
-    string = six.text_type(string)
+    string = str(string)
     string = string.replace('@', '@@')
     string = string.replace('}', '}}')
     return string

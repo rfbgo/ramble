@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -27,6 +27,7 @@ If you're new to Ramble and want to start using it, see :doc:`getting_started`.
    configuration_files
    workspace
    workspace_config
+   package_managers
    success_criteria
 
 .. toctree::

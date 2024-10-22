@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -9,9 +9,8 @@
 from ramble.util.logger import logger
 
 
-class Repeats(object):
-    """Class to represent configuration of experiment repeats
-    """
+class Repeats:
+    """Class to represent configuration of experiment repeats"""
 
     def __init__(self):
         """Constructor for a Repeats object
@@ -35,8 +34,10 @@ class Repeats(object):
             self.n_repeats = n_repeats
             self.repeat_index = None
         else:
-            logger.die(f'Failed to set repeats with is_repeats_base = {is_repeat_base}'
-                       f'and n_repeats = {n_repeats}.')
+            logger.die(
+                f"Failed to set repeats with is_repeats_base = {is_repeat_base}"
+                f"and n_repeats = {n_repeats}."
+            )
 
     def set_repeat_index(self, index):
         """Set the index for an instance of a repeated experiment"""

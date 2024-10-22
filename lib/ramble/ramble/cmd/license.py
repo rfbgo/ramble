@@ -1,12 +1,12 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
 # <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
-from __future__ import print_function
 
+from datetime import datetime, timezone
 import os
 import re
 from collections import defaultdict
@@ -15,12 +15,12 @@ import ramble.paths
 from ramble.util.logger import logger
 from spack.util.executable import which
 
-description = 'list and check license headers on files in ramble'
+description = "list and check license headers on files in ramble"
 section = "developer"
 level = "long"
 
 #: need the git command to check new files
-git = which('git')
+git = which("git")
 
 #: SPDX license id must appear in the first <license_lines> lines of a file
 license_lines = 9
@@ -31,54 +31,59 @@ apache2_mit_spdx = "(Apache-2.0 OR MIT)"
 #: regular expressions for licensed files.
 licensed_files = [
     # ramble scripts
-    r'^bin/ramble$',
-    r'^bin/ramble-python$',
-
+    r"^bin/ramble$",
+    r"^bin/ramble-python$",
     # all of ramble core
-    r'^lib/ramble/ramble/.*\.py$',
-    r'^lib/ramble/ramble/.*\.sh$',
-    r'^lib/ramble/llnl/.*\.py$',
-
+    r"^lib/ramble/ramble/.*\.py$",
+    r"^lib/ramble/ramble/.*\.sh$",
+    r"^lib/ramble/llnl/.*\.py$",
     # rst files in documentation
-    r'^lib/ramble/docs/(?!command_index|ramble|llnl).*\.rst$',
-    r'^lib/ramble/docs/.*\.py$',
-
+    r"^lib/ramble/docs/(?!command_index|ramble|llnl).*\.rst$",
+    r"^lib/ramble/docs/.*\.py$",
     # 2 files in external
-    r'^lib/ramble/external/__init__.py$',
-    r'^lib/ramble/external/ordereddict_backport.py$',
-
+    r"^lib/ramble/external/__init__.py$",
+    r"^lib/ramble/external/ordereddict_backport.py$",
     # shell scripts in share
-    r'^share/ramble/.*\.sh$',
-    r'^share/ramble/.*\.bash$',
-    r'^share/ramble/.*\.csh$',
-    r'^share/ramble/qa/run-[^/]*$',
-
+    r"^share/ramble/.*\.sh$",
+    r"^share/ramble/.*\.bash$",
+    r"^share/ramble/.*\.csh$",
+    r"^share/ramble/qa/run-[^/]*$",
     # all applications
-    r'^var/ramble/repos/.*/application.py$'
+    r"^var/ramble/repos/.*/application.py$",
 ]
 
 #: licensed files that can have LGPL language in them
 #: so far, just this command -- so it can find LGPL things elsewhere
 lgpl_exceptions = [
-    r'lib/ramble/ramble/cmd/license.py',
-    r'lib/ramble/ramble/test/cmd/license.py',
+    r"lib/ramble/ramble/cmd/license.py",
+    r"lib/ramble/ramble/test/cmd/license.py",
 ]
 
 
-def _all_ramble_files(root=ramble.paths.prefix):
+def _get_modified_files(root):
+    """Get a list of modified files in the current repository."""
+    diff_args = ["-C", root, "diff", "HEAD", "--name-only"]
+    files = git(*diff_args, output=str).split()
+    return files
+
+
+def _all_ramble_files(root=ramble.paths.prefix, modified_only=False):
     """Generates root-relative paths of all files in the ramble repository."""
-    visited = set()
-    for cur_root, folders, files in os.walk(root):
-        for filename in files:
-            path = os.path.realpath(os.path.join(cur_root, filename))
+    if modified_only:
+        yield from _get_modified_files(root)
+    else:
+        visited = set()
+        for cur_root, folders, files in os.walk(root):
+            for filename in files:
+                path = os.path.realpath(os.path.join(cur_root, filename))
 
-            if path not in visited:
-                yield os.path.relpath(path, root)
-                visited.add(path)
+                if path not in visited:
+                    yield os.path.relpath(path, root)
+                    visited.add(path)
 
 
-def _licensed_files(root=ramble.paths.prefix):
-    for relpath in _all_ramble_files(root):
+def _licensed_files(root=ramble.paths.prefix, modified_only=False):
+    for relpath in _all_ramble_files(root, modified_only=modified_only):
         if any(regex.match(relpath) for regex in licensed_files):
             yield relpath
 
@@ -94,7 +99,7 @@ def list_files(args):
 OLD_LICENSE, SPDX_MISMATCH, GENERAL_MISMATCH = range(1, 4)
 
 
-class LicenseError(object):
+class LicenseError:
     def __init__(self):
         self.error_counts = defaultdict(int)
 
@@ -110,28 +115,34 @@ class LicenseError(object):
         spdx_mismatch = self.error_counts[SPDX_MISMATCH]
         old_license = self.error_counts[OLD_LICENSE]
         return (
-            '%d improperly licensed files' % (total),
-            'files with wrong SPDX-License-Identifier:   %d' % spdx_mismatch,
-            'files with old license header:              %d' % old_license,
-            'files not containing expected license:      %d' % missing)
+            "%d improperly licensed files" % (total),
+            "files with wrong SPDX-License-Identifier:   %d" % spdx_mismatch,
+            "files with old license header:              %d" % old_license,
+            "files not containing expected license:      %d" % missing,
+        )
+
+
+strict_date_range = f"2022-{datetime.now(timezone.utc).year}"
+
+strict_copyright_date = f"Copyright {strict_date_range}"
 
 
 def _check_license(lines, path):
+    # The years are hard-coded in the license header to allow them to be out-dated.
+    # The `strict_copyright_date` below issues warnings as reminders for refreshing.
     license_lines = [
-        r'Copyright 2022-2024 Google LLC',  # noqa: E501
-        r'Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or',  # noqa: E501
-        r'https://www.apache.org/licenses/LICENSE-2.0> or the MIT license',  # noqa: E501
-        r'<LICENSE-MIT or https://opensource.org/licenses/MIT>, at your',  # noqa: E501
-        r'option. This file may not be copied, modified, or distributed',  # noqa: E501
-        r'except according to those terms.'  # noqa: E501
+        r"Copyright 2022-2024 The Ramble Authors",
+        r"Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or",
+        r"https://www.apache.org/licenses/LICENSE-2.0> or the MIT license",
+        r"<LICENSE-MIT or https://opensource.org/licenses/MIT>, at your",
+        r"option. This file may not be copied, modified, or distributed",
+        r"except according to those terms.",
     ]
-
-    strict_date = r'Copyright 2024'
 
     found = []
 
     for line in lines:
-        line = re.sub(r'^[\s#\.]*', '', line)
+        line = re.sub(r"^[\s#\.]*", "", line)
         line = line.rstrip()
         for i, license_line in enumerate(license_lines):
             if re.match(license_line, line):
@@ -139,26 +150,27 @@ def _check_license(lines, path):
                 # We allow it to be out of date but print a warning if it is
                 # out of date.
                 if i == 0:
-                    if not re.search(strict_date, line):
-                        logger.debug(f'{path}: copyright date mismatch')
+                    if not re.search(strict_copyright_date, line):
+                        logger.warn(f"{path}: copyright date mismatch")
                 found.append(i)
 
     if len(found) == len(license_lines) and found == list(sorted(found)):
         return
 
     def old_license(line, path):
-        if re.search('This program is free software', line):
-            print('{0}: has old LGPL license header'.format(path))
+        if re.search("This program is free software", line):
+            print(f"{path}: has old LGPL license header")
             return OLD_LICENSE
 
     # If the SPDX identifier is present, then there is a mismatch (since it
     # did not match the above regex)
     def wrong_spdx_identifier(line, path):
-        m = re.search(r'SPDX-License-Identifier: ([^\n]*)', line)
+        m = re.search(r"SPDX-License-Identifier: ([^\n]*)", line)
         if m and m.group(1) != apache2_mit_spdx:
-            print('{0}: SPDX license identifier mismatch'
-                  '(expecting {1}, found {2})'
-                  .format(path, apache2_mit_spdx, m.group(1)))
+            print(
+                "{}: SPDX license identifier mismatch"
+                "(expecting {}, found {})".format(path, apache2_mit_spdx, m.group(1))
+            )
             return SPDX_MISMATCH
 
     checks = [old_license, wrong_spdx_identifier]
@@ -169,7 +181,7 @@ def _check_license(lines, path):
             if error:
                 return error
 
-    print('{0}: the license does not match the expected format'.format(path))
+    print(f"{path}: the license does not match the expected format")
     return GENERAL_MISMATCH
 
 
@@ -178,8 +190,10 @@ def verify(args):
 
     license_errors = LicenseError()
 
-    for relpath in _licensed_files(args.root):
+    for relpath in _licensed_files(args.root, modified_only=args.modified):
         path = os.path.join(args.root, relpath)
+        if not os.path.exists(path):
+            continue
         with open(path) as f:
             lines = [line for line in f][:license_lines]
 
@@ -190,29 +204,73 @@ def verify(args):
     if license_errors.has_errors():
         logger.die(*license_errors.error_messages())
     else:
-        logger.msg('No license issues found.')
+        logger.msg("No license issues found.")
+
+
+def update_copyright_year(args):
+    """update copyright header for the current year (utc-based) in all licensed files"""
+    for filename in _licensed_files():
+        with open(filename) as lic_f:
+            lines = lic_f.readlines()
+            lines[0] = re.sub(r"Copyright \d{4}-\d{4}", strict_copyright_date, lines[0])
+        with open(filename, "w") as lic_f:
+            lic_f.writelines(lines)
+
+    def replace_text(file, regex, new_text):
+        with open(file) as f:
+            content = f.read()
+            content = re.sub(regex, new_text, content)
+        with open(file, "w") as f:
+            f.write(content)
+
+    # Update also the mit license and sphinx config file
+    replace_text(
+        os.path.join(ramble.paths.ramble_root, "LICENSE-MIT"),
+        r"Copyright \(c\) \d{4}-\d{4}",
+        f"Copyright (c) {strict_date_range}",
+    )
+    replace_text(
+        os.path.join(ramble.paths.ramble_root, "lib", "ramble", "docs", "conf.py"),
+        r"\d{4}-\d{4}, Google LLC",
+        f"{strict_date_range}, Google LLC",
+    )
 
 
 def setup_parser(subparser):
-    sp = subparser.add_subparsers(metavar='SUBCOMMAND', dest='license_command')
-    sp.add_parser('list-files', help=list_files.__doc__,
-                  description=list_files.__doc__)
+    sp = subparser.add_subparsers(metavar="SUBCOMMAND", dest="license_command")
+    sp.add_parser("list-files", help=list_files.__doc__, description=list_files.__doc__)
 
-    verify_parser = sp.add_parser('verify', help=verify.__doc__,
-                                  description=verify.__doc__)
+    verify_parser = sp.add_parser("verify", help=verify.__doc__, description=verify.__doc__)
     verify_parser.add_argument(
-        '--root', action='store', default=ramble.paths.prefix,
-        help='scan a different prefix for license issues')
+        "--root",
+        action="store",
+        default=ramble.paths.prefix,
+        help="scan a different prefix for license issues",
+    )
+    verify_parser.add_argument(
+        "--modified",
+        "-m",
+        action="store_true",
+        default=False,
+        help="verify only the modified files as outputted by `git ls-files --modified`",
+    )
+
+    sp.add_parser(
+        "update-copyright-year",
+        help=update_copyright_year.__doc__,
+        description=update_copyright_year.__doc__,
+    )
 
 
 def license(parser, args):
     if not git:
-        logger.die('ramble license requires git in your environment')
+        logger.die("ramble license requires git in your environment")
 
     licensed_files[:] = [re.compile(regex) for regex in licensed_files]
 
     commands = {
-        'list-files': list_files,
-        'verify': verify,
+        "list-files": list_files,
+        "verify": verify,
+        "update-copyright-year": update_copyright_year,
     }
     return commands[args.license_command](args)

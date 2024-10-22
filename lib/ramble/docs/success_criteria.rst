@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -116,7 +116,7 @@ The above example shows the full interface for defining success criteria with
 * ``fom_context``: (Optional) The context ``fom_name`` should exist in. Defaults to ``null``.
 
 Both ``fom_name`` and ``fom_context`` support
-`python style globbing<https://docs.python.org/3/library/fnmatch.html>`.
+`python style globbing<https://docs.python.org/3/library/fnmatch.html>`_.
 
 When using the globbing functionality, all contexts that match the
 ``fom_context`` argument are searched. Within each context, all FOMs that match

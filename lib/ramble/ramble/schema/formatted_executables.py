@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -14,37 +14,35 @@
 
 #: Properties for inclusion in other schemas
 properties = {
-    'formatted_executables': {
-        'type': 'object',
-        'default': {},
-        'properties': {},
-        'additionalProperties': {
-            'type': 'object',
-            'default': {},
-            'additionalProperties': False,
-            'properties':  {
-                'prefix': {
-                    'type': 'string',
-                    'default': ''
+    "formatted_executables": {
+        "type": "object",
+        "default": {},
+        "properties": {},
+        "additionalProperties": {
+            "type": "object",
+            "default": {},
+            "additionalProperties": False,
+            "properties": {
+                "prefix": {"type": "string", "default": ""},
+                "indentation": {"type": "number", "default": 0},
+                "join_separator": {"type": "string", "default": "\n"},
+                "commands": {
+                    "type": "array",
+                    "default": ["{unformatted_command}"],
+                    "items": {
+                        "type": "string",
+                    },
                 },
-                'indentation': {
-                    'type': 'number',
-                    'default': 0
-                },
-                'join_separator': {
-                    'type': 'string',
-                    'default': '\n'
-                }
-            }
-        }
+            },
+        },
     }
 }
 
 #: Full schema with metadata
 schema = {
-    '$schema': 'http://json-schema.org/schema#',
-    'title': 'Ramble formatted executables configuration file schema',
-    'type': 'object',
-    'additionalProperties': False,
-    'properties': properties
+    "$schema": "http://json-schema.org/schema#",
+    "title": "Ramble formatted executables configuration file schema",
+    "type": "object",
+    "additionalProperties": False,
+    "properties": properties,
 }

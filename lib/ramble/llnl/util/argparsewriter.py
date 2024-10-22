@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -10,10 +10,9 @@ from __future__ import print_function
 
 import argparse
 import errno
+import io
 import re
 import sys
-
-from six import StringIO
 
 
 class Command(object):
@@ -186,7 +185,7 @@ class ArgparseRstWriter(ArgparseWriter):
         self.rst_levels = rst_levels
 
     def format(self, cmd):
-        string = StringIO()
+        string = io.StringIO()
         string.write(self.begin_command(cmd.prog))
 
         if cmd.description:

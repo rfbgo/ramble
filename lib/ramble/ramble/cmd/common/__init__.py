@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -35,8 +35,9 @@ def shell_init_instructions(cmd, equivalent):
         color.colorize("@*c{For csh/tcsh:}"),
         "  source %s/setup-env.csh" % ramble.paths.share_path,
         "",
-        "Or, if you do not want to use shell support, run " + (
-            "one of these" if shell_specific else "this") + " instead:",
+        "Or, if you do not want to use shell support, run "
+        + ("one of these" if shell_specific else "this")
+        + " instead:",
         "",
     ]
 
@@ -48,5 +49,5 @@ def shell_init_instructions(cmd, equivalent):
     else:
         msg += ["  " + equivalent]
 
-    msg += ['']
+    msg += [""]
     logger.error(*msg)

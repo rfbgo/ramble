@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -42,21 +42,27 @@ Below we will provide some basics of how to get started with these steps.
 However, this guide will not provide exhaustive information for all
 applications. So, in general, this step is left to you to complete.
 
+.. _application-definition-compilation:
+
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Compilation / Installation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Ramble has first party support for some package managers (currently, Spack). To
-improve provenance information that Ramble is able to track, we strongly
-recommend using a supported package manager.
+Ramble has first party support for some package managers. The provided package
+managers can be seen through the ``ramble list --type package_managers``
+command. To improve provenance information that Ramble is able to track, we
+strongly recommend using a supported package manager.
 
-You have two options at this stage. The first (and arguably more complicated)
+You have three options at this stage. The first (and arguably more complicated)
 option is to add support for a new package manager, if your application is not
 included in any of the supported package manager yet. The second is to add your
-application to one of the supported package managers.
+application to one of the supported package managers. The third and final
+option is to manually install your application and use the default setting for
+a package manager which disables package manager support.
 
-This might include writing a Spack package definition file. While this guide
-will not walk you through this process, Spack has
+This might include writing a definition file for the targeted package manager.
+This guide will not walk you through this process, however the actual steps
+vary dramatically from one package manager to another.  Spack has
 `documentation to help write package definition files <https://spack.readthedocs.io/en/latest/packaging_guide.html>`_.
 
 .. _experiment-input-files:
@@ -104,7 +110,7 @@ application definition file as well.
 Application Definition Creation
 -------------------------------
 
-Application definition files are stored within application repositories. These
+Application definition files are stored within object repositories. These
 repositories generally store all applications within a directory named
 ``applications``, however each repository can control this through their own
 config file ( ``repo.yaml`` ).
@@ -131,6 +137,12 @@ manager logic, but more generally change the behavior of the underlying
 application definitions. These can be seen in more detail in
 :mod:`ramble.application_types`.
 
+New application definitions can also inherit their behavior from other
+application classes to replicate aspects of their behavior.
+
+Existing application classes can be referenced using the:
+``from ramble.app.builtin.<application_name> import <application_class>`` syntax.
+
 ---------------------------------
 Writing an application definition
 ---------------------------------
@@ -148,7 +160,7 @@ variables, as in:
 
 .. code-block:: python
 
-    class Hpl(SpackPackage):
+    class Hpl(ExecutableApplication):
         executable(....)
         executable(....)
         input_file(....)
@@ -256,6 +268,15 @@ context. Each context represents a grouping of figures of merit that are
 collected together. A figure of merit context can be defined using
 :py:meth:`ramble.language.shared_language.figure_of_merit_context`.
 
+^^^^^^^^^^^^^^^^^^
+File path handling
+^^^^^^^^^^^^^^^^^^
+
+Ramble provides a utility function :py:meth:`ramble.util.file_util.get_file_path`
+that should be used when referencing file paths in application definitions. This
+helps with Ramble to properly mock out these paths during unit testing, where the
+files may not exist under the dry-run setting.
+
 --------------------------
 Package Manager Directives
 --------------------------
@@ -265,7 +286,7 @@ directives that are intended to be package manager specific. As an example,
 there are directives for Spack defined by:
 
 * :meth:`ramble.language.shared_language.software_spec`
-* :meth:`ramble.language.shared_language.default_compiler`
+* :meth:`ramble.language.shared_language.define_compiler`
 * :meth:`ramble.language.shared_language.required_package`
 
 These provide Ramble with information about how Spack could install and require

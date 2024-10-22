@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,8 +6,8 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
+import io
 import os
-import six
 
 import llnl.util.tty.color as clr
 
@@ -21,46 +21,45 @@ import spack.parse
 HASH, DEP, AT, COLON, COMMA, ON, OFF, PCT, EQ, ID, VAL, FILE = range(12)
 
 #: Regex for fully qualified spec names. (e.g., builtin.hdf5)
-spec_id_re = r'\w[\w.-]*'
+spec_id_re = r"\w[\w.-]*"
 
 color_formats = {}
 
-default_format = '{name}'
+default_format = "{name}"
 
 
 class SpecLexer(spack.parse.Lexer):
-
     """Parses tokens that make up spack specs."""
 
     def __init__(self):
-        super(SpecLexer, self).__init__([
-            (r'\^', lambda scanner, val: self.token(DEP,   val)),
-            (r'\@', lambda scanner, val: self.token(AT,    val)),
-            (r'\:', lambda scanner, val: self.token(COLON, val)),
-            (r'\,', lambda scanner, val: self.token(COMMA, val)),
-            (r'\+', lambda scanner, val: self.token(ON,    val)),
-            (r'\-', lambda scanner, val: self.token(OFF,   val)),
-            (r'\~', lambda scanner, val: self.token(OFF,   val)),
-            (r'\%', lambda scanner, val: self.token(PCT,   val)),
-            (r'\=', lambda scanner, val: self.token(EQ,    val)),
-
-            # Filenames match before identifiers, so no initial filename
-            # component is parsed as a spec (e.g., in subdir/spec.yaml)
-            (r'[/\w.-]*/[/\w/-]+\.yaml[^\b]*',
-             lambda scanner, v: self.token(FILE, v)),
-
-            # Hash match after filename. No valid filename can be a hash
-            # (files end w/.yaml), but a hash can match a filename prefix.
-            (r'/', lambda scanner, val: self.token(HASH, val)),
-
-            # Identifiers match after filenames and hashes.
-            (spec_id_re, lambda scanner, val: self.token(ID, val)),
-
-            (r'\s+', lambda scanner, val: None)],
+        super().__init__(
+            [
+                (r"\^", lambda scanner, val: self.token(DEP, val)),
+                (r"\@", lambda scanner, val: self.token(AT, val)),
+                (r"\:", lambda scanner, val: self.token(COLON, val)),
+                (r"\,", lambda scanner, val: self.token(COMMA, val)),
+                (r"\+", lambda scanner, val: self.token(ON, val)),
+                (r"\-", lambda scanner, val: self.token(OFF, val)),
+                (r"\~", lambda scanner, val: self.token(OFF, val)),
+                (r"\%", lambda scanner, val: self.token(PCT, val)),
+                (r"\=", lambda scanner, val: self.token(EQ, val)),
+                # Filenames match before identifiers, so no initial filename
+                # component is parsed as a spec (e.g., in subdir/spec.yaml)
+                (r"[/\w.-]*/[/\w/-]+\.yaml[^\b]*", lambda scanner, v: self.token(FILE, v)),
+                # Hash match after filename. No valid filename can be a hash
+                # (files end w/.yaml), but a hash can match a filename prefix.
+                (r"/", lambda scanner, val: self.token(HASH, val)),
+                # Identifiers match after filenames and hashes.
+                (spec_id_re, lambda scanner, val: self.token(ID, val)),
+                (r"\s+", lambda scanner, val: None),
+            ],
             [EQ],
-            [(r'[\S].*', lambda scanner, val: self.token(VAL,    val)),
-             (r'\s+', lambda scanner, val: None)],
-            [VAL])
+            [
+                (r"[\S].*", lambda scanner, val: self.token(VAL, val)),
+                (r"\s+", lambda scanner, val: None),
+            ],
+            [VAL],
+        )
 
 
 # Lexer is always the same for every parser
@@ -76,8 +75,8 @@ class SpecParser(spack.parse.Parser):
                 directly into. This is used to avoid construction of a
                 superfluous Spec object in the Spec constructor.
         """
-        logger.debug(f'Starting parser with spec {initial_spec}')
-        super(SpecParser, self).__init__(_lexer)
+        logger.debug(f"Starting parser with spec {initial_spec}")
+        super().__init__(_lexer)
         self.previous = None
         self._initial = initial_spec
 
@@ -111,17 +110,16 @@ class SpecParser(spack.parse.Parser):
 
     def check_identifier(self, id=None):
         """The only identifiers that can contain '.' are versions, but version
-           ids are context-sensitive so we have to check on a case-by-case
-           basis. Call this if we detect a version id where it shouldn't be.
+        ids are context-sensitive so we have to check on a case-by-case
+        basis. Call this if we detect a version id where it shouldn't be.
         """
         if not id:
             id = self.token.value
-        if '.' in id:
-            self.last_token_error(
-                "{0}: Identifier cannot contain '.'".format(id))
+        if "." in id:
+            self.last_token_error(f"{id}: Identifier cannot contain '.'")
 
 
-class Spec(object):
+class Spec:
     def __init__(self, spec_like=None):
         """Create a new Spec.
 
@@ -144,8 +142,8 @@ class Spec(object):
         self._application_class = None
         self.workloads = {}
 
-        if isinstance(spec_like, six.string_types):
-            namespace, dot, spec_name = spec_like.rpartition('.')
+        if isinstance(spec_like, str):
+            namespace, dot, spec_name = spec_like.rpartition(".")
             if not namespace:
                 namespace = None
             self.name = spec_name
@@ -185,7 +183,7 @@ class Spec(object):
         color = kwargs.get("color", False)
         transform = kwargs.get("transform", {})
 
-        out = six.StringIO()
+        out = io.StringIO()
 
         def write(s, c=None):
             f = clr.cescape(s)
@@ -218,7 +216,7 @@ class Spec(object):
                     except AttributeError:
                         parent = ".".join(parts[:idx])
                         m = "Attempted to format attribute %s." % attribute
-                        m += "Spec %s has no attribute %s" % (parent, part)
+                        m += f"Spec {parent} has no attribute {part}"
                         raise SpecFormatStringError(m)
 
                     if callable(current):
@@ -275,7 +273,7 @@ class Spec(object):
     @property
     def fullname(self):
         return (
-            ("%s.%s" % (self.namespace, self.name))
+            (f"{self.namespace}.{self.name}")
             if self.namespace
             else (self.name if self.name else "")
         )
@@ -291,8 +289,9 @@ class Spec(object):
     def application_class(self):
         if not self._application_class:
             app_type = ramble.repository.ObjectTypes.applications
-            self._application_class = \
-                ramble.repository.paths[app_type].get_obj_class(self.fullname)
+            self._application_class = ramble.repository.paths[app_type].get_obj_class(
+                self.fullname
+            )
         return self._application_class
 
     @property
@@ -304,15 +303,15 @@ class Spec(object):
 
 
 def parse(string):
-    """Returns a spec from an input string.
-    """
+    """Returns a spec from an input string."""
     return SpecParser().parse(string)
 
 
 class SpecParseError(ramble.error.SpecError):
     """Wrapper for ParseError for when we're parsing specs."""
+
     def __init__(self, parse_error):
-        super(SpecParseError, self).__init__(parse_error.message)
+        super().__init__(parse_error.message)
         self.string = parse_error.string
 
 

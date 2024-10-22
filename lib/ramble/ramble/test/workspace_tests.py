@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -14,14 +14,15 @@ import ramble.workspace
 
 # everything here uses the mock_workspace_path
 pytestmark = pytest.mark.usefixtures(
-    'mutable_mock_workspace_path', 'config', 'mutable_mock_apps_repo')
+    "mutable_mock_workspace_path", "config", "mutable_mock_apps_repo"
+)
 
 
 @pytest.fixture()
 def workspace_deactivate():
     yield
     ramble.workspace._active_workspace = None
-    os.environ.pop('RAMBLE_WORKSPACE', None)
+    os.environ.pop("RAMBLE_WORKSPACE", None)
 
 
 def test_re_read(tmpdir):

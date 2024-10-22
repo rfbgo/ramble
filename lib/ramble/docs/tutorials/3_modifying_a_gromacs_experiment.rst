@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -56,7 +56,7 @@ To get detailed information about where variable definitions come from, you can 
 
 .. code-block:: console
 
-    $ ramble workspace info -v
+    $ ramble workspace info --expansions
 
 The experiments section of this command's output might contain the following:
 
@@ -128,16 +128,16 @@ available variables with the following command:
 
 .. code-block:: console
 
-    $ ramble info gromacs
+    $ ramble info --attrs workloads -v -p "water*" gromacs
 
-
-Focusing on the relevant workloads, you see the following information:
+Which should contain the following information:
 
 .. code-block:: console
 
     Workload: water_gmx50
-        Executables: ['builtin::env_vars', 'builtin::spack_source', 'builtin::spack_activate', 'pre-process', 'execute-gen']
+        Executables: ['pre-process', 'execute-gen']
         Inputs: ['water_gmx50_bare']
+        Tags: []
         Variables:
             size:
                 Description: Workload size
@@ -151,8 +151,9 @@ Focusing on the relevant workloads, you see the following information:
                 Description: Input path for water GMX50
                 Default: {water_gmx50_bare}/{size}
     Workload: water_bare
-        Executables: ['builtin::env_vars', 'builtin::spack_source', 'builtin::spack_activate', 'pre-process', 'execute-gen']
+        Executables: ['pre-process', 'execute-gen']
         Inputs: ['water_bare_hbonds']
+        Tags: []
         Variables:
             size:
                 Description: Workload size
@@ -214,7 +215,7 @@ These changes should now be reflected in the output of:
 
 .. code-block:: console
 
-    $ ramble workspace info -v
+    $ ramble workspace info --expansions
 
 .. include:: shared/gromacs_execute.rst
 

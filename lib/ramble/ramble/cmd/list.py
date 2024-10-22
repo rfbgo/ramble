@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -9,17 +9,14 @@
 import ramble.repository
 import ramble.cmd.common.list
 
-description = "list and search available applications"
+description = "list and search available objects"
 section = "basic"
 level = "short"
 
-app_type = ramble.repository.ObjectTypes.applications
-
 
 def setup_parser(subparser):
-    ramble.cmd.common.list.setup_list_parser(subparser,
-                                             app_type)
+    ramble.cmd.common.list.setup_list_parser(subparser)
 
 
 def list(parser, args):
-    ramble.cmd.common.list.perform_list(args, app_type)
+    ramble.cmd.common.list.perform_list(args)

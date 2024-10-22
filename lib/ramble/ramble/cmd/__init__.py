@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,7 +6,6 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-from __future__ import print_function
 
 import os
 import re
@@ -31,7 +30,7 @@ from ruamel.yaml.error import MarkedYAMLError
 python_list = list
 
 # Patterns to ignore in the commands directory when looking for commands.
-ignore_files = r'^\.|^__init__.py$|^#'
+ignore_files = r"^\.|^__init__.py$|^#"
 
 SETUP_PARSER = "setup_parser"
 DESCRIPTION = "description"
@@ -52,7 +51,7 @@ def require_python_name(pname):
 
 def cmd_name(python_name):
     """Convert module name (with ``_``) to command name (with ``-``)."""
-    return python_name.replace('_', '-')
+    return python_name.replace("_", "-")
 
 
 def require_cmd_name(cname):
@@ -82,7 +81,7 @@ def all_commands():
         for path in command_paths:
             for file in os.listdir(path):
                 if file.endswith(".py") and not re.search(ignore_files, file):
-                    cmd = re.sub(r'.py$', '', file)
+                    cmd = re.sub(r".py$", "", file)
                     _all_commands.append(cmd_name(cmd))
 
         _all_commands.sort()
@@ -94,7 +93,7 @@ def remove_options(parser, *options):
     """Remove some options from a parser."""
     for option in options:
         for action in parser._actions:
-            if vars(action)['option_strings'][0] == option:
+            if vars(action)["option_strings"][0] == option:
                 parser._handle_conflict_resolve(None, [(option, action)])
                 break
 
@@ -109,21 +108,20 @@ def get_module(cmd_name):
     require_cmd_name(cmd_name)
     pname = python_name(cmd_name)
 
-    logger.debug(f'Getting module for command {cmd_name}')
+    logger.debug(f"Getting module for command {cmd_name}")
 
     try:
         # Try to import the command from the built-in directory
-        module_name = "%s.%s" % (__name__, pname)
-        module = __import__(module_name,
-                            fromlist=[pname, SETUP_PARSER, DESCRIPTION],
-                            level=0)
-        logger.debug(f'Imported {pname} from built-in commands')
+        module_name = f"{__name__}.{pname}"
+        module = __import__(module_name, fromlist=[pname, SETUP_PARSER, DESCRIPTION], level=0)
+        logger.debug(f"Imported {pname} from built-in commands")
     except ImportError:
         try:
             module = spack.extensions.get_module(cmd_name)
         except AttributeError:
             from ramble.main import RambleCommandError
-            raise RambleCommandError('Command %s does not exist.' % cmd_name)
+
+            raise RambleCommandError("Command %s does not exist." % cmd_name)
 
     attr_setdefault(module, SETUP_PARSER, lambda *args: None)  # null-op
     attr_setdefault(module, DESCRIPTION, "")
@@ -151,16 +149,16 @@ def get_command(cmd_name):
 
 def elide_list(line_list, max_num=10):
     """Takes a long list and limits it to a smaller number of elements,
-       replacing intervening elements with '...'.  For example::
+    replacing intervening elements with '...'.  For example::
 
-           elide_list([1,2,3,4,5,6], 4)
+        elide_list([1,2,3,4,5,6], 4)
 
-       gives::
+    gives::
 
-           [1, 2, 3, '...', 6]
+        [1, 2, 3, '...', 6]
     """
     if len(line_list) > max_num:
-        return line_list[:max_num - 1] + ['...'] + line_list[-1:]
+        return line_list[: max_num - 1] + ["..."] + line_list[-1:]
     else:
         return line_list
 
@@ -171,7 +169,7 @@ def ramble_is_git_repo():
 
 
 def is_git_repo(path):
-    dotgit_path = join_path(path, '.git')
+    dotgit_path = join_path(path, ".git")
     if os.path.isdir(dotgit_path):
         # we are in a regular git repo
         return True
@@ -188,18 +186,18 @@ def is_git_repo(path):
 
 class PythonNameError(ramble.error.RambleError):
     """Exception class thrown for impermissible python names"""
+
     def __init__(self, name):
         self.name = name
-        super(PythonNameError, self).__init__(
-            '{0} is not a permissible Python name.'.format(name))
+        super().__init__(f"{name} is not a permissible Python name.")
 
 
 class CommandNameError(ramble.error.RambleError):
     """Exception class thrown for impermissible command names"""
+
     def __init__(self, name):
         self.name = name
-        super(CommandNameError, self).__init__(
-            '{0} is not a permissible Ramble command name.'.format(name))
+        super().__init__(f"{name} is not a permissible Ramble command name.")
 
 
 ########################################
@@ -210,7 +208,7 @@ def extant_file(f):
     Argparse type for files that exist.
     """
     if not os.path.isfile(f):
-        raise argparse.ArgumentTypeError('%s does not exist' % f)
+        raise argparse.ArgumentTypeError("%s does not exist" % f)
     return f
 
 
@@ -232,11 +230,12 @@ def require_active_workspace(cmd_name):
         return ws
     else:
         logger.die(
-            f'`ramble {cmd_name}` requires a workspace',
-            'activate a workspace first:',
-            '    ramble workspace activate WRKSPC',
-            'or use:',
-            f'    ramble -w WRKSPC {cmd_name} ...')
+            f"`ramble {cmd_name}` requires a workspace",
+            "activate a workspace first:",
+            "    ramble workspace activate WRKSPC",
+            "or use:",
+            f"    ramble -w WRKSPC {cmd_name} ...",
+        )
 
 
 def find_workspace(args):
@@ -273,13 +272,18 @@ def find_workspace(args):
             # nothing was set; there's no active environment
             if not ws:
                 return None
+            elif not ramble.workspace.is_workspace_dir(ws):
+                env_var = ramble.workspace.ramble_workspace_var
+                raise ramble.workspace.RambleActiveWorkspaceError(
+                    f"The environment variable {env_var} refers to an invalid ramble workspace."
+                )
 
-    # if we get here, env isn't the name of a spack environment; it has
-    # to be a path to an environment, or there is something wrong.
+    # if we get here, ws isn't the name of a ramble workspace; it has
+    # to be a path to a workspace, or there is something wrong.
     if ramble.workspace.is_workspace_dir(ws):
         return ramble.workspace.Workspace(ws)
 
-    raise ramble.workspace.RambleWorkspaceError('no workspace in %s' % ws)
+    raise ramble.workspace.RambleWorkspaceError(f"No workspace in {ws}")
 
 
 def find_workspace_path(args):
@@ -322,4 +326,4 @@ def find_workspace_path(args):
     if ramble.workspace.is_workspace_dir(ws):
         return ws
 
-    raise ramble.workspace.RambleWorkspaceError('no workspace in %s' % ws)
+    raise ramble.workspace.RambleWorkspaceError("no workspace in %s" % ws)

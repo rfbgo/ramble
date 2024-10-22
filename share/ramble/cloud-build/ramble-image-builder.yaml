@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -13,14 +13,28 @@ steps:
     args:
     - 'build'
     - '-t'
-    - 'us-central1-docker.pkg.dev/$PROJECT_ID/ramble-repo/ramble-centos7:latest'
+    - 'us-central1-docker.pkg.dev/$PROJECT_ID/ramble-repo/ramble-${_BASE_IMG}-${_BASE_VER}-spack${_SPACK_REF}-python${_PYTHON_VER}:latest'
     - '--cache-from'
-    - 'us-central1-docker.pkg.dev/$PROJECT_ID/ramble-repo/ramble-centos7:latest'
+    - 'us-central1-docker.pkg.dev/$PROJECT_ID/ramble-repo/ramble-${_BASE_IMG}-${_BASE_VER}-spack${_SPACK_REF}-python${_PYTHON_VER}:latest'
     - '-f'
-    - 'share/ramble/cloud-build/Dockerfile-centos7'
+    - 'share/ramble/cloud-build/Dockerfile-${_PKG_MANAGER}'
+    - '--build-arg'
+    - 'BASE_IMG=${_BASE_IMG}'
+    - '--build-arg'
+    - 'BASE_VER=${_BASE_VER}'
+    - '--build-arg'
+    - 'SPACK_REF=${_SPACK_REF}'
+    - '--build-arg'
+    - 'PYTHON_VER=${_PYTHON_VER}'
     - '.'
-images: ['us-central1-docker.pkg.dev/$PROJECT_ID/ramble-repo/ramble-centos7']
-timeout: 1500s
+substitutions:
+  _SPACK_REF: v0.21.2
+  _PYTHON_VER: 3.11.6
+  _BASE_IMG: centos
+  _BASE_VER: '7'
+  _PKG_MANAGER: 'yum'
+images: ['us-central1-docker.pkg.dev/$PROJECT_ID/ramble-repo/ramble-${_BASE_IMG}-${_BASE_VER}-spack${_SPACK_REF}-python${_PYTHON_VER}']
+timeout: 6000s
 options:
   machineType: N1_HIGHCPU_8
 

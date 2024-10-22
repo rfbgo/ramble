@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -9,20 +9,26 @@
 from ramble.appkit import *
 
 
-class ZlibConfigs(SpackApplication):
+class ZlibConfigs(ExecutableApplication):
     name = "zlib-configs"
 
-    software_spec('zlib', spack_spec='zlib')
+    software_spec("zlib", pkg_spec="zlib", package_manager="spack*")
 
-    executable('list_lib', 'ls {zlib}/lib', use_mpi=False)
+    executable("list_lib", "ls {zlib_path}/lib", use_mpi=False)
 
-    workload('ensure_installed', executable='list_lib')
+    workload("ensure_installed", executable="list_lib")
 
-    package_manager_config('enable_debug', 'config:debug:true')
+    package_manager_config(
+        "enable_debug", "config:debug:true", package_manager="spack*"
+    )
 
-    figure_of_merit('zlib_installed',
-                    fom_regex=r'(?P<lib_name>libz.so.*)', group_name='lib_name',
-                    units='')
+    figure_of_merit(
+        "zlib_installed",
+        fom_regex=r"(?P<lib_name>libz.so.*)",
+        group_name="lib_name",
+        units="",
+    )
 
-    success_criteria('zlib_installed', mode='string',
-                     match=r'libz.so', file='{log_file}')
+    success_criteria(
+        "zlib_installed", mode="string", match=r"libz.so", file="{log_file}"
+    )

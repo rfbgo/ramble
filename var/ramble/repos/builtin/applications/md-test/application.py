@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -10,55 +10,81 @@ from ramble.appkit import *
 from ramble.expander import Expander
 
 
-class MdTest(SpackApplication):
-    '''Define the MDTest parallel IO benchmark'''
-    name = 'md-test'
+class MdTest(ExecutableApplication):
+    """Define the MDTest parallel IO benchmark"""
 
-    maintainers('rfbgo')
+    name = "md-test"
 
-    tags('synthetic-benchmarks', 'IO')
+    maintainers("rfbgo")
 
-    default_compiler('gcc', spack_spec='gcc')
-    software_spec('openmpi', spack_spec='openmpi')
+    tags("synthetic-benchmarks", "IO")
+
+    define_compiler("gcc", pkg_spec="gcc", package_manager="spack*")
+    software_spec("openmpi", pkg_spec="openmpi", package_manager="spack*")
 
     # The IOR spack package also includes MDTest, but we implement it as a
     # separate application in ramble
-    software_spec('ior', spack_spec='ior', compiler='gcc')
+    software_spec(
+        "ior", pkg_spec="ior", compiler="gcc", package_manager="spack*"
+    )
 
-    required_package('ior')
+    required_package("ior", package_manager="spack*")
 
-    workload('multi-file', executable='ior')
+    workload("multi-file", executable="ior")
 
-    workload_variable('num-objects', default='1000',
-                      description='Number of files and dirs to create (per rank)',
-                      workloads=['multi-file'])
-    workload_variable('iterations', default='10',
-                      description='Number of iterations',
-                      workloads=['multi-file'])
-    workload_variable('additional-args', default='',
-                      description='Pass additional args, such as working directiroy (-d)',
-                      workloads=['multi-file'])
+    workload_variable(
+        "num-objects",
+        default="1000",
+        description="Number of files and dirs to create (per rank)",
+        workloads=["multi-file"],
+    )
+    workload_variable(
+        "iterations",
+        default="10",
+        description="Number of iterations",
+        workloads=["multi-file"],
+    )
+    workload_variable(
+        "additional-args",
+        default="",
+        description="Pass additional args, such as working directiroy (-d)",
+        workloads=["multi-file"],
+    )
 
-    executable(name='ior', template='mdtest -n {num-objects} -i {iterations} {additional-args}',
-               use_mpi=True)
+    executable(
+        name="ior",
+        template="mdtest -n {num-objects} -i {iterations} {additional-args}",
+        use_mpi=True,
+    )
 
-    operations = ['Directory creation', 'Directory stat', 'Directory removal', 'File creation',
-                  'File stat', 'File read', 'File removal', 'Tree creation', 'Tree removal']
+    operations = [
+        "Directory creation",
+        "Directory stat",
+        "Directory removal",
+        "File creation",
+        "File stat",
+        "File read",
+        "File removal",
+        "Tree creation",
+        "Tree removal",
+    ]
 
     unit = "ops/sec"
 
-    metrics = ['max', 'min', 'mean', 'stddev']
-    base_regex = ':'
+    metrics = ["max", "min", "mean", "stddev"]
+    base_regex = ":"
     for metric in metrics:
-        base_regex += r'\s+(?P<' + metric + r'>[0-9]+\.[0-9]+)'
+        base_regex += r"\s+(?P<" + metric + r">[0-9]+\.[0-9]+)"
 
-    log_str = Expander.expansion_str('log_file')
+    log_str = Expander.expansion_str("log_file")
 
     for op in operations:
-        fom_regex = r'\s*' + op + r'\s+' + base_regex
+        fom_regex = r"\s*" + op + r"\s+" + base_regex
         for metric in metrics:
-            figure_of_merit(f'{op}-{metric}',
-                            log_file=log_str,
-                            fom_regex=fom_regex,
-                            group_name=metric,
-                            units=unit)
+            figure_of_merit(
+                f"{op}-{metric}",
+                log_file=log_str,
+                fom_regex=fom_regex,
+                group_name=metric,
+                units=unit,
+            )

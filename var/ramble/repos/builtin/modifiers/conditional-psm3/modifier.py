@@ -1,5 +1,4 @@
-
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -7,7 +6,9 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-from ramble.modkit import *  # noqa: F403
+import re
+
+from ramble.modkit import *
 
 
 class ConditionalPsm3(BasicModifier):
@@ -24,18 +25,42 @@ class ConditionalPsm3(BasicModifier):
 
     These environment variables are removed after the command finishes.
     """
+
     name = "conditional-psm3"
 
-    tags('mpi-provider')
+    tags("mpi-provider")
 
-    maintainers('douglasjacobsen')
+    maintainers("douglasjacobsen")
 
-    mode('standard', description='Standard execution mode for conditional PSM3')
+    mode(
+        "standard", description="Standard execution mode for conditional PSM3"
+    )
 
-    executable_modifier('apply_psm3')
+    executable_modifier("apply_psm3")
 
-    required_variable('psm3_mpi')
-    required_package('intel-oneapi-mpi')
+    required_variable("psm3_mpi")
+
+    modifier_variable(
+        "apply_psm3_exec_regex",
+        default="",
+        description="When the non-empty regex matches with the executable_name, apply psm3 even if mpi is not explicitly used",
+        mode="standard",
+    )
+
+    modifier_variable(
+        "psm3_log_file",
+        default="{log_file}",
+        description="Log file where PSM3 info writes to, this varies based on applications",
+        mode="standard",
+    )
+
+    modifier_variable(
+        "psm3_identify",
+        # Default to only output identification info from rank 0
+        default="1:",
+        description="PSM3_IDENTIFY setting as documented at https://www.intel.com/content/www/us/en/docs/mpi-library/developer-guide-linux/2021-6/ofi-providers-support.html",
+        mode="standard",
+    )
 
     def apply_psm3(self, executable_name, executable, app_inst=None):
         from ramble.util.executable import CommandExecutable
@@ -43,41 +68,66 @@ class ConditionalPsm3(BasicModifier):
         pre_cmds = []
         post_cmds = []
 
-        if executable.mpi:
+        exec_regex = self.expander.expand_var_name("apply_psm3_exec_regex")
+        should_apply = executable.mpi or (
+            exec_regex and re.match(exec_regex, executable_name)
+        )
+
+        if should_apply:
             pre_cmds.append(
-                CommandExecutable(f'add-psm3-{executable_name}',
-                                  template=[
-                                      'grep "{psm3_mpi}" {env_path}/spack.yaml &> /dev/null',
-                                      'if [ $? -eq 0 ]; then',
-                                      'spack load {psm3_mpi}',
-                                      'export FI_PROVIDER="psm3"',
-                                      'export PSM3_ALLOW_ROUTERS=1',
-                                      'export PSM3_HAL="sockets"',
-                                      'export PSM3_IDENTIFY=1',
-                                      'fi'
-                                  ],
-                                  mpi=False,
-                                  redirect='',
-                                  output_capture='',
-                                  )
+                CommandExecutable(
+                    f"add-psm3-{executable_name}",
+                    template=[
+                        'grep "{psm3_mpi}" {env_path}/spack.yaml &> /dev/null',
+                        "if [ $? -eq 0 ]; then",
+                        "spack load {psm3_mpi}",
+                        'export FI_PROVIDER="psm3"',
+                        "export PSM3_ALLOW_ROUTERS=1",
+                        'export PSM3_HAL="sockets"',
+                        'export PSM3_IDENTIFY="{psm3_identify}"',
+                        "fi",
+                    ],
+                    mpi=False,
+                    redirect="",
+                    output_capture="",
+                )
             )
 
             post_cmds.append(
-                CommandExecutable(f'remove-psm3-{executable_name}',
-                                  template=[
-                                      'grep "{psm3_mpi}" {env_path}/spack.yaml &> /dev/null',
-                                      'if [ $? -eq 0 ]; then',
-                                      'spack unload {psm3_mpi}',
-                                      'unset FI_PROVIDER',
-                                      'unset PSM3_ALLOW_ROUTERS',
-                                      'unset PSM3_HAL',
-                                      'unset PSM3_IDENTIFY',
-                                      'fi'
-                                  ],
-                                  mpi=False,
-                                  redirect='',
-                                  output_capture='',
-                                  )
+                CommandExecutable(
+                    f"remove-psm3-{executable_name}",
+                    template=[
+                        'grep "{psm3_mpi}" {env_path}/spack.yaml &> /dev/null',
+                        "if [ $? -eq 0 ]; then",
+                        "spack unload {psm3_mpi}",
+                        "unset FI_PROVIDER",
+                        "unset PSM3_ALLOW_ROUTERS",
+                        "unset PSM3_HAL",
+                        "unset PSM3_IDENTIFY",
+                        "fi",
+                    ],
+                    mpi=False,
+                    redirect="",
+                    output_capture="",
+                )
             )
 
         return pre_cmds, post_cmds
+
+    psm3_build_info_regex = r".*\sPSM3_IDENTIFY PSM3\s+(?P<version>v[\d.]+)\s+built for\s+(?P<target>.*)$"
+
+    figure_of_merit(
+        "PSM3 version",
+        fom_regex=psm3_build_info_regex,
+        group_name="version",
+        units="",
+        log_file="{psm3_log_file}",
+    )
+
+    figure_of_merit(
+        "PSM3 build target",
+        fom_regex=psm3_build_info_regex,
+        group_name="target",
+        units="",
+        log_file="{psm3_log_file}",
+    )

@@ -1,4 +1,4 @@
-.. Copyright 2022-2024 Google LLC
+.. Copyright 2022-2024 The Ramble Authors
 
    Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
    https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -75,7 +75,7 @@ users to be sure their experiments completed successfully.
 
 When WRF runs, it outputs the time each timestep takes. To begin with, you will
 define a new success criteria within your workspace configuration file that
-validates some timing data is present in the output an experiment. In the
+validates some timing data is present in the output of an experiment. In the
 experiment output, the timing data is prefixed with the string
 ``Timing for main``.
 
@@ -98,44 +98,8 @@ Edit your workspace configuration file with:
 And add the example block within the ``wrfv4`` application block. The resulting
 configuration file might look like the following:
 
-.. code-block:: YAML
-
-    ramble:
-      variables:
-        processes_per_node: 16
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-      applications:
-        wrfv4:
-          success_criteria:
-          - name: 'timing-present'
-            mode: 'string'
-            match: 'Timing for main.*'
-            file: '{experiment_run_dir}/rsl.out.0000'
-          workloads:
-            CONUS_12km:
-              experiments:
-                scaling_{n_nodes}:
-                  variables:
-                    n_nodes: [1, 2]
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
+.. literalinclude:: ../../../../examples/tutorial_9_regex_criteria_config.yaml
+   :language: YAML
 
 Placing the success criteria definition here applies it to all of the
 experiments defined within the ``wrfv4`` application.
@@ -168,49 +132,8 @@ Edit your workspace configuration using:
 And add the success criteria within the ``CONUS_12km`` workload definition. The
 resulting configuration file might look like the following:
 
-.. code-block:: YAML
-
-    ramble:
-      variables:
-        processes_per_node: 16
-        n_ranks: '{processes_per_node}*{n_nodes}'
-        batch_submit: '{execute_experiment}'
-        mpi_command: mpirun -n {n_ranks}
-      applications:
-        wrfv4:
-          success_criteria:
-          - name: 'timing-present'
-            mode: 'string'
-            match: 'Timing for main.*'
-            file: '{experiment_run_dir}/rsl.out.0000'
-          workloads:
-            CONUS_12km:
-              success_criteria:
-              - name: 'correct-timesteps'
-                mode: 'fom_comparison'
-                fom_name: 'Number of timesteps'
-                formula: '{value} >= 50'
-              experiments:
-                scaling_{n_nodes}:
-                  variables:
-                    n_nodes: [1, 2]
-      spack:
-        concretized: true
-        packages:
-          gcc9:
-            spack_spec: gcc@9.4.0
-          intel-mpi:
-            spack_spec: intel-mpi@2018.4.274
-            compiler: gcc9
-          wrfv4:
-            spack_spec: wrf@4.2 build_type=dm+sm compile_type=em_real nesting=basic ~chem
-              ~pnetcdf
-            compiler: gcc9
-        environments:
-          wrfv4:
-            packages:
-            - intel-mpi
-            - wrfv4
+.. literalinclude:: ../../../../examples/tutorial_9_fom_criteria_config.yaml
+   :language: YAML
 
 This new success criteria will apply to all experiments within the
 ``CONUS_12km`` workload. This is because different workloads could have
@@ -243,14 +166,7 @@ explore using this after you perform experiments.
 To ensure the success criteria are checked and the experiments pass them,
 ensure ``SUCCESS`` is printed for the status of each experiment.
 
-When an experiment fails, you can force Ramble to print the figure of merit
-data using:
-
-.. code-block:: console
-
-    $ ramble workspace analyze --always-print-foms
-
-Also, running analyze in debug mode as:
+Running analyze in debug mode as:
 
 .. code-block:: console
 
@@ -258,3 +174,18 @@ Also, running analyze in debug mode as:
 
 Will print significnatly more output, but you should see where Ramble tests the
 ``timing-present`` and ``correct-timesteps`` success criteria in the output.
+
+Clean the Workspace
+-------------------
+
+Once you are finished with the tutorial content, make sure you deactivate your workspace:
+
+.. code-block:: console
+
+    $ ramble workspace deactivate
+
+Additionally, you can remove the workspace and all of its content with:
+
+.. code-block:: console
+
+    $ ramble workspace remove success_wrf

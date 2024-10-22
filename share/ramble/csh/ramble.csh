@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Google LLC
+# Copyright 2022-2024 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -96,6 +96,19 @@ case workspace:
                 else
                     # No args: source the output of the command.
                     eval `\ramble $_rmb_flags workspace deactivate --csh`
+                endif
+                breaksw
+            case create:
+                echo $_rmb_args
+                if ( "$_rmb_args" =~ *" -a"* || \
+                     "$_rmb_args" =~ *" --activate"* ) then
+                    # Args contain activate flag
+                    set _activate_cmd = `\ramble $_rmb_flags workspace $_rmb_args`
+                    eval $_activate_cmd
+                    set _ws = `echo $_activate_cmd | awk '{print $NF}'`
+                    echo "==> Created and activated workspace in $_ws"
+                else
+                    \ramble $_rmb_flags workspace $_rmb_args
                 endif
                 breaksw
             default:
