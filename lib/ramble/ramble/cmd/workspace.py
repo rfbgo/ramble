@@ -525,6 +525,21 @@ def workspace_analyze_setup_parser(subparser):
         help="print out only the summary stats for repeated experiments",
     )
 
+    subparser.add_argument(
+        "--fom_filter",
+        dest="fom_filter",
+        help="Filter experiments with an abitrary query based on FOM values",
+        required=False,
+    )
+
+    # TODO: impl
+    subparser.add_argument(
+        "--order_by",
+        dest="order_by",
+        help="Override default FOM output order",
+        required=False,
+    )
+
     arguments.add_common_arguments(
         subparser,
         ["phases", "include_phase_dependencies", "where", "exclude_where", "filter_tags"],
@@ -553,6 +568,7 @@ def workspace_analyze(args):
         upload=args.upload,
         print_results=args.print_results,
         summary_only=args.summary_only,
+        output_filter=args.fom_filter
     )
 
     with ws.read_transaction():

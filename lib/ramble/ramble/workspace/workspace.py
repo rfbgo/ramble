@@ -1495,7 +1495,7 @@ ramble:
 
         create_symlink(out_file, latest_file)
 
-    def dump_results(self, output_formats=["text"], print_results=False, summary_only=False):
+    def dump_results(self, output_formats=["text"], print_results=False, output_filter=False):
         """
         Write out result file in desired format
 
@@ -1508,7 +1508,7 @@ ramble:
         if not self.results:
             self.results = {}
 
-        results = _filter_results(self.results, summary_only=summary_only)
+        results = _filter_results(self.results, output_filter=output_filter)
 
         results_written = []
         symlinks_updated = []
@@ -2127,8 +2127,15 @@ def no_active_workspace():
             activate(ws)
 
 
-def _filter_results(results, summary_only):
-    if not summary_only or "experiments" not in results:
+def _filter_results(results, output_filter):
+    # TODO: Fitler more
+    expression = output_filter.filter_query
+    for result in results:
+        if inst.expander.evaluate_predicate(expression):
+            print(result)
+            yield result
+
+    if not output_filter.summary_only or "experiments" not in results:
         return results
     results = copy.deepcopy(results)
     results["experiments"] = [r for r in results["experiments"] if r["N_REPEATS"] > 0]

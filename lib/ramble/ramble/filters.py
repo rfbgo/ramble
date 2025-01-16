@@ -33,3 +33,15 @@ class Filters:
             self.exclude_where = list(itertools.chain.from_iterable(exclude_where_filters))
         if tags:
             self.tags = set(itertools.chain.from_iterable(tags))
+
+class OutputFilter:
+    def __init__(
+        self,
+        filter_query=None,
+        summary_only=False
+    ):
+        if filter_query:
+            #self.filter_query = list(itertools.chain.from_iterable(filter_query))
+            self.filter_query = filter_query
+
+        self.summary_only = summary_only
