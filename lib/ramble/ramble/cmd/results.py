@@ -81,6 +81,13 @@ def setup_parser(subparser):
         help="generate a FOM report, showing values of FOMs for each experiment",
         required=False,
     )
+    plot_type_group.add_argument(
+        "--table",
+        dest="table",
+        nargs="+",
+        help="generate a text representation of the output",
+        required=False,
+    )
     report_parser.add_argument(
         "--pandas-where",
         dest="where",

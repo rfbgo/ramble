@@ -227,6 +227,7 @@ class PlotFactory:
 
     def determine_plot_type(self, args):
         plot_types = [
+            (args.table, TableOutput),
             (args.strong_scaling, StrongScalingPlot),
             (args.weak_scaling, WeakScalingPlot),
             (args.compare, ComparisonPlot),
@@ -882,6 +883,21 @@ class MultiLinePlot(ScalingPlotGenerator):
         y_label = perf_measure
 
         self.draw_multiline(perf_measure, scale_var, pdf_report, y_label)
+
+
+class TableOutput(PlotGenerator):
+    plot_type = "table"
+
+    def generate_plot_data(self, pdf_report):
+        print(self.results_df.columns)
+        print(self.results_df)
+        print(self.spec)
+        #df[df.columns.intersection(set(['list', 'of', 'cols']))]
+        df = self.results_df[self.results_df.columns & self.spec + ['fom_name', 'fom_value'] ]
+        #df.style.hide()
+        print(df.to_string(index=False))
+        #print(df)
+        print(df.T)
 
 
 def get_reports_path():
