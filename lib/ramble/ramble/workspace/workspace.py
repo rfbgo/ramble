@@ -2129,15 +2129,45 @@ def no_active_workspace():
 
 def _filter_results(results, output_filter):
     # TODO: Fitler more
-    expression = output_filter.filter_query
-    for result in results:
-        if inst.expander.evaluate_predicate(expression):
-            print(result)
-            yield result
+    expression = None
+    if output_filter:
+        expression = output_filter.filter_query
+
+    if expression and "experiments" in results:
+        filtered_exps = []
+        added = 0
+        total = 0
+        for exp in results["experiments"]:
+            exp_copy = copy.deepcopy(exp)
+            filtered_contexts = []
+            for context in exp["CONTEXTS"]:
+                context_copy = copy.deepcopy(context)
+                filtered_foms = []
+                for fom in context["foms"]:
+                    fom['fom_name'] = fom['name']
+
+                    expander = ramble.expander.Expander(fom, None)
+                    # TODO: numeric filters will not work well here for a workspace that has mixed types, since `evaluate_predicate` hard dies instead of throws on type error
+                    if expander.evaluate_predicate(expression):
+                        filtered_foms.append(fom)
+                        added += 1
+
+                    total += 1
+
+                context_copy["foms"] = filtered_foms
+                filtered_contexts.append(context_copy)
+            exp_copy['CONTEXTS'] = filtered_contexts
+            filtered_exps.append(exp_copy)
+        tty.debug(f"Filtered results showing {added} foms out of {total}")
+        results["experiments"] = filtered_exps
+
+    if added == 0:
+        logger.die('No results selected during filter')
 
     if not output_filter.summary_only or "experiments" not in results:
+        print('early return')
         return results
-    results = copy.deepcopy(results)
+    #results = copy.deepcopy(results) # TODO: is this needed?
     results["experiments"] = [r for r in results["experiments"] if r["N_REPEATS"] > 0]
     return results
 

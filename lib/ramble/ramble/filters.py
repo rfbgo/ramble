@@ -40,8 +40,7 @@ class OutputFilter:
         filter_query=None,
         summary_only=False
     ):
-        if filter_query:
-            #self.filter_query = list(itertools.chain.from_iterable(filter_query))
-            self.filter_query = filter_query
-
+        # TODO: can I use this method?
+        #self.filter_query = list(itertools.chain.from_iterable(filter_query))
+        self.filter_query = filter_query
         self.summary_only = summary_only
