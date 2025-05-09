@@ -17,7 +17,7 @@ from ramble.util.logger import logger
 
 default_node_type_val = "Not Specified"
 
-uploader_types = Enum("uploader_types", ["BigQuery", "PrintOnly"])
+uploader_types = Enum("uploader_types", ["BigQuery", "SQLite", "PrintOnly"])
 
 
 class Uploader:
@@ -149,6 +149,8 @@ def upload_results(results):
     logger.all_msg(f"Uploading results to {uri} with {uploader_type} uploader")
     if uploader_type == uploader_types.BigQuery:
         uploader = BigQueryUploader()
+    elif uploader_type == uploader_types.SQLite:
+        uploader = SQLiteUploader()
     else:
         uploader = PrintOnlyUploader()
     uploader.perform_upload(uri, formatted_data)
@@ -308,6 +310,130 @@ class BigQueryUploader(Uploader):
     # query_job = client.query(query)
     # results = query_job.result()  # Waits for job to complete.
     # return results[0]
+
+def trim_trailing_comma(str_in):
+    return str_in.rstrip(", ")
+
+class SQLiteUploader(Uploader):
+
+    def obj_to_insert_string_values(self, obj):
+        insert_string = "("
+
+        for k, v in obj.items():
+            # Append field names
+            insert_string += '"' + k + '", '
+
+        # Trim last , (TODO: better way?)
+        insert_string = trim_trailing_comma(insert_string)
+        insert_string += ") VALUES ("
+
+        for k, v in obj.items():
+            # Append field values
+            insert_string += '"' + str(v) + '", '
+
+        insert_string = trim_trailing_comma(insert_string)
+        insert_string += ");"
+
+        return insert_string
+
+    def insert_data(self, uri, results, cursor):
+        exps_to_insert = []
+        foms_to_insert = []
+
+        for experiment in results:
+            import json
+
+            exps_to_insert.append(experiment)
+
+            for fom in experiment.foms:
+                fom_data = fom
+                fom_data["experiment_id"] = experiment.get_hash()
+                fom_data["experiment_name"] = experiment.name
+                foms_to_insert.append(fom_data)
+
+            experiment.data = json.dumps(experiment.data)
+            experiment.foms = json.dumps(experiment.foms)
+            experiment.data = experiment.data.replace('"', "'")
+            experiment.foms = experiment.foms.replace('"', "'")
+
+        for exp in exps_to_insert:
+            exp_dict = exp.__dict__
+            insert_string = "INSERT INTO experiments" + self.obj_to_insert_string_values(exp_dict)
+            cursor.execute(insert_string)
+
+        for fom_dict in foms_to_insert:
+            insert_string = "INSERT INTO foms" + self.obj_to_insert_string_values(fom_dict)
+            cursor.execute(insert_string)
+
+        print("Data Inserted in the experiments table: ")
+        data=cursor.execute('''SELECT * FROM experiments''')
+        for row in data:
+            print("Row")
+            print(row)
+
+
+    def perform_upload(self, uri, results):
+        import sqlite3
+        import os
+
+        # TODO: specify file
+        file_name = "ramble.sqlite"
+
+        apply_schema = False
+        if not os.path.isfile(file_name):
+            apply_schema = True
+
+        conn = sqlite3.connect(file_name)
+        cursor = conn.cursor()
+
+        if apply_schema:
+            # TODO: formally encode schema
+            exp_table = """
+            CREATE TABLE experiments (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              data TEXT,
+              bulk_hash TEXT,
+              application_name TEXT,
+              name TEXT,
+              foms TEXT,
+              processes_per_node INTEGER,
+              n_nodes INTEGER,
+              n_ranks INTEGER,
+              n_threads INTEGER,
+              workload_name TEXT,
+              timestamp TEXT, -- Store as ISO8601 string, e.g., 'YYYY-MM-DD HH:MM:SS'
+              workspace_name TEXT,
+              node_type TEXT,
+              workspace_hash TEXT,
+              "user" TEXT, -- Quoted because USER is an SQL keyword
+              status TEXT
+            );"""
+            cursor.execute(exp_table)
+
+            fom_table = """
+            CREATE TABLE foms (
+              name TEXT,
+              value TEXT,
+              unit TEXT,
+              context TEXT,
+              experiment_id TEXT, -- Must match the type of experiments.id (TEXT)
+              experiment_name TEXT,
+              origin TEXT,
+              origin_type TEXT,
+              FOREIGN KEY (experiment_id) REFERENCES experiments(id)
+                -- Optional: ON UPDATE action ON DELETE action (e.g., ON DELETE CASCADE)
+            );"""
+            cursor.execute(fom_table)
+
+        self.insert_data(uri, results, cursor)
+
+        # Commit your changes in the database
+        conn.commit()
+
+        # Closing the connection
+        conn.close()
+
+
 
 
 class PrintOnlyUploader(Uploader):
