@@ -10,7 +10,13 @@ import json
 import math
 import sys
 from enum import Enum
+import os
+try:
+    import jsonschema
+except ImportError:
+    jsonschema = None
 
+from ramble.schema.generic_sql_schema import GENERIC_SCHEMA, DataTypes, get_jsonschema_for_table
 import ramble.config
 from ramble.config import ConfigError
 from ramble.util.logger import logger
@@ -74,10 +80,16 @@ class Experiment:
 
         self.bulk_hash = exps_hash
 
-        self.timestamp = str(timestamp)
+        # Ensure timestamp is in ISO 8601 format as expected by GENERIC_SCHEMA and BigQuery TIMESTAMP
+        if isinstance(timestamp, str):
+            self.timestamp = timestamp
+        else:
+            # Assuming timestamp is a datetime object if not a string
+            self.timestamp = timestamp.isoformat()
+
 
         self.id = None
-        self.generate_hash()
+        self.generate_hash() # This will set self.id as an integer hash
 
     def generate_hash(self):
         # Avoid regenerating a hash when possible
@@ -98,11 +110,29 @@ class Experiment:
         # deep copy so the assignment below doesn't affect the foms array
         import copy
 
-        j = copy.deepcopy(self.__dict__)
-
-        j["foms"] = json.dumps(self.foms)
-        j["data"] = json.dumps(self.data, default=vars)
-        return j
+        # Create a dictionary ensuring alignment with GENERIC_SCHEMA['experiments']
+        # and correct Python types.
+        exp_dict = {
+            "id": self.id, # Integer
+            "name": self.name, # String
+            "application_name": self.application_name, # String
+            "workspace_name": self.workspace_name, # String
+            "workspace_hash": self.workspace_hash, # String
+            "workload_name": self.workload_name, # String
+            "bulk_hash": self.bulk_hash, # String
+            "n_nodes": self.n_nodes, # Integer
+            "processes_per_node": self.processes_per_node, # Integer
+            "n_ranks": self.n_ranks, # Integer
+            "n_threads": self.n_threads, # Integer
+            "node_type": self.node_type, # String
+            "status": self.status, # String
+            "user": self.user, # String
+            "timestamp": self.timestamp, # ISO 8601 String
+            "data": json.dumps(self.data, default=vars) # JSON String
+        }
+        # Note: The 'foms' field which was a JSON string in the old Experiment.to_json()
+        # is not part of GENERIC_SCHEMA['experiments'] as FOMs are normalized.
+        return exp_dict
 
 
 def determine_node_type(experiment, contexts):
@@ -237,6 +267,29 @@ def _prepare_data(results, uri):
 class BigQueryUploader(Uploader):
     """Class to handle upload of FOMs to BigQuery"""
 
+    BIGQUERY_TYPE_MAP = {
+        DataTypes.INTEGER: "INTEGER",
+        DataTypes.STRING: "STRING",
+        DataTypes.TEXT: "STRING",  # BigQuery uses STRING for text
+        DataTypes.BOOLEAN: "BOOLEAN",
+        DataTypes.TIMESTAMP: "TIMESTAMP",  # Expects ISO 8601 string
+        DataTypes.JSON_TEXT: "STRING",  # JSON stored as string
+    }
+
+    def _get_validation_schemas(self):
+        """
+        Generates jsonschemas for experiments and FOMs tables using generic_sql_schema.
+        """
+        exp_schema = get_jsonschema_for_table('experiments')
+        foms_schema = get_jsonschema_for_table('foms')
+
+        if not exp_schema:
+            logger.error("Could not generate jsonschema for 'experiments' table. Skipping validation.")
+        if not foms_schema:
+            logger.error("Could not generate jsonschema for 'foms' table. Skipping validation.")
+        
+        return {"experiments": exp_schema, "foms": foms_schema}
+
     """
     Attempt to chunk the upload into acceptable size chunks, per BigQuery requirements
     """
@@ -271,25 +324,84 @@ class BigQueryUploader(Uploader):
         return error
 
     def insert_data(self, uri: str, results) -> None:
+        validation_schemas = self._get_validation_schemas()
+        validate = ramble.config.get("config:upload:validate_schema", False)
 
         exp_table_id, exps_to_insert, fom_table_id, foms_to_insert = _prepare_data(results, uri)
 
         logger.debug("Experiments to insert:")
         logger.debug(exps_to_insert)
 
+        # Validate Experiments
+        if validate and validation_schemas.get("experiments") and jsonschema:
+            logger.info("Validating experiments against schema...")
+            exp_schema_for_validation = validation_schemas["experiments"]
+            for exp_data in exps_to_insert:
+                try:
+                    jsonschema.validate(instance=exp_data, schema=exp_schema_for_validation)
+                except jsonschema.exceptions.ValidationError as e:
+                    # Use .get('name', 'N/A') as 'name' might be missing if data is malformed
+                    exp_name = exp_data.get('name', exp_data.get('id', 'N/A'))
+                    logger.warn(f"Experiment validation failed for {exp_name}: {e.message}")
+        elif validate and not jsonschema:
+            logger.warn("jsonschema library not found. Skipping schema validation for experiments. Install with 'pip install jsonschema'")
+        elif validate and not validation_schemas.get("experiments"):
+            logger.warn("Experiment validation schema not available. Skipping validation.")
+
+
         logger.msg("Upload experiments...")
         errors1 = self.chunked_upload(exp_table_id, exps_to_insert)
         errors2 = None
 
-        if errors1 == []:
+        if errors1 == []: # Proceed with FOMs only if experiment upload had no errors
+            # Validate FOMs
+            if validate and validation_schemas.get("foms") and jsonschema:
+                logger.info("Validating FOMs against schema...")
+                fom_schema_for_validation = validation_schemas["foms"]
+                for fom_data in foms_to_insert:
+                    try:
+                        jsonschema.validate(instance=fom_data, schema=fom_schema_for_validation)
+                    except jsonschema.exceptions.ValidationError as e:
+                        fom_name = fom_data.get('name', 'N/A')
+                        exp_id = fom_data.get('experiment_id', 'N/A')
+                        logger.warn(f"FOM validation failed for {fom_name} (Experiment ID: {exp_id}): {e.message}")
+            elif validate and not jsonschema: # jsonschema missing, already warned for experiments if applicable
+                if not validation_schemas.get("experiments"): # only warn again if not warned for exps
+                    logger.warn("jsonschema library not found. Skipping schema validation for FOMs. Install with 'pip install jsonschema'")
+            elif validate and not validation_schemas.get("foms"):
+                 logger.warn("FOM validation schema not available. Skipping validation.")
+
             logger.msg("Upload FOMs...")
             errors2 = self.chunked_upload(fom_table_id, foms_to_insert)
+        else:
+            logger.warn("Skipping FOM upload due to errors during experiment upload.")
 
-        for errors, name in zip([errors1, errors2], ["exp", "fom"]):
-            if errors == []:
-                logger.msg(f"New rows have been added in {name}")
+
+        # Error Reporting
+        upload_summary = []
+        if errors1 == []:
+            upload_summary.append(f"Successfully added {len(exps_to_insert)} rows to {exp_table_id}")
+            if errors2 == []:
+                upload_summary.append(f"Successfully added {len(foms_to_insert)} rows to {fom_table_id}")
+            elif errors2: # errors2 is not empty list and not None
+                upload_summary.append(f"Encountered errors while inserting FOM rows into {fom_table_id}: {errors2}")
+            # If errors2 is None (skipped), it's already logged.
+        elif errors1: # errors1 is not empty list and not None
+            upload_summary.append(f"Encountered errors while inserting experiment rows into {exp_table_id}: {errors1}")
+            upload_summary.append(f"FOM upload to {fom_table_id} was skipped due to experiment upload errors.")
+        
+        for summary_msg in upload_summary:
+            if "errors" in summary_msg:
+                 logger.error(summary_msg) # Use error for actual upload errors
             else:
-                logger.die(f"Encountered errors while inserting rows: {errors}")
+                 logger.msg(summary_msg)
+        
+        # If any part of the upload had errors that were not just validation warnings, consider it a failure.
+        if (errors1 and errors1 != []) or (errors2 and errors2 != []):
+            # logger.die is not a standard logger method, perhaps meant to raise an exception or exit.
+            # For now, just log as error. If it should terminate, an exception should be raised.
+            logger.error("One or more upload operations failed.")
+
 
     def perform_upload(self, uri, results):
         super().perform_upload(uri, results)

@@ -183,6 +183,7 @@ The current default configuration is as follows:
       upload:
         type: 'BigQuery'
         uri: ''
+        validate_schema: false # Default: false
 
 
 .. _spack-config-option:
@@ -219,6 +220,25 @@ destination.
 As part of the upload it tries to attribute the data to a user. This can be
 specified via ``config:user``, or if blank ramble will try deduce it based on
 the calling user.
+
+.. _config-upload-validate-schema:
+
+The ``validate_schema`` option (boolean, default: ``false``) under the ``upload``
+block controls whether Ramble (specifically the `BigQueryUploader`) should validate
+the experiment and FOM data against a dynamically generated jsonschema before
+attempting to upload it.
+
+*   If set to ``true``, Ramble will perform the validation.
+    *   This requires the ``jsonschema`` Python package to be installed.
+    *   If ``jsonschema`` is not found, a warning will be logged, and validation will be skipped.
+    *   If validation fails for any record, a warning will be logged with details about the validation error, but Ramble will still attempt to upload the data.
+*   If set to ``false`` (the default), no schema validation is performed.
+
+This option is particularly useful for ensuring data integrity and for debugging
+issues related to data structure when uploading to BigQuery. The jsonschema used
+for validation is dynamically generated from the definitions in
+``lib/ramble/ramble/schema/generic_sql_schema.py`` (see the
+:ref:`results documentation <results>` for more details on the generic schema).
 
 
 .. _disable-passthrough-config-option:
