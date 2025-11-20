@@ -32,7 +32,6 @@ import ramble.schema.applications
 import ramble.schema.merged
 import ramble.schema.workspace
 import ramble.software_environments
-from ramble.util.aggregator  import aggregator_factory
 import ramble.util.hashing
 import ramble.util.install_cache
 import ramble.util.lock as lk
@@ -1730,20 +1729,15 @@ ramble:
                                         mod = fom["origin"]
                                         name = f"{fom['origin_type']}{delim}{mod}{delim}{name}"
 
-                                    output = "{} = {} {}".format(name, fom["value"], fom["units"])
-                                    f.write("    %s\n" % (output.strip()))
-
+                                    extra_info = ""
                                     if len(fom["value_array"]) > 1:
-                                        output = "{} = {} {}".format(name, str(fom["value_array"]), fom["units"])
-                                        f.write("    %s\n" % (output.strip()))
+                                        extra_info = f"({str(fom["aggregator"].value)}) {fom["value_array"]}"
 
-                                        fom_aggregator = aggregator_factory(fom["aggregator"])
-                                        value_array_single = fom_aggregator(fom["value_array"])
-
-                                        # TODO: instead of being in the LHS string, the JSON would want this "output_str" field emitted too, to indentify the strategy used
-                                        # TODO: how to represent callables?
-                                        output = "{} = {} {}".format(name + " [" + str(fom["aggregator"].value) + "]", value_array_single, fom["units"])
-                                        f.write("    %s\n" % (output.strip()))
+                                    # TODO: instead of being in the LHS string, the JSON would want this "output_str" field emitted too, to indentify the strategy used
+                                    # TODO: how to represent callables?
+                                    unit_str = f"_{fom["units"]}" if fom["units"] else ""
+                                    output = f"{name} = {fom["value"]}{unit_str} {extra_info}"
+                                    f.write("    %s\n" % (output.strip()))
 
                             if software_key in exp and exp[software_key]:
                                 self.write_software_info(f, exp)

@@ -6,36 +6,47 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-from enum import Enum
 import statistics
-from typing import Callable, Union, Type, List, Any
+from enum import Enum
+from typing import Any, Callable, List, Union
+import csv
+import io
+
 
 class AggregatorType(Enum):
     """Defines the possible strategies for list aggregation."""
-    LAST = 'last'
-    FIRST = 'first'
-    MEAN = 'mean'
-    MIN = 'min'
-    MAX = 'max'
-    CSV = 'csv'
 
+    LAST = "last"
+    FIRST = "first"
+    MEAN = "mean"
+    MIN = "min"
+    MAX = "max"
+    CSV = "csv"
+
+
+# TODO: should these be callable classes so they can hold .name?
 def aggregate_last(data: list) -> object:
     return data[-1] if data else None
 
+
 def aggregate_first(data: list) -> object:
     return data[0] if data else None
+
 
 def aggregate_mean(data: list) -> float:
     # TODO: try using statistics.mean as an abtrirary callable
     return statistics.mean(data) if data else 0.0
 
+
 def aggregate_min(data: list) -> object:
     return min(data) if data else None
+
 
 def aggregate_max(data: list) -> object:
     return max(data) if data else None
 
-def aggregator_csv(data: List[List[Any]]) -> str: # <-- NEW
+
+def aggregator_csv(data: List[List[Any]]) -> str:  # <-- NEW
     """
     Aggregates a list of data rows (list of lists) into a single CSV-formatted string.
     """
@@ -53,18 +64,20 @@ def aggregator_csv(data: List[List[Any]]) -> str: # <-- NEW
     # Get the resulting string and return it
     return output.getvalue()
 
+
 AGGREGATOR_MAP: dict[AggregatorType, Callable[[list], object]] = {
     AggregatorType.LAST: aggregate_last,
     AggregatorType.FIRST: aggregate_first,
     AggregatorType.MEAN: aggregate_mean,
     AggregatorType.MIN: aggregate_min,
     AggregatorType.MAX: aggregate_max,
-    AggregatorType.CSV: aggregator_csv
+    AggregatorType.CSV: aggregator_csv,
 }
 
 # TODO: inline these type hints?
 AggregatorCallable = Callable[[list], object]
 AggregatorInput = Union[AggregatorType, AggregatorCallable]
+
 
 def aggregator_factory(aggregator_input: AggregatorInput) -> AggregatorCallable:
     """

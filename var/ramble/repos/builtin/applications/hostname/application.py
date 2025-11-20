@@ -60,6 +60,7 @@ class Hostname(ExecutableApplication):
         fom_regex=r"(?P<hostname>\S+)",
         group_name="hostname",
         units="",
+        aggregator=AggregatorType.FIRST,
     )
 
     success_criteria("wrote_anything", mode="string", match=r".*")

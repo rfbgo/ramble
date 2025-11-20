@@ -497,9 +497,9 @@ class Openfoam(ExecutableApplication):
 
                 # Compute statistics from other times
                 for stat in ramble.util.stats.all_stats:
-                    #print(stat.name)
-                    #print(timestep_times)
-                    #print(stat.compute(timestep_times))
+                    # print(stat.name)
+                    # print(timestep_times)
+                    # print(stat.compute(timestep_times))
                     self.add_inmem_fom_value(
                         f"simple-foam-time-{stat.name}",
                         stat.compute(timestep_times),

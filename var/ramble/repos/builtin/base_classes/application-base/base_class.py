@@ -58,6 +58,7 @@ from ramble.language.shared_language import (
     register_phase,
 )
 from ramble.util import constants, conversions
+from ramble.util.aggregator import aggregator_factory
 from ramble.util.foms import FomType
 from ramble.util.logger import logger
 from ramble.util.naming import NS_SEPARATOR
@@ -2332,6 +2333,13 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
         """
         pass
 
+    def _apply_fom_aggregation(self, fom_values):
+        for context, foms in fom_values.items():
+            for name, fom in foms.items():
+                fom_aggregator = aggregator_factory(fom["aggregator"])
+                value_array_single = fom_aggregator(fom["value_array"])
+                fom["value"] = value_array_single
+
     def _extract_inmem_foms(self, inmem_fom_defs, fom_values):
         """Extract in-memory FOMs"""
         for context, foms in inmem_fom_defs.items():
@@ -2357,6 +2365,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                     "origin": fom_conf["origin"],
                     "origin_type": fom_conf["origin_type"],
                     "fom_type": fom_conf["fom_type"],
+                    "aggregator": fom_conf["aggregator"],
                 }
 
     register_phase(
@@ -2532,13 +2541,20 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                                                 )
 
                                             existing_value_array = []
-                                            if fom_name in fom_values[fom_context]:
-                                                existing_value_array = fom_values[fom_context][fom_name]["value_array"]
+                                            if (
+                                                fom_name
+                                                in fom_values[fom_context]
+                                            ):
+                                                existing_value_array = (
+                                                    fom_values[fom_context][
+                                                        fom_name
+                                                    ]["value_array"]
+                                                )
                                             fom_values[fom_context][
                                                 fom_name
                                             ] = {
-                                                "value": fom_val,
-                                                "value_array": existing_value_array + [fom_val],
+                                                "value_array": existing_value_array
+                                                + [fom_val],
                                                 "units": fom_unit,
                                                 "origin": fom_conf["origin"],
                                                 "origin_type": fom_conf[
@@ -2547,9 +2563,13 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                                                 "fom_type": fom_conf[
                                                     "fom_type"
                                                 ],
-                                                "aggregator": fom_conf["aggregator"],
+                                                "aggregator": fom_conf[
+                                                    "aggregator"
+                                                ],
                                             }
         self._extract_inmem_foms(inmem_defs, fom_values)
+
+        self._apply_fom_aggregation(fom_values)
 
         # Test all non-file based success criteria
         for criteria_obj, _ in criteria_list.all_criteria():
