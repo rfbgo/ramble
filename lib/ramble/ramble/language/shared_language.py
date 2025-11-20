@@ -106,7 +106,8 @@ def figure_of_merit(
     fom_type: FomType = FomType.UNDEFINED,
     when=None,
     fom_map_key=None,
-    default_aggregation=AggregationType.LAST, # TODO: make this this can take an aribtrary callable / lambda
+    # TODO: change back to last
+    aggregator=AggregatorType.FIRST, # TODO: make this this can take an aribtrary callable / lambda
     **kwargs,
 ):
     """Adds a figure of merit to track for this object
@@ -156,6 +157,7 @@ def figure_of_merit(
             "when": when_list,
             "origin_type": obj.origin_type if hasattr(obj, "origin_type") else "",
             "fom_map_key": fom_map_key,
+            "aggregator": aggregator,
         }
 
     return _execute_figure_of_merit

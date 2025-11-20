@@ -8,7 +8,7 @@
 
 from enum import Enum
 import statistics
-from typing import Callable, Union, Type
+from typing import Callable, Union, Type, List, Any
 
 class AggregatorType(Enum):
     """Defines the possible strategies for list aggregation."""
@@ -17,6 +17,7 @@ class AggregatorType(Enum):
     MEAN = 'mean'
     MIN = 'min'
     MAX = 'max'
+    CSV = 'csv'
 
 def aggregate_last(data: list) -> object:
     return data[-1] if data else None
@@ -25,6 +26,7 @@ def aggregate_first(data: list) -> object:
     return data[0] if data else None
 
 def aggregate_mean(data: list) -> float:
+    # TODO: try using statistics.mean as an abtrirary callable
     return statistics.mean(data) if data else 0.0
 
 def aggregate_min(data: list) -> object:
@@ -33,12 +35,31 @@ def aggregate_min(data: list) -> object:
 def aggregate_max(data: list) -> object:
     return max(data) if data else None
 
+def aggregator_csv(data: List[List[Any]]) -> str: # <-- NEW
+    """
+    Aggregates a list of data rows (list of lists) into a single CSV-formatted string.
+    """
+    if not data:
+        return ""
+
+    # Use io.StringIO to treat a string as a file
+    output = io.StringIO()
+    # Create a CSV writer object
+    writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+
+    # Write all rows to the in-memory buffer
+    writer.writerows(data)
+
+    # Get the resulting string and return it
+    return output.getvalue()
+
 AGGREGATOR_MAP: dict[AggregatorType, Callable[[list], object]] = {
     AggregatorType.LAST: aggregate_last,
     AggregatorType.FIRST: aggregate_first,
     AggregatorType.MEAN: aggregate_mean,
     AggregatorType.MIN: aggregate_min,
     AggregatorType.MAX: aggregate_max,
+    AggregatorType.CSV: aggregator_csv
 }
 
 # TODO: inline these type hints?

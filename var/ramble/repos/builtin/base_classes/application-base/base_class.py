@@ -2547,6 +2547,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                                                 "fom_type": fom_conf[
                                                     "fom_type"
                                                 ],
+                                                "aggregator": fom_conf["aggregator"],
                                             }
         self._extract_inmem_foms(inmem_defs, fom_values)
 
@@ -3090,6 +3091,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                                 except ramble.expander.RambleSyntaxError:
                                     return None
 
+                            # TODO: why is this not a type?
                             fom_def = {
                                 "origin": source.name,
                                 "origin_type": source.origin_type,
@@ -3117,6 +3119,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                                 "fom_name_expanded": _try_expand_var_or_none(
                                     fom, self.expander
                                 ),
+                                "aggregator": source_def["aggregator"],
                             }
 
                             dest_def_dict[context]["foms"][fom] = fom_def
