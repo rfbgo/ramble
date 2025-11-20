@@ -2352,6 +2352,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                 expanded_fom_value = self.expander.expand_var(fom_value)
                 fom_values[context][fom_name] = {
                     "value": expanded_fom_value,
+                    "value_array": [expanded_fom_value],
                     "units": fom_conf["units_expanded"],
                     "origin": fom_conf["origin"],
                     "origin_type": fom_conf["origin_type"],
@@ -2529,10 +2530,15 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                                                         extra_vars=fom_vars,
                                                     )
                                                 )
+
+                                            existing_value_array = []
+                                            if fom_name in fom_values[fom_context]:
+                                                existing_value_array = fom_values[fom_context][fom_name]["value_array"]
                                             fom_values[fom_context][
                                                 fom_name
                                             ] = {
                                                 "value": fom_val,
+                                                "value_array": existing_value_array + [fom_val],
                                                 "units": fom_unit,
                                                 "origin": fom_conf["origin"],
                                                 "origin_type": fom_conf[
@@ -2776,6 +2782,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                                 False,
                                 fom["value"],
                                 fom["fom_type"],
+                                fom["value_array"],
                             )
                         if repeat_foms[context_name][fom_key][
                             "fom_is_numeric"

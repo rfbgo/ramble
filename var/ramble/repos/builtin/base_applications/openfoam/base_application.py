@@ -403,7 +403,7 @@ class Openfoam(ExecutableApplication):
     )
 
     simple_foam_exec_regex = (
-        r"\s*ExecutionTime = (?P<foam_time>[0-9]+\.?[0-9]*)"
+        r"\s*ExecutionTime = (?P<foam_time>[0-9]+\.?[0-9]*).*"
     )
     figure_of_merit(
         "simpleFoam Time",
@@ -422,7 +422,7 @@ class Openfoam(ExecutableApplication):
     figure_of_merit(
         "potentialFoam Time",
         log_file=(log_prefix + "potentialFoam"),
-        fom_regex=r"\s*ExecutionTime = (?P<foam_time>[0-9]+\.?[0-9]*)",
+        fom_regex=r"\s*ExecutionTime = (?P<foam_time>[0-9]+\.?[0-9]*).*",
         group_name="foam_time",
         units="s",
     )
@@ -497,6 +497,9 @@ class Openfoam(ExecutableApplication):
 
                 # Compute statistics from other times
                 for stat in ramble.util.stats.all_stats:
+                    #print(stat.name)
+                    #print(timestep_times)
+                    #print(stat.compute(timestep_times))
                     self.add_inmem_fom_value(
                         f"simple-foam-time-{stat.name}",
                         stat.compute(timestep_times),

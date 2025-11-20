@@ -8,6 +8,9 @@
 
 import copy
 from enum import Enum
+from abc import ABC, abstractmethod
+from enum import Enum
+import statistics
 
 
 # For a FOM, the direction that is 'better' e.g., faster is better
@@ -23,7 +26,6 @@ class BetterDirection(Enum):
             return cls[string.upper()]
         except KeyError:
             return None
-
 
 class FomType(Enum):
     TIME = 1

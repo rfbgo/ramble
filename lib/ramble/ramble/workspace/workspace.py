@@ -1732,6 +1732,40 @@ ramble:
                                     output = "{} = {} {}".format(name, fom["value"], fom["units"])
                                     f.write("    %s\n" % (output.strip()))
 
+                                    # TODO: move to somewhere less local
+                                    class first_wins:
+                                        output_str = "first"
+                                        def calculate(list_in):
+                                            return list_in[0]
+                                    class last_wins:
+                                        output_str = "last"
+                                        def calculate(list_in):
+                                            return list_in[-1]
+                                    class avg:
+                                        output_str = "avg"
+                                        def calculate(list_in):
+                                            print(list_in)
+                                            #l = [float(i) for i in list_in]
+                                            l = []
+                                            for i in list_in:
+                                                print(i)
+                                                l.append(float(i))
+                                            return sum(l) / len(list_in)
+
+                                    if len(fom["value_array"]) > 1:
+                                        output = "{} = {} {}".format(name, str(fom["value_array"]), fom["units"])
+                                        f.write("    %s\n" % (output.strip()))
+
+                                        # TODO: this should obviously be set by the fom itself
+                                        #value_array_strategy = avg
+                                        #value_array_strategy = first_wins
+                                        value_array_strategy = last_wins
+
+                                        value_array_single = value_array_strategy.calculate(fom["value_array"])
+                                        # TODO: instead of being in the LHS string, the JSON would want this "output_str" field emitted too, to indentify the strategy used
+                                        output = "{} = {} {}".format(name + " [" + str(value_array_strategy.output_str) + "]", value_array_single, fom["units"])
+                                        f.write("    %s\n" % (output.strip()))
+
                             if software_key in exp and exp[software_key]:
                                 self.write_software_info(f, exp)
 

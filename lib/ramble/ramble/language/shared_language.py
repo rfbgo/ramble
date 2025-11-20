@@ -15,6 +15,7 @@ import ramble.language.language_helpers
 import ramble.success_criteria
 import ramble.variants
 from ramble.util.foms import FomType
+from ramble.util.aggregator import AggregatorType
 from ramble.util.logger import logger
 from ramble.util.spec_utils import SoftwareSpec
 
@@ -105,6 +106,7 @@ def figure_of_merit(
     fom_type: FomType = FomType.UNDEFINED,
     when=None,
     fom_map_key=None,
+    default_aggregation=AggregationType.LAST, # TODO: make this this can take an aribtrary callable / lambda
     **kwargs,
 ):
     """Adds a figure of merit to track for this object
