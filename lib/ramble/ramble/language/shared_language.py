@@ -106,6 +106,7 @@ def figure_of_merit(
     fom_type: FomType = FomType.UNDEFINED,
     when=None,
     fom_map_key=None,
+    primary=False,
     **kwargs,
 ):
     """Adds a figure of merit to track for this object
@@ -125,6 +126,7 @@ def figure_of_merit(
       when (list | None): List of when conditions to apply to directive
       fom_map_key: If supplied, this is treated as an in-memory (as opposed to file-based)
                    figure of merit, and its value is extracted using this key
+      primary (bool): Whether this is a primary figure of merit for the application
     """
 
     def _execute_figure_of_merit(obj):
@@ -155,6 +157,7 @@ def figure_of_merit(
             "when": when_list,
             "origin_type": obj.origin_type if hasattr(obj, "origin_type") else "",
             "fom_map_key": fom_map_key,
+            "primary": primary,
         }
 
     return _execute_figure_of_merit

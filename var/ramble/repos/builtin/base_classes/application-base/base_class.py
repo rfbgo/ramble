@@ -2529,6 +2529,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                     "origin": fom_conf["origin"],
                     "origin_type": fom_conf["origin_type"],
                     "fom_type": fom_conf["fom_type"],
+                    "primary": fom_conf["primary"],
                 }
 
     register_phase(
@@ -2732,6 +2733,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                                                 "fom_type": fom_conf[
                                                     "fom_type"
                                                 ],
+                                                "primary": fom_conf["primary"],
                                             }
         self._extract_inmem_foms(inmem_defs, fom_values)
 
@@ -3059,8 +3061,8 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                         continue
 
             # Display the FOMs in alphabetic order, even if the corresponding log entries
-            # may be in different ordering.
-            context_map["foms"].sort(key=operator.itemgetter("name"))
+            # may be in different ordering. Primary FOMs are displayed first.
+            context_map["foms"].sort(key=lambda x: (not x.get("primary", False), x["name"]))
             if context == _NULL_CONTEXT:
                 context_map["foms"] = summary_foms + context_map["foms"]
             results.append(context_map)
@@ -3282,6 +3284,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                                 ),
                                 "fom_type": source_def["fom_type"].to_dict(),
                                 "fom_map_key": source_def["fom_map_key"],
+                                "primary": source_def["primary"],
                                 # If expansion works (i.e., it doesn't rely on the matched fom
                                 # groups), then cache it here to avoid repeated expansion later.
                                 "units_expanded": _try_expand_var_or_none(

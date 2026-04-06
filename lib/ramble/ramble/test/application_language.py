@@ -299,6 +299,19 @@ def test_figure_of_merit_directive_required_args():
     assert foms["test_inmem_fom"]["fom_map_key"] == "test_fom_map_key"
 
 
+def test_figure_of_merit_directive_primary():
+    app_inst = ExecutableApplication("/not/a/path")  # noqa: F405
+    app_inst.figure_of_merit(
+        "test_primary_fom",
+        units="s",
+        fom_map_key="test_fom_map_key",
+        primary=True,
+    )
+    foms = list(list(app_inst.figures_of_merit.values())[0].values())[0]
+    assert len(foms) == 1
+    assert foms["test_primary_fom"]["primary"] is True
+
+
 @pytest.mark.parametrize("app_class", app_types)
 def test_input_file_directive(app_class):
     test_defs = {}

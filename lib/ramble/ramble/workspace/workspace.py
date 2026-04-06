@@ -1747,7 +1747,8 @@ ramble:
                                         mod = fom["origin"]
                                         name = f"{fom['origin_type']}{delim}{mod}{delim}{name}"
 
-                                    output = f"{name} = {fom['value']} {fom['units']}"
+                                    prefix = "(Primary) " if fom.get("primary", False) else ""
+                                    output = f"{prefix}{name} = {fom['value']} {fom['units']}"
                                     f.write(f"    {output.strip()}\n")
 
                             if software_key in exp and exp[software_key]:
