@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,46 +6,52 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-# TODO Define language features
-"""This package contains directives that can be used within a package.
-
-Directives are functions that can be called inside a package
-definition to modify the package, for example:
-
-    class Gromacs(MpiRunApplication):
-        workload('water_bare_hbonds_1536')
-        ...
-
-    'workload' is a ramble directive
-
-The available directives are:
-
-    <TO BE IMPLEMENTED>
-
+"""This package contains the underlying implementation for the language
+directives, which are to allow functions to be invoked at class level
 """
 
+import copy
 import functools
-import sys
-
-from six import string_types
+from collections.abc import Sequence  # novm
+from typing import Any, Dict, List
 
 import llnl.util.lang
-import llnl.util.tty.color
 
 import ramble.error
 
-if sys.version_info >= (3, 3):
-    from collections.abc import Sequence  # novm
-else:
-    from collections import Sequence
-
-
-__all__ = ['DirectiveMeta', 'DirectiveError']
+__all__ = ["DirectiveMeta", "DirectiveError"]
 
 
 #: These are variant names used by ramble internally; applications can't use
 #: them
 reserved_names = []
+
+namespaces = [
+    "ramble.app",
+    "ramble.mod",
+    "ramble.pkg_man",
+    "ramble.package_manager",
+    "ramble.wm",
+    "ramble.workflow_manager",
+    "ramble.application",
+    "ramble.modifier",
+]
+
+
+def _push_to_context(when_condition: str) -> None:
+    DirectiveMeta._when_constraints_from_context.append(when_condition)
+
+
+def _pop_from_context() -> str:
+    return DirectiveMeta._when_constraints_from_context.pop()
+
+
+def _push_default_args(default_args: Dict[str, Any]) -> None:
+    DirectiveMeta._default_args.append(default_args)
+
+
+def _pop_default_args() -> dict:
+    return DirectiveMeta._default_args.pop()
 
 
 class DirectiveMeta(type):
@@ -55,7 +61,17 @@ class DirectiveMeta(type):
 
     # Set of all known directives
     _directive_names = set()
+    _directive_init_values = {}
     _directives_to_be_executed = []
+    _directive_functions = {}
+    _directive_classes = {}
+    _when_constraints_from_context = []
+    _default_args: List[dict] = []
+
+    push_to_context = _push_to_context
+    pop_from_context = _pop_from_context
+    push_default_args = _push_default_args
+    pop_default_args = _pop_default_args
 
     def __new__(cls, name, bases, attr_dict):
         # Initialize the attribute containing the list of directives
@@ -63,66 +79,58 @@ class DirectiveMeta(type):
         # commands:
         # 1. in the order they were defined
         # 2. following the MRO
-
-        attr_dict['_directives_to_be_executed'] = []
-
-        meta_stack = []
-        meta_stack.extend(cls.__bases__)
-        meta_list = []
-        while meta_stack:
-            cur_meta = meta_stack.pop(0)
-
-            meta_stack.extend(cur_meta.__bases__)
-
-            if hasattr(cur_meta, '_directives_to_be_executed'):
-                meta_list.append(cur_meta)
-
-        for meta in meta_list:
-            try:
-                directives = meta._directives_to_be_executed
-                attr_dict['_directives_to_be_executed'].extend(directives)
-                meta._directives_to_be_executed = []
-            except AttributeError:
-                pass
-
-            for directive in meta._directive_names:
-                if directive not in cls._directive_names:
-                    cls._directive_names |= set((directive,))
-
+        attr_dict["_directives_to_be_executed"] = []
         for base in reversed(bases):
             try:
                 directive_from_base = base._directives_to_be_executed
-                attr_dict['_directives_to_be_executed'].extend(
-                    directive_from_base)
+                attr_dict["_directives_to_be_executed"].extend(directive_from_base)
             except AttributeError:
                 # The base class didn't have the required attribute.
                 # Continue searching
                 pass
 
         # De-duplicates directives from base classes
-        attr_dict['_directives_to_be_executed'] = [
-            x for x in llnl.util.lang.dedupe(
-                attr_dict['_directives_to_be_executed'])]
+        attr_dict["_directives_to_be_executed"] = [
+            x for x in llnl.util.lang.dedupe(attr_dict["_directives_to_be_executed"])
+        ]
 
         # Move things to be executed from module scope (where they
         # are collected first) to class scope
-        if cls._directives_to_be_executed:
-            attr_dict['_directives_to_be_executed'].extend(
-                cls._directives_to_be_executed)
-            cls._directives_to_be_executed = []
+        if DirectiveMeta._directives_to_be_executed:
+            attr_dict["_directives_to_be_executed"].extend(
+                DirectiveMeta._directives_to_be_executed
+            )
+            DirectiveMeta._directives_to_be_executed = []
 
-        return super(DirectiveMeta, cls).__new__(
-            cls, name, bases, attr_dict)
+        return super().__new__(cls, name, bases, attr_dict)
 
     def __init__(cls, name, bases, attr_dict):
         # The instance is being initialized: if it is a package we must ensure
         # that the directives are called to set it up.
 
-        if 'ramble.app' in cls.__module__:
+        valid_module = False
+        for namespace in namespaces:
+            if namespace in cls.__module__:
+                valid_module = True
+
+        if valid_module:
             # Ensure the presence of the dictionaries associated
             # with the directives
-            for d in cls._directive_names:
-                setattr(cls, d, {})
+            for d, t in DirectiveMeta._directive_init_values.items():
+                setattr(cls, d, copy.deepcopy(t))
+
+            directive_attrs = {
+                "_directive_functions": {},
+                "_directive_classes": {},
+                "_directive_names": DirectiveMeta._directive_names.copy(),
+            }
+
+            for attr in directive_attrs.keys():
+                if hasattr(DirectiveMeta, attr):
+                    directive_attrs[attr].update(getattr(DirectiveMeta, attr))
+
+            for attr in directive_attrs.keys():
+                setattr(cls, attr, directive_attrs[attr])
 
             # Lazily execute directives
             for directive in cls._directives_to_be_executed:
@@ -130,26 +138,30 @@ class DirectiveMeta(type):
 
             # Ignore any directives executed *within* top-level
             # directives by clearing out the queue they're appended to
-            cls._directives_to_be_executed = []
+            DirectiveMeta._directives_to_be_executed = []
 
         super().__init__(name, bases, attr_dict)
 
     @classmethod
-    def directive(cls, dicts=None):
+    def directive(cls, dicts=None, init_value=None):
         """Decorator for Ramble directives.
 
-        Ramble directives allow you to modify a package while it is being
+        Ramble directives allow you to modify an object while it is being
         defined, e.g. to add version or dependency information.  Directives are
-        one of the key pieces of Ramble's appliaction "language", which is
+        one of the key pieces of Ramble's object "language", which is
         embedded in python.
 
         Here's an example directive:
+
+        .. code-block:: python
 
             @directive(dicts='workloads')
             workload('workload_name', ...):
                 ...
 
         This directive allows you write:
+
+        .. code-block:: python
 
             class Foo(ApplicationBase):
                 workload(...)
@@ -169,46 +181,93 @@ class DirectiveMeta(type):
         and that if no directive actually modified it, it will just be an empty
         dict.
 
-        This is just a modular way to add storage attributes to the Appliaction
+        The ``(init_value={})`` part allows objects in Ramble to define what the
+        type of the attribute defined by the `dicts` argument will be. This
+        allows ``(dicts="variables", init_value=[])`` which makes the attribute
+        a list instead of a dict, which is the default.
+
+        This is just a modular way to add storage attributes to the Application
         class, and it's how Ramble gets information from the applications to
         the core.
 
         """
-        if isinstance(dicts, string_types):
-            dicts = (dicts, )
+        if isinstance(dicts, str):
+            dicts = (dicts,)
+
         if not isinstance(dicts, Sequence):
             message = "dicts arg must be list, tuple, or string. Found {0}"
             raise TypeError(message.format(type(dicts)))
+
+        if init_value is None:
+            init_value = {}
+
         # Add the dictionary names if not already there
-        cls._directive_names |= set(dicts)
+        dicts_set = set(dicts)
+        DirectiveMeta._directive_names |= dicts_set
+        for attr_name in dicts_set:
+            DirectiveMeta._directive_init_values[attr_name] = init_value
 
         # This decorator just returns the directive functions
         def _decorator(decorated_function):
-            mod = sys.modules[decorated_function.__module__]
-
-            if hasattr(mod, '__all__'):
-                mod.__all__.append(decorated_function.__name__)
-            else:
-                mod.__all__ = [decorated_function.__name__]
-            # __all__.append(decorated_function.__name__)
-
             @functools.wraps(decorated_function)
-            def _wrapper(*args, **kwargs):
+            def _wrapper(*args, **_kwargs):
+                # First merge default args with kwargs
+                kwargs = dict()
+                for default_args in DirectiveMeta._default_args:
+                    kwargs.update(default_args)
+                kwargs.update(_kwargs)
+
+                # Inject when arguments from the context
+                if DirectiveMeta._when_constraints_from_context:
+                    # Check that directives not yet supporting the when= argument
+                    # are not used inside the context manager
+                    if decorated_function.__name__ not in [
+                        "software_spec",
+                        "required_package",
+                        "define_compiler",
+                        "package_manager_config",
+                        "register_builtin",
+                        "register_phase",
+                        "register_template",
+                        "figure_of_merit",
+                        "figure_of_merit_context",
+                        "formatted_executable",
+                        "register_validator",
+                        "variable",
+                        "workload_variable",
+                        "modifier_variable",
+                        "package_manager_variable",
+                        "workflow_manager_variable",
+                    ]:
+                        msg = (
+                            'directive "{0}" cannot be used within a "when"'
+                            ' context since it does not support a "when=" '
+                            "argument"
+                        )
+                        msg = msg.format(decorated_function.__name__)
+                        raise DirectiveError(msg)
+
+                    when_constraints = DirectiveMeta._when_constraints_from_context.copy()
+
+                    if kwargs.get("when"):
+                        when_constraints.extend(kwargs["when"])
+
+                    kwargs["when"] = when_constraints.copy()
+
                 # If any of the arguments are executors returned by a
                 # directive passed as an argument, don't execute them
                 # lazily. Instead, let the called directive handle them.
                 # This allows nested directive calls in applications.  The
                 # caller can return the directive if it should be queued.
                 def remove_directives(arg):
-                    directives = cls._directives_to_be_executed
+                    directives = DirectiveMeta._directives_to_be_executed
                     if isinstance(arg, (list, tuple)):
                         # Descend into args that are lists or tuples
                         for a in arg:
                             remove_directives(a)
                     else:
                         # Remove directives args from the exec queue
-                        remove = next(
-                            (d for d in directives if d is arg), None)
+                        remove = next((d for d in directives if d is arg), None)
                         if remove is not None:
                             directives.remove(remove)
 
@@ -224,13 +283,17 @@ class DirectiveMeta(type):
                 # ...so if it is not a sequence make it so
                 values = result
                 if not isinstance(values, Sequence):
-                    values = (values, )
+                    values = (values,)
 
-                cls._directives_to_be_executed.extend(values)
+                DirectiveMeta._directives_to_be_executed.extend(values)
 
                 # wrapped function returns same result as original so
                 # that we can nest directives
                 return result
+
+            DirectiveMeta._directive_classes[decorated_function.__name__] = cls
+            DirectiveMeta._directive_functions[decorated_function.__name__] = decorated_function
+
             return _wrapper
 
         return _decorator

@@ -1,0 +1,51 @@
+# Copyright 2022-2025 The Ramble Authors
+
+# Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+# https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+# <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your
+# option. This file may not be copied, modified, or distributed
+# except according to those terms.
+
+ramble:
+  modifiers:
+  - name: apptainer
+  env_vars:
+    set:
+      OMP_NUM_THREADS: '{n_threads}'
+  variables:
+    mpi_command: ''
+    container_uri: docker://ghcr.io/converged-computing/metric-lammps-cpu:libfabric-zen4-reax
+    container_name: lammps-reax
+    batch_submit: '{execute_experiment}'
+    processes_per_node: 1
+    gpus_per_node: 0
+    # This is how you can add flags
+    # apptainer_run_args: --nv --bind {container_mounts} --writable-tmpfs
+  applications:
+    lammps: # Application name
+      workloads:
+        hns-reaxff: # Workload name from application
+          experiments:
+            strong_scale: # Arbitrary experiment name
+              variables:
+                env_name: apptainer
+                n_nodes: 1
+                lammps_path: /usr
+                # Add other lammps flags
+                lammps_flags: "-nocite"
+                # This is the release that is downloaded
+                input_stage: stable_29Aug2024_update1
+                # The input file used for lammps from the input_path directory
+                input_file: in.reaxff.hns
+                # Problem size dimensions for lammps
+                xx: 2
+                yy: 2
+                zz: 2
+  software:
+    packages:
+      apptainer:
+        pkg_spec: apptainer
+    environments:
+      lammps:
+        packages:
+        - apptainer

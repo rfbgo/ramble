@@ -1,0 +1,107 @@
+[tool.black]
+line-length = 99
+# Older versions of black (like the ones compatible with py3.7)
+# don't recognize newer python versions like py312.
+target-version = ["py36", "py37", "py38", "py39", "py310"]
+include = '''
+    \.pyi?$
+'''
+force-exclude = '''
+/(
+    \.git
+  | etc
+  | share
+  | var
+  | lib/ramble/external
+  | lib/ramble/spack
+  | lib/ramble/llnl
+  | __pycache__
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 99
+filter_files = true
+skip_glob = [
+  "**/lib/ramble/external/**",
+  "**/lib/ramble/llnl/**",
+  "**/lib/ramble/spack/**",
+]
+sections = [
+  "FUTURE",
+  "STDLIB",
+  "THIRDPARTY",
+  "LLNL",
+  "FIRSTPARTY",
+  "SPACK",
+  "LOCALFOLDER",
+]
+known_first_party = "ramble"
+known_spack = "spack"
+known_llnl = "llnl"
+known_third_party = ["ruamel", "jsonschema"]
+
+[tool.coverage.run]
+parallel = true
+data_file = "./tests-coverage/.coverage"
+include = [
+  "**/bin/ramble",
+  "**/bin/ramble-python",
+  "**/lib/ramble/ramble/**",
+  "**/lib/ramble/ramble/schema/**",
+  "**/lib/ramble/ramble/cmd/**",
+]
+omit = [
+    "**/spack/lib/**",
+    "**/spack/var/**",
+    "lib/ramble/spack/**",
+    "lib/ramble/external/**",
+    "lib/ramble/llnl/**",
+    "share/**",
+]
+
+[tool.coverage.report]
+# Regexes for lines to exclude from consideration
+exclude_lines = [
+    # Have to re-enable the standard pragma
+    'pragma: no cover',
+
+    # Don't complain about missing debug-only code:
+    'def __repr__',
+    'if self\.debug',
+
+    # Don't complain if tests don't hit defensive assertion code:
+    'raise AssertionError',
+    'raise NotImplementedError',
+
+    # Don't complain if non-runnable code isn't run:
+    'if 0:',
+    'if False:',
+    'if __name__ == .__main__.:',
+
+    # Ignore import statements:
+    # Imports (and defs) are not counted due to coverage being run after
+    # these modules are already initialized.
+    '^import .*',
+    '^from .* import .*',
+]
+ignore_errors = true
+include = [
+  "**/bin/ramble",
+  "**/bin/ramble-python",
+  "**/lib/ramble/ramble/**",
+  "**/lib/ramble/ramble/schema/**",
+  "**/lib/ramble/ramble/cmd/**",
+]
+omit = [
+    "**/spack/lib/**",
+    "**/spack/var/**",
+    "lib/ramble/spack/**",
+    "lib/ramble/external/**",
+    "lib/ramble/llnl/**",
+    "share/**",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"

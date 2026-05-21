@@ -1,13 +1,25 @@
-Ramble is a multi-platform experimentation framework that is capable of driving
-software installation, acquire input files, configure experiments, and extract
-results. It works on Linux, macOS, and many supercomputers.
+Ramble is a multi-platform experimentation framework that increases exploration
+productivity and improves reproducibility. Ramble is capable of driving
+software installation, acquiring input files, configuring experiments, and
+extracting results.
+It works on Linux, macOS, and many supercomputers.
 
-To install ramble and configure your experiment workspace, make sure you have Python.
+Ramble can be used to configure a variety of experiments for applications.
+These can include anything from:
+ - Scientific parameter sweeps
+ - Performance focused scaling studies
+ - Compiler flag sweeps
+
+To install ramble and configure your experiment workspace, make sure you have
+Python, and Ramble’s dependencies are installed as per the dependency section
+below.
 Then:
 
-    $ git clone -c feature.manyFiles=true https://github.com/GoogleCloudPlatform/ramble.git
-    $ cd ramble/bin
-    $ ./ramble workspace create -d test_workspace -c ../examples/basic_workspace.yaml
+    git clone -c feature.manyFiles=true https://github.com/GoogleCloudPlatform/ramble.git
+    python3 -m venv ramble/env
+    . ramble/env/bin/activate
+    pip install -r ramble/requirements.txt
+    ./ramble/bin/ramble workspace create -d test_workspace -c ramble/examples/basic_hostname_config.yaml
 
 Dependencies
 ------------
@@ -16,16 +28,35 @@ Ramble’s python dependencies can be installed using the included requirements.
 
 e.g.
 
-    $ pip -r requirements.txt
+    pip install -r requirements.txt
 
-Outside of these requirements, ramble requires an existing installation of
-spack for some application definition. See
-[Spack’s documentation](https://github.com/spack/spack#-spack) to install Spack.
+We recommend Python >= 3.7 for Ramble, but a best effort attempt is made to
+support Python 3.6 as it is used by older operating systems such as Centos7.
+Specifically, you might need to update `pip` and downgrade `protobuf` when
+using Python 3.6.
+
+Outside of these requirements, Ramble requires package managers to be
+configured if they will be used as part of the experiments Ramble creates.
+
+Although package manager support is not required to use Ramble, some
+experiments are more easily accomplished by allowing Ramble to drive the
+package manager execution. To allow this, package managers generally need to be
+installed indepednently from Ramble. For more information on this, see
+[Ramble's supported package managers](https://ramble.readthedocs.io/en/latest/package_managers.html).
 
 Documentation
 ----------------
 
+Ramble’s documentation can be viewed at
+[https://ramble.readthedocs.io/](https://ramble.readthedocs.io/).
+
 For help with Ramble’s commands, run `ramble help` or `ramble help --all`.
+
+For more information on concepts in Ramble, see Ramble’s
+[Getting Started](./lib/ramble/docs/getting_started.rst) guide.
+
+Example configuration files are also contained in the
+[examples](./examples) directory.
 
 Community
 ------------------------
@@ -40,6 +71,14 @@ Resources:
 
 Contributing
 ------------------------
+When developing features for Ramble, it can be helpful to install the
+development requirements instead of the user requirements:
+
+e.g.
+
+    pip install -r requirements-dev.txt
+
+
 Contributing to Ramble is relatively easy.  Just send us a
 [pull request](https://help.github.com/articles/using-pull-requests/).
 When you send your request, make ``develop`` the destination branch on the
@@ -47,12 +86,14 @@ When you send your request, make ``develop`` the destination branch on the
 
 Your PR must pass Ramble's unit tests and documentation tests, and must be
 [PEP 8](https://www.python.org/dev/peps/pep-0008/) compliant.  We enforce
-these guidelines with our CI process. To run these tests locally,
-please use the test runners:
- - share/ramble/qa/run-unit-tests
- - share/ramble/qa/run-flake8-tests
+these guidelines with our CI process.
 
- For additional requirements about contributing, see our
+These tests can be run locally through test runners in the share/ramble/qa/
+directory. Alternatively, [pre-commit](https://pre-commit.com/#install) can be
+used to manage our git hooks. To install the hooks, simply run:
+- pre-commit install
+
+ For additional requirements about contributing, including Google’s CLA, see our
  [Contribution Guide](.github/CONTRIBUTING.md).
 
 

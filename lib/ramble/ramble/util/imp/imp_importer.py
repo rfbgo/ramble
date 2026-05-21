@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -36,7 +36,7 @@ def load_source(full_name, path, prepend=None):
             loaded module; e.g., can be used to inject import statements
 
     Returns:
-        (ModuleType): the loaded module
+        (types.ModuleType): the loaded module
     """
     with import_lock():
         if prepend is None:
@@ -60,12 +60,12 @@ def prepend_open(f, *args, **kwargs):
     See the ``importlib``-based importer for a faster way to do this in
     later versions of python.
     """
-    text = kwargs.get('text', None)
+    text = kwargs.get("text", None)
 
     with open(f, *args) as f:
-        with tempfile.NamedTemporaryFile(mode='w+') as tf:
+        with tempfile.NamedTemporaryFile(mode="w+") as tf:
             if text:
-                tf.write(text + '\n')
+                tf.write(text + "\n")
             tf.write(f.read())
             tf.seek(0)
             yield tf.file

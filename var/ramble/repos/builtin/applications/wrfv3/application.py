@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,93 +6,187 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
+import os
+
 from ramble.appkit import *
+from ramble.expander import Expander
 
 
-class Wrfv3(SpackApplication):
-    '''Define Wrf version 3 application'''
-    name = 'wrfv3'
+class Wrfv3(ExecutableApplication):
+    """Define Wrf version 3 application"""
 
-    tags = ['nwp', 'weather']
+    name = "wrfv3"
 
-    default_compiler('gcc8', base='gcc', version='8.2.0')
+    maintainers("douglasjacobsen")
 
-    mpi_library('impi2018', base='intel-mpi', version='2018.4.274')
+    tags("nwp", "weather")
 
-    software_spec('wrf', base='wrf', version='3.9.1.1',
-                  variants='build_type=dm+sm compile_type=em_real nesting=basic ~pnetcdf',
-                  compiler='gcc8', mpi='impi2018', required=True)
+    with when("package_manager_family=spack"):
+        define_compiler("gcc8", pkg_spec="gcc@8.2.0")
 
-    input_file('CONUS_2p5km', url='https://www2.mmm.ucar.edu/wrf/bench/conus2.5km_v3911/bench_2.5km.tar.bz2',
-               description='2.5 km resolution mesh of the continental United States.')
+        software_spec("impi2018", pkg_spec="intel-mpi@2018.4.274")
 
-    input_file('CONUS_12km', url='https://www2.mmm.ucar.edu/wrf/bench/conus12km_v3911/bench_12km.tar.bz2',
-               description='12 km resolution mesh of the continental United States.')
+        software_spec(
+            "wrfv3",
+            pkg_spec="wrf@3.9.1.1 build_type=dm+sm compile_type=em_real nesting=basic ~pnetcdf",
+            compiler="gcc8",
+        )
 
-    executable('cleanup', 'rm -f rsl.* wrfout*', use_mpi=False)
-    executable('copy', template=['cp -R {input_path}/* {experiment_run_dir}/.',
-                                 'ln -s {wrf}/run/* {experiment_run_dir}/.'],
-               use_mpi=False)
-    executable('execute', 'wrf.exe', use_mpi=True)
+        required_package("wrf")
 
-    workload('CONUS_2p5km', executables=['cleanup', 'copy', 'execute'],
-             input='CONUS_2p5km')
+    input_file(
+        "CONUS_2p5km",
+        url="https://www2.mmm.ucar.edu/wrf/bench/conus2.5km_v3911/bench_2.5km.tar.bz2",
+        sha256="1919a0e0499057c1a570619d069817022bae95b17cf1a52bdaa174f8e8d11508",
+        description="2.5 km resolution mesh of the continental United States.",
+    )
 
-    workload('CONUS_12km', executables=['cleanup', 'copy', 'execute'],
-             input='CONUS_12km')
+    input_file(
+        "CONUS_12km",
+        url="https://www2.mmm.ucar.edu/wrf/bench/conus12km_v3911/bench_12km.tar.bz2",
+        sha256="0c5ecfc85f2a982f0fa0191371401c1474cf562a7cf97192acd3c9b91ebcc48d",
+        description="12 km resolution mesh of the continental United States.",
+    )
 
-    workload_variable('input_path', default='{CONUS_12km}',
-                      description='Path for CONUS 12km inputs.',
-                      workloads=['CONUS_12km'])
+    executable(
+        "cleanup",
+        "rm -f rsl.* wrfout*",
+        use_mpi=False,
+        output_capture=OUTPUT_CAPTURE.ALL,
+    )
+    executable(
+        "copy",
+        template=[
+            "cp -R {input_path}/* {experiment_run_dir}/.",
+            "ln -s {wrf_path}/run/* {experiment_run_dir}/.",
+        ],
+        use_mpi=False,
+        output_capture=OUTPUT_CAPTURE.ALL,
+    )
+    executable("execute", "wrf.exe", use_mpi=True)
 
-    workload_variable('input_path', default='{CONUS_2p5km}',
-                      description='Path for CONUS 2.5km inputs.',
-                      workloads=['CONUS_2p5km'])
+    workload(
+        "CONUS_2p5km",
+        executables=["cleanup", "copy", "execute"],
+        input="CONUS_2p5km",
+    )
 
-    figure_of_merit('Average Timestep Time', log_file='{experiment_run_dir}/stats.out',
-                    fom_regex='Average time:\s+(?P<avg_time>[0-9]+\.[0-9]*).*',
-                    group_name='avg_time', units='s')
+    workload(
+        "CONUS_12km",
+        executables=["cleanup", "copy", "execute"],
+        input="CONUS_12km",
+    )
 
-    figure_of_merit('Cumulative Timestep Time', log_file='{experiment_run_dir}/stats.out',
-                    fom_regex='Cumulative time:\s+(?P<total_time>[0-9]+\.[0-9]*).*',
-                    group_name='total_time', units='s')
+    workload_variable(
+        "input_path",
+        default="{CONUS_12km}",
+        description="Path for CONUS 12km inputs.",
+        workloads=["CONUS_12km"],
+    )
 
-    figure_of_merit('Minimum Timestep Time', log_file='{experiment_run_dir}/stats.out',
-                    fom_regex='Min time:\s+(?P<min_time>[0-9]+\.[0-9]*).*',
-                    group_name='min_time', units='s')
+    workload_variable(
+        "input_path",
+        default="{CONUS_2p5km}",
+        description="Path for CONUS 2.5km inputs.",
+        workloads=["CONUS_2p5km"],
+    )
 
-    figure_of_merit('Maximum Timestep Time', log_file='{experiment_run_dir}/stats.out',
-                    fom_regex='Max time:\s+(?P<max_time>[0-9]+\.[0-9]*).*',
-                    group_name='max_time', units='s')
+    log_str = os.path.join(
+        Expander.expansion_str("experiment_run_dir"), "stats.out"
+    )
 
-    figure_of_merit('Number of timesteps', log_file='{experiment_run_dir}/stats.out',
-                    fom_regex='Number of times:\s+(?P<count>[0-9]+)',
-                    group_name='count', units='')
+    figure_of_merit(
+        "Average Timestep Time",
+        log_file=log_str,
+        fom_regex=r"Average time:\s+(?P<avg_time>[0-9]+\.[0-9]*)",
+        group_name="avg_time",
+        units="s",
+        fom_type=FomType.TIME,
+    )
 
-    figure_of_merit('Avg. Max Ratio Time', log_file='{experiment_run_dir}/stats.out',
-                    fom_regex='Avg time / Max time:\s+(?P<avg_max_ratio>[0-9]+\.[0-9]*).*',
-                    group_name='avg_max_ratio', units='')
+    figure_of_merit(
+        "Cumulative Timestep Time",
+        log_file=log_str,
+        fom_regex=r"Cumulative time:\s+(?P<total_time>[0-9]+\.[0-9]*)",
+        group_name="total_time",
+        units="s",
+        fom_type=FomType.TIME,
+    )
 
-    def _analyze_experiments(self, workspace, expander):
+    figure_of_merit(
+        "Minimum Timestep Time",
+        log_file=log_str,
+        fom_regex=r"Min time:\s+(?P<min_time>[0-9]+\.[0-9]*)",
+        group_name="min_time",
+        units="s",
+        fom_type=FomType.TIME,
+    )
+
+    figure_of_merit(
+        "Maximum Timestep Time",
+        log_file=log_str,
+        fom_regex=r"Max time:\s+(?P<max_time>[0-9]+\.[0-9]*)",
+        group_name="max_time",
+        units="s",
+        fom_type=FomType.TIME,
+    )
+
+    figure_of_merit(
+        "Number of timesteps",
+        log_file=log_str,
+        fom_regex=r"Number of times:\s+(?P<count>[0-9]+)",
+        group_name="count",
+        units="",
+        fom_type=FomType.MEASURE,
+    )
+
+    figure_of_merit(
+        "Avg. Max Ratio Time",
+        log_file=log_str,
+        fom_regex=r"Avg time / Max time:\s+(?P<avg_max_ratio>[0-9]+\.[0-9]*)",
+        group_name="avg_max_ratio",
+        units="",
+        fom_type=FomType.MEASURE,
+    )
+
+    success_criteria(
+        "Complete",
+        mode="string",
+        match=r".*?wrf: SUCCESS COMPLETE WRF",
+        file="{experiment_run_dir}/rsl.out.0000",
+    )
+
+    archive_pattern("{experiment_run_dir}/rsl.out.*")
+    archive_pattern("{experiment_run_dir}/rsl.error.*")
+
+    def _analyze_experiments(self, workspace, app_inst=None):
         import glob
         import re
+
         # Generate stats file
 
-        file_list = glob.glob(expander.expand_var('{experiment_run_dir}/rsl.out.*'))
+        file_list = glob.glob(
+            os.path.join(
+                self.expander.expand_var_name("experiment_run_dir"),
+                "rsl.out.*",
+            )
+        )
 
         if file_list:
-            timing_regex = re.compile(r'Timing for main.*(?P<main_time>[0-9]+\.[0-9]*).*')
+            timing_regex = re.compile(
+                r"Timing for main.*:\s+(?P<main_time>[0-9]+\.[0-9]*).*"
+            )
             avg_time = 0.0
-            min_time = float('inf')
-            max_time = float('-inf')
+            min_time = float("inf")
+            max_time = float("-inf")
             sum_time = 0.0
             count = 0
             for out_file in file_list:
-                with open(out_file, 'r') as f:
+                with open(out_file) as f:
                     for line in f.readlines():
                         m = timing_regex.match(line)
                         if m:
-                            time = float(m.group('main_time'))
+                            time = float(m.group("main_time"))
                             count += 1
                             sum_time += time
                             min_time = min(min_time, time)
@@ -100,13 +194,19 @@ class Wrfv3(SpackApplication):
 
             avg_time = sum_time / max(count, 1)
 
-            stats_path = expander.expand_var('{experiment_run_dir}/stats.out')
-            with open(stats_path, 'w+') as f:
-                f.write('Average time: %s s\n' % (avg_time))
-                f.write('Cumulative time: %s s\n' % (sum_time))
-                f.write('Min time: %s s\n' % (min_time))
-                f.write('Max time: %s s\n' % (max_time))
-                f.write('Avg time / Max time: %s s\n' % (avg_time / max(max_time, float(1.0))))
-                f.write('Number of times: %s\n' % (count))
+            stats_path = os.path.join(
+                self.expander.expand_var_name("experiment_run_dir"),
+                "stats.out",
+            )
+            with open(stats_path, "w+") as f:
+                f.write("Average time: %s s\n" % (avg_time))
+                f.write("Cumulative time: %s s\n" % (sum_time))
+                f.write("Min time: %s s\n" % (min_time))
+                f.write("Max time: %s s\n" % (max_time))
+                f.write(
+                    "Avg time / Max time: %s s\n"
+                    % (avg_time / max(max_time, float(1.0)))
+                )
+                f.write("Number of times: %s\n" % (count))
 
-        super()._analyze_experiments(workspace, expander)
+        super()._analyze_experiments(workspace)

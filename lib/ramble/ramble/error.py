@@ -1,17 +1,15 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
 # <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
-from __future__ import print_function
 
-import sys
 import inspect
+import sys
 
-import llnl.util.tty as tty
-
+from ramble.util.logger import logger
 
 #: whether we should write stack traces or short error messages
 #: this is module-scoped because it needs to be set very early
@@ -20,11 +18,11 @@ debug = False
 
 class RambleError(Exception):
     """This is the superclass for all Ramble errors.
-       Subclasses can be found in the modules they have to do with.
+    Subclasses can be found in the modules they have to do with.
     """
 
     def __init__(self, message, long_message=None):
-        super(RambleError, self).__init__()
+        super().__init__()
         self.message = message
         self._long_message = long_message
 
@@ -54,10 +52,10 @@ class RambleError(Exception):
             return
 
         # basic debug message
-        tty.error(self.message)
+        logger.error(self.message)
         if self.long_message:
             sys.stderr.write(self.long_message)
-            sys.stderr.write('\n')
+            sys.stderr.write("\n")
 
         # stack trace, etc. in debug mode.
         if debug:
@@ -84,10 +82,9 @@ class RambleError(Exception):
 
     def __repr__(self):
         args = [repr(self.message), repr(self.long_message)]
-        args = ','.join(args)
-        qualified_name = inspect.getmodule(
-            self).__name__ + '.' + type(self).__name__
-        return qualified_name + '(' + args + ')'
+        args = ",".join(args)
+        qualified_name = inspect.getmodule(self).__name__ + "." + type(self).__name__
+        return qualified_name + "(" + args + ")"
 
     def __reduce__(self):
         return type(self), (self.message, self.long_message)
@@ -95,3 +92,7 @@ class RambleError(Exception):
 
 class SpecError(RambleError):
     """Superclass for all errors that occur while constructing specs."""
+
+
+class RambleCommandError(Exception):
+    """Raised when RambleCommand execution fails."""

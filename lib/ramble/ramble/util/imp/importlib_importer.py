@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -10,23 +10,23 @@
 
 ``importlib`` is only fully implemented in Python 3.
 """
-from importlib.machinery import SourceFileLoader  # novm
 import types
+from importlib.machinery import SourceFileLoader  # novm
 
 
 class PrependFileLoader(SourceFileLoader):
     def __init__(self, full_name, path, prepend=None):
-        super(PrependFileLoader, self).__init__(full_name, path)
+        super().__init__(full_name, path)
         self.prepend = prepend
 
     def path_stats(self, path):
-        stats = super(PrependFileLoader, self).path_stats(path)
+        stats = super().path_stats(path)
         if self.prepend:
             stats["size"] += len(self.prepend) + 1
         return stats
 
     def get_data(self, path):
-        data = super(PrependFileLoader, self).get_data(path)
+        data = super().get_data(path)
         if path != self.path or self.prepend is None:
             return data
         else:
@@ -45,7 +45,7 @@ def load_source(full_name, path, prepend=None):
             loaded module; e.g., can be used to inject import statements
 
     Returns:
-        (ModuleType): the loaded module
+        (types.ModuleType): the loaded module
     """
     # use our custom loader
     loader = PrependFileLoader(full_name, path, prepend)

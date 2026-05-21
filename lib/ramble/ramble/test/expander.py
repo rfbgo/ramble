@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -8,306 +8,243 @@
 
 import pytest
 
-import ramble.workspace
 import ramble.expander
-from ramble.main import RambleCommand
-
-pytestmark = pytest.mark.usefixtures(
-    'mutable_mock_workspace_path', 'config', 'mutable_mock_repo')
-
-workspace  = RambleCommand('workspace')
-add  = RambleCommand('add')
-remove  = RambleCommand('remove')
+import ramble.variants
 
 
-def test_expansions(mutable_mock_workspace_path):
-    workspace('create', 'test')
-
-    assert 'test' in workspace('list')
-
-    with ramble.workspace.read('test') as ws:
-        add('basic')
-        exp = ramble.expander.Expander(ws)
-
-        assert exp.workspace_vars['processes_per_node'] == -1
-
-        exp.set_var('level1_var', 'level1')
-        exp.set_var('level2_var', 'level2 {level1_var}')
-        exp.set_var('level3_var', 'level3 {level2_var}')
-        assert exp.expand_var('{level3_var}') == \
-            "level3 level2 level1"
-
-        assert exp.expand_var('2*{processes_per_node}') == '-2'
-
-        assert exp.expand_var('2**4') == '16'
-
-        assert exp.expand_var('((((16-10+2)/4)**2)*4)') == '16.0'
-
-
-def test_layered_expansions(mutable_mock_workspace_path):
-    application_vars = {
-        'app_var': 'test_app',
-        'ppn': '5'
-    }
-    workload_vars = {
-        'wl_var': 'test_wl',
-        'n_threads': '2'
-    }
-    experiment_vars = {
-        'exp_var': 'test_exp',
-        'n_nodes': '3'
+def exp_dict():
+    return {
+        "application_name": "foo",
+        "workload_name": "bar",
+        "experiment_name": "baz",
+        "application_input_dir": "/workspace/inputs/foo",
+        "workload_input_dir": "/workspace/inputs/foo/bar",
+        "application_run_dir": "/workspace/experiments/foo",
+        "workload_run_dir": "/workspace/experiments/foo/bar",
+        "experiment_run_dir": "/workspace/experiments/foo/bar/baz",
+        "env_name": "spack_foo.bar",
+        "n_ranks": "4",
+        "processes_per_node": "2",
+        "n_nodes": "2",
+        "var1": "{var2}",
+        "var2": "{var3}",
+        "var3": "3",
+        "decimal.06.var": "foo",
+        "size": '"0000.96"',  # Escaped as a string
+        "test_mask": '"0x0"',
+        "max_len": 9,
+        "test_dict": {"test_key1": "test_val1", "test_key2": "test_val2"},
     }
 
-    workspace('create', 'test')
 
-    assert 'test' in workspace('list')
+def build_variant_set():
+    variant_set = ramble.variants.VariantSet()
 
-    with ramble.workspace.read('test') as ws:
-        add('basic')
-        exp = ramble.expander.Expander(ws)
-
-        exp.set_application('basic')
-        exp.set_application_vars(application_vars)
-
-        exp.set_workload('test_wl')
-        exp.set_workload_vars(workload_vars)
-
-        exp.set_experiment('single_node')
-        exp.set_experiment_vars(experiment_vars)
-
-        union = {}
-        union.update(application_vars)
-        union.update(workload_vars)
-        union.update(experiment_vars)
-
-        for key, val in union.items():
-            expansion = '{' + key + '}'
-            result = exp.expand_var(expansion)
-            assert result == val
-
-
-def test_experiment_name_expansions(mutable_mock_workspace_path):
-    workspace('create', 'test')
-
-    assert 'test' in workspace('list')
-
-    experiment_name_template = 'exp_name_{new_var}'
-
-    with ramble.workspace.read('test') as ws:
-        exp = ramble.expander.Expander(ws)
-        exp.set_application('basic')
-        exp.set_application_vars({})
-
-        exp.set_workload('test_wl')
-        exp.set_workload_vars({})
-
-        exp.set_experiment(experiment_name_template)
-        exp.set_experiment_vars({'new_var': '2'})
-
-        exp._finalize_experiment()
-
-        assert exp.experiment_name == 'exp_name_2'
-
-
-def test_vector_expansions(mutable_mock_workspace_path):
-    workspace('create', 'test')
-
-    assert 'test' in workspace('list')
-
-    template_base = 'exp_name'
-    experiment_name_template = template_base + '_{n_nodes}'
-
-    exp_vars_vector = {
-        'n_nodes': [1, 2, 4, 8],
-        'n_ranks': '{processes_per_node}*{n_nodes}',
-        'processes_per_node': '1'
+    variants = {
+        "test_variant": "defined",
+        "package_manager": "spack",
+        "workflow_manager": "slurm",
     }
 
-    expected_exp_names = set()
-    for n in exp_vars_vector['n_nodes']:
-        expected_exp_names.add(template_base + '_%s' % n)
+    multi_value_variants = [
+        ("package_manager_family", "spack"),
+        ("workflow_manager_family", "slurm"),
+    ]
 
-    with ramble.workspace.read('test') as ws:
-        exp = ramble.expander.Expander(ws)
-        exp.set_application('basic')
-        exp.set_application_vars({})
+    for name, value in variants.items():
+        variant_set.default_variant(name, value)
 
-        exp.set_workload('test_wl')
-        exp.set_workload_vars({})
+    for name, value in multi_value_variants:
+        variant_set.multi_value_variant(name, value)
 
-        exp.set_experiment(experiment_name_template)
-        exp.set_experiment_vars(exp_vars_vector)
-
-        for _ in exp.rendered_experiments():
-            assert exp.experiment_name in expected_exp_names
-            expected_exp_names.remove(exp.experiment_name)
-
-    assert len(expected_exp_names) == 0
+    return variant_set
 
 
-def test_zipped_vector_expansions(mutable_mock_workspace_path):
-    workspace('create', 'test')
+@pytest.mark.parametrize(
+    "input,output,no_expand_vars,passes",
+    [
+        ("{var1}", "3", set(), 1),
+        ("{var2}", "3", set(), 1),
+        ("{var3}", "3", set(), 1),
+        ("{application_name}", "foo", set(), 1),
+        ("{n_nodes}", "2", set(), 1),
+        ("{processes_per_node}", "2", set(), 1),
+        ("{n_nodes}*{processes_per_node}", "4", set(), 1),
+        ("2**4", "16", set(), 1),
+        ("{((((16-10+2)/4)**2)*4)}", "16.0", set(), 1),
+        ("gromacs +blas", "gromacs +blas", set(), 1),
+        ("range(0, 5)", "[0, 1, 2, 3, 4]", set(), 1),
+        ("{decimal.06.var}", "foo", set(), 1),
+        ("{}", "{}", set(), 1),
+        ("{{n_ranks}+2}", "6", set(), 1),
+        ("{{n_ranks}*{var{processes_per_node}}:05d}", "00012", set(), 1),
+        ("{{n_ranks}-1}", "3", set(), 1),
+        ("{{{n_ranks}/2}:0.0f}", "2", set(), 1),
+        ("{size}", "0000.96", {"size"}, 1),
+        ("CPU(s)", "CPU(s)", set(), 1),
+        ("str(1.5)", "1.5", set(), 1),
+        ("int(1.5)", "1", set(), 1),
+        ("float(1.5)", "1.5", set(), 1),
+        ("ceil(0.6)", "1", set(), 1),
+        ("floor(0.6)", "0", set(), 1),
+        ("max(1, 5)", "5", set(), 1),
+        ("min(1, 5)", "1", set(), 1),
+        ('simplify_str("a.b_c")', "a-b-c", set(), 1),
+        (r"\{experiment_name\}", "{experiment_name}", set(), 1),
+        (r"\{experiment_name\}", "baz", set(), 2),
+        (r"{\{experiment_name\}}", "{{experiment_name}}", set(), 1),
+        (r"\\{experiment_name\\}", r"\{experiment_name\}", set(), 1),
+        (r"\\{experiment_name\\}", "{experiment_name}", set(), 2),
+        (r"\\{experiment_name\\}", "baz", set(), 3),
+        ('"2.1.1" in ["2.1.1", "3.1.1", "4.2.1"]', "True", set(), 1),
+        ('"2.1.2" in ["2.1.1", "3.1.1", "4.2.1"]', "False", set(), 1),
+        ('"3.1.2" not in ["2.1.1", "3.1.1", "4.2.1"]', "True", set(), 1),
+        ('"2.1.1" not in ["2.1.1", "3.1.1", "4.2.1"]', "False", set(), 1),
+        ("{test_mask}", "0x0", {"test_mask"}, 1),
+        ('re_search(r"bz$", {experiment_name})', "False", set(), 1),
+        ('re_search("o+\\\\.b", {env_name})', "True", set(), 1),
+        ('"foo" in "{env_name}"', "True", set(), 1),
+        ('"c" in "{experiment_name}"', "False", set(), 1),
+        ('"foo123" not in "{env_name}"', "True", set(), 1),
+        ('"foo" not in "{env_name}"', "False", set(), 1),
+        ('"{env_name}"[:{max_len}:1]', "spack_foo", set(), 1),
+        ("not_a_slice[0]", "not_a_slice[0]", set(), 1),
+        ("not_a_valid_slice[0:a]", "not_a_valid_slice[0:a]", set(), 1),
+        ("{test_dict}", "{'test_key1': 'test_val1', 'test_key2': 'test_val2'}", set(), 1),
+        ("{test_dict['test_key1']}", "test_val1", set(), 1),
+        ("{test_dict['test_key2']}", "test_val2", set(), 1),
+        ("{test_dict['missing_key']}", "{test_dict['missing_key']}", set(), 1),
+        ("{test_dict[None]}", "{test_dict[None]}", set(), 1),
+        ("maybe(env_name, foo)", "spack_foo.bar", set(), 1),
+        ("maybe(not_a_var, foo)", "foo", set(), 1),
+        ("maybe(not_a_var)", "", set(), 1),
+        ("2.1.a", "2.1.a", set(), 1),
+        ("{'key1':'val1'}", "{'key1':'val1'}", set(), 1),
+        ("{'key1': 'val1'}", "{'key1': 'val1'}", set(), 1),
+        ("{'key1': 'val1', 'key2': 'val2'}", "{'key1': 'val1', 'key2': 'val2'}", set(), 1),
+        ("${job_id}", "${job_id}", set(), 1),
+        ("${job_id:-}", "${job_id:-}", set(), 1),
+    ],
+)
+def test_expansions(input, output, no_expand_vars, passes):
+    expansion_vars = exp_dict()
 
-    assert 'test' in workspace('list')
+    expander = ramble.expander.Expander(expansion_vars, None, no_expand_vars=no_expand_vars)
 
-    template_base = 'exp_name'
-    experiment_name_template = template_base + '_{n_nodes}_{processes_per_node}'
+    step_input = input
+    for _ in range(0, passes):
+        step_input = expander.expand_var(step_input)
+    final_output = step_input
 
-    exp_vars_vector = {
-        'n_nodes': [1, 2, 4, 8],
-        'n_ranks': '{processes_per_node}*{n_nodes}',
-        'processes_per_node': [10, 20, 30, 40]
-    }
-
-    expected_exp_names = set()
-    for n, p in zip(exp_vars_vector['n_nodes'], exp_vars_vector['processes_per_node']):
-        expected_exp_names.add(template_base + '_%s_%s' % (n, p))
-
-    with ramble.workspace.read('test') as ws:
-        exp = ramble.expander.Expander(ws)
-        exp.set_application('basic')
-        exp.set_application_vars({})
-
-        exp.set_workload('test_wl')
-        exp.set_workload_vars({})
-
-        exp.set_experiment(experiment_name_template)
-        exp.set_experiment_vars(exp_vars_vector)
-
-        for _ in exp.rendered_experiments():
-            assert exp.experiment_name in expected_exp_names
-            expected_exp_names.remove(exp.experiment_name)
-
-    assert len(expected_exp_names) == 0
-
-
-def test_matrix_expansions(mutable_mock_workspace_path):
-    import itertools
-    workspace('create', 'test')
-
-    assert 'test' in workspace('list')
-
-    template_base = 'exp_name'
-    experiment_name_template = template_base + '_{n_nodes}_{processes_per_node}'
-
-    exp_vars_vector = {
-        'n_nodes': [1, 2, 4],
-        'n_ranks': '{processes_per_node}*{n_nodes}',
-        'processes_per_node': [10, 20, 30, 40]
-    }
-
-    exp_matrix_vecs = [['n_nodes', 'processes_per_node']]
-
-    expected_exp_names = set()
-    for config in itertools.product(exp_vars_vector['n_nodes'],
-                                    exp_vars_vector['processes_per_node']):
-        expected_exp_names.add(template_base + '_%s_%s' % (config[0],
-                                                           config[1]))
-
-    with ramble.workspace.read('test') as ws:
-        exp = ramble.expander.Expander(ws)
-        exp.set_application('basic')
-        exp.set_application_vars({})
-
-        exp.set_workload('test_wl')
-        exp.set_workload_vars({})
-
-        exp.set_experiment(experiment_name_template)
-        exp.set_experiment_vars(exp_vars_vector)
-        exp.set_experiment_matrices(exp_matrix_vecs)
-
-        for _ in exp.rendered_experiments():
-            assert exp.experiment_name in expected_exp_names
-            expected_exp_names.remove(exp.experiment_name)
-
-    assert len(expected_exp_names) == 0
-
-
-def test_multi_matrix_expansions(mutable_mock_workspace_path):
-    import itertools
-    workspace('create', 'test')
-
-    assert 'test' in workspace('list')
-
-    template_base = 'exp_name'
-    experiment_name_template = template_base + '_{n_nodes}_{processes_per_node}_{exp_idx}'
-
-    exp_vars_vector = {
-        'n_nodes': [1, 2, 4],
-        'n_ranks': '{processes_per_node}*{n_nodes}',
-        'processes_per_node': [10, 20, 30, 40],
-        'exp_idx': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    }
-
-    exp_matrix_vecs = [['n_nodes', 'processes_per_node'], ['exp_idx']]
-
-    expected_exp_names = set()
-    for config in zip(itertools.product(exp_vars_vector['n_nodes'],
-                                        exp_vars_vector['processes_per_node']),
-                      exp_vars_vector['exp_idx']):
-        expected_exp_names.add(template_base + '_%s_%s_%s' % (config[0][0],
-                                                              config[0][1],
-                                                              config[1]))
-
-    with ramble.workspace.read('test') as ws:
-        exp = ramble.expander.Expander(ws)
-        exp.set_application('basic')
-        exp.set_application_vars({})
-
-        exp.set_workload('test_wl')
-        exp.set_workload_vars({})
-
-        exp.set_experiment(experiment_name_template)
-        exp.set_experiment_vars(exp_vars_vector)
-        exp.set_experiment_matrices(exp_matrix_vecs)
-
-        for _ in exp.rendered_experiments():
-            assert exp.experiment_name in expected_exp_names
-            expected_exp_names.remove(exp.experiment_name)
-
-    assert len(expected_exp_names) == 0
+    assert final_output == output
 
 
-def test_matrix_vector_expansions(mutable_mock_workspace_path):
-    import itertools
-    workspace('create', 'test')
+@pytest.mark.parametrize(
+    "input,output,no_expand_vars,passes",
+    [
+        ("{var1}", 3, set(), 1),
+        ("{var2}", 3, set(), 1),
+        ("{var3}", 3, set(), 1),
+        ("{application_name}", "foo", set(), 1),
+        ("{n_nodes}", 2, set(), 1),
+        ("{processes_per_node}", 2, set(), 1),
+        ("{n_nodes}*{processes_per_node}", 4, set(), 1),
+        ("2**4", 16, set(), 1),
+        ("{((((16-10+2)/4)**2)*4)}", 16.0, set(), 1),
+        ('"gromacs +blas"', "gromacs +blas", set(), 1),
+        ("range(0, 5)", [0, 1, 2, 3, 4], set(), 1),
+        ("{decimal.06.var}", "foo", set(), 1),
+        ("{}", {}, set(), 1),
+        ("{{n_ranks}+2}", 6, set(), 1),
+        ("{{n_ranks}*{var{processes_per_node}}:05d}", "00012", set(), 1),
+        ("{{n_ranks}-1}", 3, set(), 1),
+        ("{{{n_ranks}/2}:0.0f}", 2, set(), 1),
+        ("{size}", 0.96, {"size"}, 1),
+        ("CPU(s)", "CPU(s)", set(), 1),
+        ("str(1.5)", 1.5, set(), 1),
+        ("int(1.5)", 1, set(), 1),
+        ("float(1.5)", 1.5, set(), 1),
+        ("ceil(0.6)", 1, set(), 1),
+        ("floor(0.6)", 0, set(), 1),
+        ("max(1, 5)", 5, set(), 1),
+        ("min(1, 5)", 1, set(), 1),
+        ('simplify_str("a.b_c")', "a-b-c", set(), 1),
+        (r"\{experiment_name\}", "{experiment_name}", set(), 1),
+        (r"\{experiment_name\}", "baz", set(), 2),
+        (r"{\{experiment_name\}}", "{{experiment_name}}", set(), 1),
+        (r"\\{experiment_name\\}", r"\{experiment_name\}", set(), 1),
+        (r"\\{experiment_name\\}", "{experiment_name}", set(), 2),
+        (r"\\{experiment_name\\}", "baz", set(), 3),
+        ('"2.1.1" in ["2.1.1", "3.1.1", "4.2.1"]', True, set(), 1),
+        ('"2.1.2" in ["2.1.1", "3.1.1", "4.2.1"]', False, set(), 1),
+        ("{test_mask}", 0, {"test_mask"}, 1),
+        ("{var3} // {processes_per_node}", 1, set(), 1),
+        ("-5 % 3", 1, set(), 1),
+        ("2 and 1", 1, set(), 1),
+        ("2 or 1", 2, set(), 1),
+        ("randrange(2, 3, 1)", 2, set(), 1),
+        ("randint(3, 3)", 3, set(), 1),
+    ],
+)
+def test_typed_expansions(input, output, no_expand_vars, passes):
+    expansion_vars = exp_dict()
 
-    assert 'test' in workspace('list')
+    expander = ramble.expander.Expander(expansion_vars, None, no_expand_vars=no_expand_vars)
 
-    template_base = 'exp_name'
-    experiment_name_template = template_base + '_{n_nodes}_{processes_per_node}_{exp_idx}'
+    step_input = input
+    for _ in range(0, passes):
+        step_input = expander.expand_var(step_input, typed=True)
+    final_output = step_input
 
-    exp_vars_vector = {
-        'n_nodes': [1, 2, 4],
-        'n_ranks': '{processes_per_node}*{n_nodes}',
-        'processes_per_node': [10, 20, 30, 40],
-        'exp_idx': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    }
+    assert final_output == output
 
-    exp_matrix_vecs = [['n_nodes', 'processes_per_node']]
 
-    expected_exp_names = set()
-    for config in itertools.product(exp_vars_vector['n_nodes'],
-                                    exp_vars_vector['processes_per_node'],
-                                    exp_vars_vector['exp_idx']):
-        expected_exp_names.add(template_base + '_%s_%s_%s' % (config[0],
-                                                              config[1],
-                                                              config[2]))
+@pytest.mark.parametrize(
+    "input,output",
+    [
+        ("application_name", "foo"),
+        ("workload_name", "bar"),
+        ("experiment_name", "baz"),
+        ("var1", "3"),
+        ("var2", "3"),
+        ("var3", "3"),
+    ],
+)
+def test_expand_var_name(input, output):
+    expansion_vars = exp_dict()
 
-    with ramble.workspace.read('test') as ws:
-        exp = ramble.expander.Expander(ws)
-        exp.set_application('basic')
-        exp.set_application_vars({})
+    expander = ramble.expander.Expander(expansion_vars, None)
 
-        exp.set_workload('test_wl')
-        exp.set_workload_vars({})
+    assert expander.expand_var_name(input) == output
 
-        exp.set_experiment(experiment_name_template)
-        exp.set_experiment_vars(exp_vars_vector)
-        exp.set_experiment_matrices(exp_matrix_vecs)
 
-        for _ in exp.rendered_experiments():
-            assert exp.experiment_name in expected_exp_names
-            expected_exp_names.remove(exp.experiment_name)
+def test_expansion_namespaces():
+    expansion_vars = exp_dict()
 
-    assert len(expected_exp_names) == 0
+    expander = ramble.expander.Expander(expansion_vars, None)
+
+    assert expander.application_namespace == "foo"
+    assert expander.workload_namespace == "foo.bar"
+    assert expander.experiment_namespace == "foo.bar.baz"
+
+
+@pytest.mark.parametrize(
+    "input_list,output",
+    [
+        (["package_manager=spack"], True),
+        (["test_variant=defined", "package_manager=spack"], True),
+        (["test_variant=undefined", "package_manager=spack"], False),
+        (["test_variant=undefined", "package_manager=spack", "workflow_manager=slurm"], False),
+        (["test_variant=defined", "package_manager=spack", "workflow_manager=slurm"], True),
+    ],
+)
+def test_satisfies_works(input_list, output):
+    variants = build_variant_set()
+
+    expansion_vars = exp_dict()
+
+    expander = ramble.expander.Expander(expansion_vars, None)
+
+    satisfied = expander.satisfies(input_list, variant_set=variants)
+
+    assert satisfied == output

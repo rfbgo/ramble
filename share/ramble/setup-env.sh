@@ -1,4 +1,5 @@
-# Copyright 2022 Google LLC
+#!/bin/bash -e
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -105,7 +106,7 @@ _ramble_shell_wrapper() {
                 case $_rmb_arg in
                     activate)
                         # Get --sh, --csh, or -h/--help arguments.
-                        # Space needed here becauses regexes start with a space
+                        # Space needed here because regexes start with a space
                         # and `-h` may be the only argument.
                         _a=" $@"
                         # Space needed here to differentiate between `-h`
@@ -126,7 +127,7 @@ _ramble_shell_wrapper() {
                         ;;
                     deactivate)
                         # Get --sh, --csh, or -h/--help arguments.
-                        # Space needed here becauses regexes start with a space
+                        # Space needed here because regexes start with a space
                         # and `-h` may be the only argument.
                         _a=" $@"
                         # Space needed here to differentiate between `--sh`
@@ -143,6 +144,23 @@ _ramble_shell_wrapper() {
                         else
                             # No args: source the output of the command.
                             eval $(command ramble $_rmb_flags workspace deactivate --sh)
+                        fi
+                        ;;
+                    create)
+                        _a=" $@"
+                        if [ "${_a#* -a}" != "$_a" ] || \
+                           [ "${_a#* --activate}" != "$_a" ];
+                        then
+                            # With -a, the command writes only the activation command
+                            # into stdout (`ramble workspace activate <ws>`.)
+                            # And the eval routes that command back to the wrapper to
+                            # inject shell args, etc.
+                            _activate_cmd="$(command ramble $_rmb_flags workspace create "$@")"
+                            eval $_activate_cmd
+                            _workspace="$(echo $_activate_cmd | awk '{print $NF}')"
+                            echo "==> Created and activated workspace in $_workspace"
+                        else
+                            command ramble $_rmb_flags workspace create "$@"
                         fi
                         ;;
                     *)
@@ -289,6 +307,26 @@ if [ "$_rmb_shell" = bash ]; then
     export -f ramble
     export -f _ramble_shell_wrapper
 fi
+
+# Identify and lock the python interpreter
+if [ -n "${RAMBLE_PYTHON:-}" ]; then
+  echo "The RAMBLE_PYTHON environment variable is set to $RAMBLE_PYTHON"
+  echo "Will pin the python binary ramble uses to this value".
+  if [ -n "${_RAMBLE_PYTHON:-}" ]; then
+    if [ "$RAMBLE_PYTHON" != "$_RAMBLE_PYTHON" ]; then
+      echo "WARNING: Ramble was previously pinned to use $_RAMBLE_PYTHON"
+      echo "         If this is not what you want, set the correct python"
+      echo "         in RAMBLE_PYTHON and re-source this file"
+    fi
+  fi
+fi
+
+for cmd in "${RAMBLE_PYTHON:-}" python3 python python2; do
+    if command -v > /dev/null "$cmd"; then
+        export _RAMBLE_PYTHON="$(command -v "$cmd")"
+        break
+    fi
+done
 
 # Add programmable tab completion for Bash
 #

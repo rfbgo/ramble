@@ -1,0 +1,85 @@
+# Copyright 2022-2025 The Ramble Authors
+#
+# Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+# https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+# <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your
+# option. This file may not be copied, modified, or distributed
+# except according to those terms.
+
+
+steps:
+  - name: gcr.io/cloud-builders/git
+    args:
+      - fetch
+      - '--unshallow'
+    id: ramble-clone
+  - name: us-central1-docker.pkg.dev/$PROJECT_ID/ramble-repo/ramble-${_BASE_IMG}-${_BASE_VER}-spack${_SPACK_REF}-python${_PYTHON_VER}:latest
+    args:
+      - '-c'
+      - |
+        cd /workspace
+
+        git branch develop origin/develop
+
+        . /opt/spack/share/spack/setup-env.sh
+
+        spack load py-pip ^python
+
+        pip install -r /workspace/requirements-dev.txt
+
+        export SPACK_PYTHON=`which python3`
+
+        . /workspace/share/ramble/setup-env.sh
+
+        echo "Spack version is $(spack --version)"
+        echo "Python version is $(python3 --version)"
+
+        UNIT_TEST_COVERAGE=true LONG=true /workspace/share/ramble/qa/run-unit-tests
+        # $$ characters are required for cloud-build:
+        # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values
+        unit_err=$$?
+
+        coverage report -m --fail-under=77
+        # $$ characters are required for cloud-build:
+        # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values
+        coverage_err=$$?
+
+        error=0
+        # $$ characters are required for cloud-build:
+        # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values
+        if [ $$unit_err -gt 0 ]; then
+          echo "Unit error = $$unit_err"
+          echo " ***** Unit tests failed"
+          error=1
+        fi
+
+        # $$ characters are required for cloud-build:
+        # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values
+        if [ $$coverage_err -gt 0 ]; then
+          if [ $$coverage_err == 2 ]; then
+            echo "Code coverage dropped below the minimum level."
+            echo " ***** Coverage decreased"
+          else
+            echo "Code coverage report generation failed."
+            echo " ***** Coverage report generic error"
+          fi
+
+          error=1
+        fi
+
+        # $$ characters are required for cloud-build:
+        # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values
+        exit $$error
+    id: ramble-unit-tests
+    entrypoint: /bin/bash
+    env:
+    - 'CODECOV_TOKEN=$_CODECOV_TOKEN'
+    - 'PUSH_CODECOV=$_PUSH_CODECOV'
+substitutions:
+  _SPACK_REF: v0.21.2
+  _PYTHON_VER: 3.11.6
+  _BASE_IMG: centos
+  _BASE_VER: '7'
+timeout: 3600s
+options:
+  machineType: N1_HIGHCPU_8

@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -11,16 +11,55 @@ from ramble.appkit import *
 
 class Hostname(ExecutableApplication):
     """This is an example application that will simply run the hostname command"""  # noqa: E501
+
     name = "hostname"
 
-    tags = ["test-app"]
+    tags("test-app")
 
-    executable('serial', '/usr/bin/time hostname', use_mpi=False)
-    executable('parallel', '/usr/bin/time hostname', use_mpi=True)
+    maintainers("douglasjacobsen")
 
-    workload('serial', executable='serial')
-    workload('parallel', executable='parallel')
+    # TODO: Remove in the future. local should be replaced by serial in all cases.
+    executable(
+        "local", "hostname", use_mpi=False, output_capture=OUTPUT_CAPTURE.ALL
+    )
 
-    figure_of_merit('user time', log_file='{experiment_run_dir}/{experiment_name}.out',
-                    fom_regex=r'(?P<user_time>[0-9]+\.[0-9]+)user.*',
-                    group_name='user_time', units='s')
+    executable(
+        "local_bg",
+        "(sleep 5; hostname)",
+        use_mpi=False,
+        output_capture=OUTPUT_CAPTURE.ALL,
+        run_in_background=True,
+    )
+    executable(
+        "local_bg2",
+        "(sleep 10; hostname)",
+        use_mpi=False,
+        output_capture=OUTPUT_CAPTURE.ALL,
+        run_in_background=True,
+    )
+    executable(
+        "serial",
+        "hostname",
+        use_mpi=False,
+        output_capture=OUTPUT_CAPTURE.ALL,
+    )
+    executable(
+        "parallel",
+        "hostname",
+        use_mpi=True,
+        output_capture=OUTPUT_CAPTURE.ALL,
+    )
+
+    workload("local", executable="local")
+    workload("local_bg", executables=["local_bg", "local_bg2"])
+    workload("serial", executable="serial")
+    workload("parallel", executable="parallel")
+
+    figure_of_merit(
+        "possible hostname",
+        fom_regex=r"(?P<hostname>\S+)",
+        group_name="hostname",
+        units="",
+    )
+
+    success_criteria("wrote_anything", mode="string", match=r".*")

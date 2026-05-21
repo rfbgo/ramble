@@ -6,7 +6,7 @@
 
 #################################################################################
 #
-# This file is part of RAmble and sets up the ramble environment for the friendly
+# This file is part of Ramble and sets up the ramble environment for the friendly
 # interactive shell (fish). This includes module support, and it also puts ramble
 # in your path. The script also checks that at least module support exists, and
 # provides suggestions if it doesn't. Source it like this:
@@ -227,7 +227,7 @@ function check_rmb_flags -d "check ramble flags for h/V flags"
     # Check if inputs contain h or V flags.
     #
 
-    # combine argument array into single string (space seperated), to be passed
+    # combine argument array into single string (space separated), to be passed
     # to regular expression matching (`string match -r`)
     set -l _a "$argv"
 
@@ -246,7 +246,7 @@ end
 
 
 
-function match_flag -d "checks all combinations of flags ocurring inside of a string"
+function match_flag -d "checks all combinations of flags occurring inside of a string"
 
     # Remove leading and trailing spaces -- but we need to insert a "guard" (x)
     # so that eg. `string trim -h` doesn't trigger the help string for `string trim`
@@ -288,7 +288,7 @@ function check_workspace_activate_flags -d "check ramble workspace subcommand fl
     # Check if inputs contain -h/--help, --sh, --csh, or --fish
     #
 
-    # combine argument array into single string (space seperated), to be passed
+    # combine argument array into single string (space separated), to be passed
     # to regular expression matching (`string match -r`)
     set -l _a "$argv"
 
@@ -331,7 +331,7 @@ function check_workspace_deactivate_flags -d "check ramble workspace subcommand 
     # Check if inputs contain --sh, --csh, or --fish
     #
 
-    # combine argument array into single string (space seperated), to be passed
+    # combine argument array into single string (space separated), to be passed
     # to regular expression matching (`string match -r`)
     set -l _a "$argv"
 
@@ -359,6 +359,20 @@ function check_workspace_deactivate_flags -d "check ramble workspace subcommand 
 end
 
 
+function check_workspace_create_with_activate_flags -d "check create for activate flags"
+    set -l _a "$argv"
+
+    if test -n "$_a"
+        if match_flag $_a "-a"
+            return 0
+        end
+        if match_flag $_a "--activate"
+            return 0
+        end
+    end
+
+    return 1
+end
 
 
 #
@@ -410,7 +424,7 @@ function ramble_runner -d "Runner function for the `ramble` wrapper"
 
         # CASE: ramble subcommand is `workspace`. Here we get the ramble runtime to
         # supply the appropriate shell commands for setting the workspace
-        # varibles. These commands are then run by fish (using the `capture_all`
+        # variables. These commands are then run by fish (using the `capture_all`
         # function, instead of a command substitution).
 
         case "workspace"
@@ -472,6 +486,23 @@ function ramble_runner -d "Runner function for the `ramble` wrapper"
                             end
                         end
 
+                    case "create"
+                        set -l _a (stream_args $__rmb_remaining_args)
+
+                        if check_workspace_create_with_activate_flags $_a
+                            set -l rmb_workspace_cmd "command ramble $rmb_flags workspace create $__rmb_remaining_args"
+                            capture_all $rmb_workspace_cmd __rmb_stat __rmb_stdout __rmb_stderr
+                            if test -n "$__rmb_stderr"
+                                echo -s \n$__rmb_stderr 1>&2  # current fish bug: handle stderr manually
+                            end
+                            set -l activate_cmd $__rmb_stdout
+                            eval $activate_cmd
+                            set -l ws (echo $activate_cmd | awk '{print $NF}')
+                            echo "==> Created and activated workspace in $ws"
+                        else
+                            command ramble workspace create $_a
+                        end
+
                     case "*"
                         # if $__rmb_remaining_args is empty, then don't include it
                         # as argument (otherwise it will be confused as a blank
@@ -521,7 +552,7 @@ set -l stat $status
 
 
 #
-# Delete temprary global variabels allocated in `allocated_rmb_shared`.
+# Delete temporary global variables allocated in `allocated_rmb_shared`.
 #
 
 delete_rmb_shared
@@ -565,7 +596,7 @@ function ramble_pathadd -d "Add path to specified variable (defaults to PATH)"
     #  -> Notes: [1] (cf. EOF).
     if test -d "$pa_new_path"
 
-        # combine argument array into single string (space seperated), to be
+        # combine argument array into single string (space separated), to be
         # passed to regular expression matching (`string match -r`)
         set -l _a "$pa_oldvalue"
 
@@ -603,6 +634,27 @@ end
 # Figure out where this file is. Below code only needs to work in fish
 #
 set -l rmb_source_file (status -f)  # name of current file
+
+#
+# Identify and lock the python interpreter
+#
+if test -n "$RAMBLE_PYTHON"
+  echo "The RAMBLE_PYTHON environment variable is set to $RAMBLE_PYTHON"
+  echo "Will pin the python binary ramble uses to this value".
+
+  if test -n "$_RAMBLE_PYTHON" -a  "$RAMBLE_PYTHON" !=  "$_RAMBLE_PYTHON"
+    echo "WARNING: Ramble was previously pinned to use $_RAMBLE_PYTHON"
+    echo "         If this is not what you want, set the correct python"
+    echo "         in RAMBLE_PYTHON and re-source this file"
+  end
+end
+for cmd in "$RAMBLE_PYTHON" python3 python python2
+    set -l _rmb_python (command -v "$cmd")
+    if test $status -eq 0
+        set -x _RAMBLE_PYTHON $_rmb_python
+        break
+    end
+end
 
 
 

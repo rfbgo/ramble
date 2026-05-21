@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -7,73 +7,117 @@
 # except according to those terms.
 
 import ramble.language.language_base
+import ramble.language.language_helpers
+import ramble.language.shared_language
+import ramble.success_criteria
+import ramble.workload
 from ramble.language.language_base import DirectiveError
 
+"""This package contains directives that can be used within an application.
 
-class ApplicationMeta(ramble.language.language_base.DirectiveMeta):
+Directives are functions that can be called inside an application
+definition to modify then application, for example:
+
+    .. code-block:: python
+
+      class Gromacs(ExecutableApplication):
+          # Workload directive:
+          workload('water_bare', executables=['pre-process', 'execute-gen'],
+               input='water_bare_hbonds')
+
+In the above example, 'workload' is a ramble directive
+
+There are many available directives, the majority of which are implemented here.
+
+Some examples include:
+
+  workload
+  executable
+  figure_of_merit
+  figure_of_merit_context
+  input_file
+
+For a full list see below, or consult the existing application definitions for
+examples
+
+"""
+
+
+class ApplicationMeta(ramble.language.shared_language.SharedMeta):
     _directive_names = set()
-    _diretives_to_be_executed = []
+    _directives_to_be_executed = []
 
 
 application_directive = ApplicationMeta.directive
 
 
-@application_directive('workloads')
-def workload(name, executables=None, executable=None, input=None,
-             inputs=None, **kwargs):
+@application_directive("workloads")
+def workload(
+    name, executables=None, executable=None, input=None, inputs=None, tags=None, **kwargs
+):
     """Adds a workload to this application
 
     Defines a new workload that can be used within the context of
     its application.
 
-    Input arguments:
-        - executable: The name of an executable to be used
-        - executables: A list of executable names to be used
-        - input (Optional): The name of an input be used
-        - inputs (Optional): A list of input names that will be used
+    Args:
+        executable (str): The name of an executable to be used
+        executables (str): A list of executable names to be used
+        input (str): Optional, name of an input be used
+        inputs (str): Optional, A list of input names that will be used
 
-    Either executable, or executables is a required input argument.
+    One of executable, or executables is required as an input argument.
     """
 
     def _execute_workload(app):
-        app.workloads[name] = {
-            'executables': [],
-            'inputs': []
-        }
+        all_execs = ramble.language.language_helpers.require_definition(
+            executable, executables, app.executables, "executable", "executables", "workload"
+        )
 
-        found_exec = False
-        if executables:
-            found_exec = True
-            if isinstance(executables, list):
-                app.workloads[name]['executables'].extend(
-                    executables)
-            else:
-                app.workloads[name]['executables'].append(
-                    executables.copy())
+        all_inputs = ramble.language.language_helpers.merge_definitions(
+            input, inputs, app.inputs, "input", "inputs", "workload"
+        )
 
-        if executable:
-            found_exec = True
-            app.workloads[name]['executables'].append(executable)
-
-        if not found_exec:
-            raise DirectiveError('workload directive requires one of:\n' +
-                                 '  executable\n' +
-                                 '  executables\n')
-
-        if inputs:
-            if isinstance(inputs, list):
-                app.workloads[name]['inputs'].extend(inputs)
-            else:
-                app.workloads[name]['inputs'].append(inputs)
-
-        if input:
-            app.workloads[name]['inputs'].append(input)
+        app.workloads[name] = ramble.workload.Workload(name, all_execs, all_inputs, tags)
 
     return _execute_workload
 
 
-@application_directive('executables')
-def executable(name, template, use_mpi=False, redirect='{log_file}', **kwargs):
+@application_directive("workload_groups")
+def workload_group(name, workloads=None, mode=None, **kwargs):
+    """Adds a workload group to this application
+
+    Defines a new workload group that can be used within the context of its
+    application.
+
+    Args:
+        name (str): The name of the group
+        workloads (list(str) | None): A list of workloads to be grouped
+    """
+    if workloads is None:
+        workloads = []
+
+    def _execute_workload_groups(app):
+        if mode == "append":
+            app.workload_groups[name].update(set(workloads))
+        else:
+            app.workload_groups[name] = set(workloads)
+
+        # Apply any existing variables in the group to the workload
+        for workload in workloads:
+            if name in app.workload_group_vars:
+                for var in app.workload_group_vars[name]:
+                    app.workloads[workload].add_variable(var)
+
+            if name in app.workload_group_env_vars:
+                for env_var in app.workload_group_env_vars[name]:
+                    app.workloads[workload].add_environment_variable(env_var)
+
+    return _execute_workload_groups
+
+
+@application_directive("executables")
+def executable(name, template, **kwargs):
     """Adds an executable to this application
 
     Defines a new executable that can be used to configure workloads and
@@ -81,124 +125,88 @@ def executable(name, template, use_mpi=False, redirect='{log_file}', **kwargs):
 
     Executables may or may not use MPI.
 
-    Arguments:
-     - template: The template command this executable should generate from
-     - use_mpi: (Boolean) determines if this executable should be
-                 wrapped with an `mpirun` like command or not.
-     - redirect (optional): Sets the path for outputs to be written to.
-                            defaults to {log_file}
+    Required Args:
+        name (str): Name of the executable
+        template (list[str] | str): The template command this executable should generate from
 
+    Optional Args:
+        use_mpi or mpi (bool): determines if this executable should be
+                        wrapped with an `mpirun` like command or not.
+
+        variables (dict): Dictionary of variable definitions to use for this
+                          executable only
+        redirect (str): Optional, sets the path for outputs to be written to.
+                             defaults to {log_file}
+        output_capture (str): Optional, Declare which output (stdout, stderr,
+                              both) to capture. Defaults to stdout
+        run_in_background (bool): Optional, Declare if the command should
+                                     run in the background. Defaults to False
     """
 
     def _execute_executable(app):
-        app.executables[name] = \
-            {
-                'template': template,
-                'mpi': use_mpi,
-                'redirect': redirect
-            }  # noqa: E123
+        from ramble.util.executable import CommandExecutable
+
+        app.executables[name] = CommandExecutable(name=name, template=template, **kwargs)
 
     return _execute_executable
 
 
-@application_directive('figure_of_merit_contexts')
-def figure_of_merit_context(name, regex, output_format):
-    """Defines a context for figures of merit
-
-    Defines a new context to contain figures of merit.
-
-    Inputs:
-     - name: High level name of the context. Can be referred to in
-             the figure of merit
-     - regex: Regular expression, using group names, to match a context.
-     - output_format: String, using python keywords {group_name} to
-                      extract group names from context regular
-                      expression.
-    """
-
-    def _execute_figure_of_merit_context(app):
-        app.figure_of_merit_contexts[name] = {
-            'regex': regex,
-            'output_format': output_format
-        }
-
-    return _execute_figure_of_merit_context
-
-
-@application_directive('archive_patterns')
-def archive_pattern(pattern):
-    """Adds a file pattern to be archived in addition to figure of merit logs
-
-    Defines a new file pattern that will be archived during workspace archival.
-    Archival will only happen for files that match the pattern when archival
-    is being performed.
-
-    Inputs:
-      - pattern: Pattern that refers to files to archive
-    """
-
-    def _execute_archive_pattern(app):
-        app.archive_patterns[pattern] = pattern
-
-    return _execute_archive_pattern
-
-
-@application_directive('figures_of_merit')
-def figure_of_merit(name, log_file, fom_regex, group_name, units='',
-                    contexts=[]):
-    """Adds a figure of merit to track for this application
-
-    Defines a new figure of merit.
-    Inputs:
-     - name: High level name of the figure of merit
-     - log_file: File the figure of merit can be extracted from
-     - fom_regex: A regular expression using named groups to extract the FOM
-     - group_name: The name of the group that the FOM should be pulled from
-     - units: The units associated with the FOM
-     - keep_policy: The policy for determining which FOM(s) to keep
-                    can be 'last' or 'all'
-    """
-
-    def _execute_figure_of_merit(app):
-        app.figures_of_merit[name] = {
-            'log_file': log_file,
-            'regex': fom_regex,
-            'group_name': group_name,
-            'units': units,
-            'contexts': contexts
-        }
-
-    return _execute_figure_of_merit
-
-
-@application_directive('inputs')
-def input_file(name, url, description, target_dir='{workload_name}', **kwargs):
-    """Adds an input file defintion to this appliaction
+@application_directive("inputs")
+def input_file(
+    name,
+    url,
+    description,
+    target_dir="{workload_input_dir}",
+    sha256=None,
+    extension=None,
+    expand=True,
+    **kwargs,
+):
+    """Adds an input file definition to this application
 
     Defines a new input file.
     An input file must define it's name, and a url where the input can be
     fetched from.
 
-    Arguments are:
-      - url: Path to the input file / archive
-      - description: Description of this input file
-      - target_dir (Optional): The directory where the archive will be
-                               expanded. Defaults to 'input'
+    Args:
+        url (str): Path to the input file / archive
+        description (str): Description of this input file
+        target_dir (str): Optional, the directory where the archive will be
+                               expanded. Defaults to the '{workload_input_dir}'
+                               + os.sep + '{input_name}'
+        sha256 (str): Optional, the expected sha256 checksum for the input file
+        extension (str): Optiona, the extension to use for the input, if it isn't part of the
+                              file name.
+        expand (bool): Optional. Whether the input should be expanded or not. Defaults to True
     """
 
     def _execute_input_file(app):
         app.inputs[name] = {
-            'url': url,
-            'description': description,
-            'target_dir': target_dir
+            "url": url,
+            "description": description,
+            "target_dir": target_dir,
+            "sha256": sha256,
+            "extension": extension,
+            "expand": expand,
         }
 
     return _execute_input_file
 
 
-@application_directive('workload_variables')
-def workload_variable(name, default, description, workload=None,
-                      workloads=None, **kwargs):
+@application_directive("workload_group_vars")
+def workload_variable(
+    name,
+    default,
+    description,
+    values=None,
+    workload=None,
+    workloads=None,
+    workload_group=None,
+    expandable: bool = True,
+    track_used: bool = True,
+    when=None,
+    **kwargs,
+):
     """Define a new variable to be used in experiments
 
     Defines a new variable that can be defined within the
@@ -206,122 +214,121 @@ def workload_variable(name, default, description, workload=None,
     an experiment.
 
     These are specific to each workload.
+
+    Args:
+        name (str): Name of variable to define
+        default: Default value of variable definition
+        description (str): Description of variable's purpose
+        values (list): Optional list of suggested values for this variable
+        workload (str): Single workload this variable is used in
+        workloads (list): List of modes this variable is used in
+        workload_group (str): Name of workload group this variable is used in
+        expandable (bool): True if the variable should be expanded, False if not.
+        track_used (bool): True if the variable should be tracked as used,
+                           False if not. Can help with allowing lists without vectorizing
+                           experiments.
+        when (list | None): List of when conditions to apply to directive
     """
 
     def _execute_workload_variable(app):
-        if not (workload or workloads):
-            raise DirectiveError('workload_variable directive requires:\n' +
-                                 '  workload or workloads to be defined.')
+        # Always apply passes workload/workloads
+        all_workloads = ramble.language.language_helpers.merge_definitions(
+            workload, workloads, app.workloads, "workload", "workloads", "workload_variable"
+        )
 
-        all_workloads = []
-        if workload:
-            all_workloads.append(workload)
-        if workloads:
-            if isinstance(workloads, list):
-                all_workloads.extend(workloads)
-            else:
-                all_workloads.extend(workloads)
+        when_list = ramble.language.language_helpers.build_when_list(
+            when, app, name, "workload_variable"
+        )
+
+        workload_var = ramble.workload.WorkloadVariable(
+            name,
+            default=default,
+            description=description,
+            values=values,
+            expandable=expandable,
+            when=when_list,
+            **kwargs,
+        )
 
         for wl_name in all_workloads:
-            if wl_name not in app.workload_variables:
-                app.workload_variables[wl_name] = {}
+            app.workloads[wl_name].add_variable(workload_var.copy())
 
-            app.workload_variables[wl_name][name] = {
-                'default': default,
-                'description': description
-            }
+        if workload_group is not None:
+            workload_group_list = app.workload_groups[workload_group]
+
+            if workload_group not in app.workload_group_vars:
+                app.workload_group_vars[workload_group] = []
+
+            # Track which vars we add to, to allow us to re-apply during inheritance
+            app.workload_group_vars[workload_group].append(workload_var.copy())
+
+            for wl_name in workload_group_list:
+                # Apply the variable
+                app.workloads[wl_name].add_variable(workload_var.copy())
+
+        if not all_workloads and workload_group is None:
+            raise DirectiveError("A workload or workload group is required")
 
     return _execute_workload_variable
 
 
-@application_directive('default_compilers')
-def default_compiler(name, base, version=None, variants=None,
-                     dependencies=None, arch=None, target=None,
-                     custom_specifier=None):
-    """Defines the default compiler that will be used with this application
+@application_directive("workload_group_env_vars")
+def environment_variable(
+    name, value, description, workload=None, workloads=None, workload_group=None, **kwargs
+):
+    """Define an environment variable to be used in experiments
 
-    Adds a new compiler spec to this application. Software specs should
-    reference a compiler that has been added.
+    Args:
+        name (str): Name of environment variable to define
+        value (str): Value to set env-var to
+        description (str): Description of the env-var
+        workload (str): Name of workload this env-var should be added to
+        workloads (list(str)): List of workload names this env-var should be
+                               added to
     """
 
-    def _execute_default_compiler(app):
-        if app.uses_spack:
-            app.default_compilers[name] = {
-                'base': base,
-                'version': version,
-                'variants': variants,
-                'dependencies': dependencies,
-                'target': target,
-                'arch': arch,
-                'spec_type': 'compiler',
-                'application_name': app.name,
-                'custom_specifier': custom_specifier
-            }
+    def _execute_environment_variable(app):
+        all_workloads = ramble.language.language_helpers.merge_definitions(
+            workload, workloads, app.workloads, "workload", "workloads", "environment_variable"
+        )
 
-    return _execute_default_compiler
+        workload_env_var = ramble.workload.WorkloadEnvironmentVariable(
+            name, value=value, description=description
+        )
+
+        for wl_name in all_workloads:
+            app.workloads[wl_name].add_environment_variable(workload_env_var.copy())
+
+        if workload_group is not None:
+            workload_group_list = app.workload_groups[workload_group]
+
+            if workload_group not in app.workload_group_env_vars:
+                app.workload_group_env_vars[workload_group] = []
+
+            app.workload_group_env_vars[workload_group].append(workload_env_var.copy())
+
+            for wl_name in workload_group_list:
+                app.workloads[wl_name].add_environment_variable(workload_env_var.copy())
+
+        if not all_workloads and workload_group is None:
+            raise DirectiveError("A workload or workload group is required")
+
+    return _execute_environment_variable
 
 
-@application_directive('mpi_libraries')
-def mpi_library(name, base, version=None, variants=None,
-                dependencies=None, arch=None,
-                target=None, custom_specifier=None):
-    """Defines a new mpi library that software_specs can use
+@application_directive(dicts=())
+def license_name(name, **kwargs):
+    """Add a new license name directive, to specify license name in a declarative way.
 
-    Adds a new mpi_library to this app that can be referenced by
-    software_specs.
+    Args:
+        name (str): name to use during license lookup and propagation
     """
 
-    def _execute_mpi_library(app):
-        if app.uses_spack:
-            app.mpi_libraries[name] = {
-                'base': base,
-                'version': version,
-                'variants': variants,
-                'dependencies': dependencies,
-                'target': target,
-                'arch': arch,
-                'spec_type': 'mpi_library',
-                'application_name': app.name,
-                'custom_specifier': custom_specifier
-            }
+    def _execute_license_name(obj):
+        license_from_base = getattr(obj, "license_names", [])
 
-    return _execute_mpi_library
+        # Here it is essential to copy, otherwise we might add to an empty list in the parent
+        # It is important that we preserve order
+        obj.license_names = list(dict.fromkeys(license_from_base + [name]))
 
-
-@application_directive('software_specs')
-def software_spec(name, base, version=None, variants=None,
-                  compiler=None, mpi=None, dependencies=None,
-                  arch=None, target=None, custom_specifier=None,
-                  required=False):
-    """Defines a new software spec needed for this application.
-
-    Adds a new software spec (for spack to use) that this application
-    needs to execute properly.
-
-    Only adds specs to applications that use spack.
-
-    Specs can be described as an mpi spec, which means they
-    will depend on the MPI library within the resulting spack
-    environment.
-    """
-
-    def _execute_software_spec(app):
-        if app.uses_spack:
-
-            # Define the spec
-            app.software_specs[name] = {
-                'base': base,
-                'version': version,
-                'variants': variants,
-                'compiler': compiler,
-                'mpi': mpi,
-                'dependencies': dependencies,
-                'target': target,
-                'arch': arch,
-                'spec_type': 'package',
-                'application_name': app.name,
-                'custom_specifier': custom_specifier,
-                'required': required
-            }
-
-    return _execute_software_spec
+    return _execute_license_name

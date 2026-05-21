@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -8,10 +8,13 @@
 
 
 import argparse
+import inspect
+
+from ramble.util.logger import logger
 
 from spack.util.pattern import Args
 
-__all__ = ['add_common_arguments']
+__all__ = ["add_common_arguments", "allows_unknown_args", "validate_unknown_args"]
 
 #: dictionary of argument-generating functions, keyed by name
 _arguments = {}
@@ -45,31 +48,161 @@ def add_common_arguments(parser, list_of_arguments):
         parser.add_argument(*x.flags, **x.kwargs)
 
 
+def allows_unknown_args(command):
+    """Implements really simple argument injection for unknown arguments.
+
+    Commands may add an optional argument called "unknown args" to
+    indicate they can handle unknown args. This checks that the
+    command allows `unknown_args` as an input argument.
+    """
+    info = dict(inspect.getmembers(command))
+    varnames = info["__code__"].co_varnames
+    argcount = info["__code__"].co_argcount
+    return argcount >= 2 and "unknown_args" in varnames
+
+
+def validate_unknown_args(command, unknown_args):
+    """Validate command allows unknown arguments when they are passed in"""
+    if allows_unknown_args(command):
+        return
+    elif unknown_args:
+        logger.die(f'unrecognized arguments: {" ".join(unknown_args)}')
+
+
 @arg
 def yes_to_all():
     return Args(
-        '-y', '--yes-to-all', action='store_true', dest='yes_to_all',
-        help='assume "yes" is the answer to every confirmation request')
+        "-y",
+        "--yes-to-all",
+        action="store_true",
+        dest="yes_to_all",
+        help='assume "yes" is the answer to every confirmation request',
+    )
 
 
 @arg
 def tags():
-    return Args(
-        '-t', '--tags', action='append',
-        help='filter a package query by tags')
+    return Args("-t", "--tags", action="append", help="filter a package query by tags")
 
 
 @arg
 def application():
-    return Args('application', help='application name')
+    return Args("application", help="application name")
 
 
 @arg
 def workspace():
-    return Args('workspace', help='workspace name')
+    return Args("workspace", help="workspace name")
 
 
 @arg
 def specs():
+    return Args("specs", nargs=argparse.REMAINDER, help="one or more workload specs")
+
+
+@arg
+def obj_type():
+    from ramble.repository import OBJECT_NAMES, default_type
+
     return Args(
-        'specs', nargs=argparse.REMAINDER, help='one or more workload specs')
+        "--type",
+        default=f"{default_type.name}",
+        help=f"type of objects. Defaults to '{default_type.name}'. "
+        f"Allowed types are {', '.join(OBJECT_NAMES)}",
+    )
+
+
+@arg
+def repo_type():
+    from ramble.repository import OBJECT_NAMES, default_type
+
+    return Args(
+        "-t",
+        "--type",
+        default="any",
+        help=f"type of repositories to manage. Defaults to '{default_type.name}'. "
+        f"Allowed types are {', '.join(OBJECT_NAMES)}, or any",
+    )
+
+
+@arg
+def phases():
+    return Args(
+        "--phases",
+        dest="phases",
+        nargs="+",
+        default=["*"],
+        help="select phases to execute when performing setup. " + "Phase names support globbing",
+        required=False,
+    )
+
+
+@arg
+def include_phase_dependencies():
+    return Args(
+        "--include-phase-dependencies",
+        dest="include_phase_dependencies",
+        action="store_true",
+        help="if set, phase dependencies are automatically added to "
+        "the list of executed phases",
+        required=False,
+    )
+
+
+@arg
+def profile_phases():
+    return Args(
+        "--profile-phase",
+        nargs="+",
+        action="append",
+        default=None,
+        dest="profile_phases",
+        help="phases to be profiled by line_profiler",
+        required=False,
+    )
+
+
+@arg
+def where():
+    return Args(
+        "--where",
+        dest="where",
+        nargs="+",
+        action="append",
+        help="inclusive filter on experiments where the provided logical statement is True",
+        required=False,
+    )
+
+
+@arg
+def exclude_where():
+    return Args(
+        "--exclude-where",
+        dest="exclude_where",
+        nargs="+",
+        action="append",
+        help="exclusive filter experiments where the provided logical statement is True",
+        required=False,
+    )
+
+
+@arg
+def filter_tags():
+    return Args(
+        "--filter-tags",
+        action="append",
+        nargs="+",
+        help="filter experiments to only those that include the provided tags",
+        required=False,
+    )
+
+
+@arg
+def no_checksum():
+    return Args(
+        "-n",
+        "--no-checksum",
+        action="store_true",
+        default=False,
+        help="do not use checksums to verify downloaded files (unsafe)",
+    )

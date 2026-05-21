@@ -1,0 +1,27 @@
+[files]
+extend-exclude = [
+    ".git/",
+    # Copy of https://github.com/spack/spack/tree/develop/lib/spack
+    "lib/ramble/external/",
+    "lib/ramble/llnl/",
+    "lib/ramble/spack/",
+]
+ignore-hidden = false
+
+[default]
+extend-ignore-re = [
+    "\\bFOMs",
+]
+
+[default.extend-words]
+"fom" = "fom"
+"namd" = "namd"
+"reord" = "reord"
+"PN" = "PN" # fixing tPN in IOR
+"repositor" = "repositor" # Fixing partial name without singular / plural suffix
+
+[default.extend-identifiers]
+"ATPase" = "ATPase"
+"cachable" = "cachable"
+"clen" = "clen"
+"enable_deck_based_FOMs" = "enable_deck_based_FOMs"

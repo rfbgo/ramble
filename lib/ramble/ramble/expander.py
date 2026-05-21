@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,31 +6,351 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-import os
-import math
-import string
 import ast
-import six
+import math
 import operator
-import itertools
-
-import llnl.util.tty as tty
+import random
+import re
+import string
+from typing import Dict, FrozenSet, List, Union
 
 import ramble.error
+import ramble.keywords
+from ramble.util.logger import logger
+
+import spack.util.naming
+
+
+def _and(a, b):
+    return a and b
+
+
+def _or(a, b):
+    return a or b
+
+
+def _re_search(regex, s):
+    import re
+
+    return re.search(regex, s) is not None
+
+
+def _safe_str_node_check(node):
+    # ast.Str was deprecated. short-circuit the test for it to avoid issues with newer python.
+    return hasattr(ast, "Str") and isinstance(node, ast.Str)
+
+
+def _maybe(expander, var_name, default=""):
+    try:
+        return expander.expand_var_name(var_name, allow_passthrough=False)
+    except RambleSyntaxError:
+        return default
+
 
 supported_math_operators = {
-    ast.Add: operator.add, ast.Sub: operator.sub,
-    ast.Mult: operator.mul, ast.Div: operator.truediv, ast.Pow:
-    operator.pow, ast.BitXor: operator.xor, ast.USub: operator.neg
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Pow: operator.pow,
+    ast.BitXor: operator.xor,
+    ast.USub: operator.neg,
+    ast.Eq: operator.eq,
+    ast.NotEq: operator.ne,
+    ast.Gt: operator.gt,
+    ast.GtE: operator.ge,
+    ast.Lt: operator.lt,
+    ast.LtE: operator.le,
+    ast.And: _and,
+    ast.Or: _or,
+    ast.Mod: operator.mod,
 }
+
+supported_scalar_function_pointers = {
+    "str": str,
+    "int": int,
+    "float": float,
+    "max": max,
+    "min": min,
+    "ceil": math.ceil,
+    "floor": math.floor,
+    "randrange": random.randrange,
+    "randint": random.randint,
+    "simplify_str": spack.util.naming.simplify_name,
+    "re_search": _re_search,
+}
+
+# Format Spec Regex:
+format_spec_regex = re.compile(r"(?P<kw>.*):(?P<format_spec>\S+)$")
+
+# Functions that need to be supplied with the expander
+supported_scalar_function_with_self_arg_pointers = {
+    "maybe": _maybe,
+}
+
+
+supported_list_function_pointers = {
+    "range": range,
+}
+
+
+formatter = string.Formatter()
+
+
+class ExpansionDelimiter:
+    """Class representing the delimiters for ramble expansion strings"""
+
+    left = "{"
+    right = "}"
+    escape = "\\"
+
+
+class VformatDelimiter:
+    """Class representing the delimiters for the string.Formatter class"""
+
+    left = "{"
+    right = "}"
+
+
+class ExpansionNode:
+    """Class representing a node in a ramble expansion graph"""
+
+    def __init__(self, left_idx, right_idx):
+        self.left = left_idx
+        self.right = right_idx
+        self.children = []
+        self.idx = None
+        self.contents = None
+        self.value = None
+        self.root = None
+
+    def __str__(self):
+        lines = []
+        lines.append("   Node:")
+        lines.append(f"      Indices: ({self.left}, {self.right})")
+        lines.append(f"      Num Children: ({len(self.children)})")
+        lines.append(f'      Contents: "{self.contents}"')
+        lines.append(f'      Value: "{self.value}"')
+        lines.append(f'      Is root: "{self is self.root}"')
+        return "\n".join(lines)
+
+    def relative_indices(self, relative_to):
+        """Compute node indices relative to another node
+
+        Args:
+            relative_to (ExpansionNode): node to shift current node's indices relative to
+
+        Returns:
+            (tuple) indices of shifted match set
+        """
+        return (self.left - relative_to.left, self.right - relative_to.left)
+
+    def add_children(self, children):
+        """Add children to this node
+
+        Args:
+            children (ExpansionNode | list): nodes to adds as children of self
+        """
+        if isinstance(children, list):
+            self.children.extend(children)
+        else:
+            self.children.append(children)
+
+    def define_value(
+        self,
+        expansion_dict,
+        allow_passthrough=True,
+        expansion_func=str,
+        evaluation_func=eval,
+        no_expand_vars=None,
+        used_vars=None,
+    ):
+        """Define the value for this node.
+
+        Construct the value of self. This builds up a string representation of
+        self, and performs evaluation and formatting of the resulting string.
+        This includes extracting the values of the children nodes, and
+        replacing their values in the proper positions in self's string.
+
+        Stores the resulting value in self.value
+
+        Args:
+            expansion_dict (dict): variable definitions to use for expanding
+                detected matches
+            allow_passthrough (bool): if true, expansion is allowed to fail. if
+                false, failed expansion raises an error.
+            expansion_func (func): function to use for expansion of nested
+                variable definitions
+            evaluation_func (func): function to use for evaluating math of
+                strings
+            no_expand_vars (set): set of variable names that should never be
+                expanded
+        """
+        if no_expand_vars is None:
+            no_expand_vars = set()
+        if used_vars is None:
+            used_vars = set()
+        if self.contents is not None:
+            parts = []
+            last_idx = 0
+            for child in self.children:
+                child_indices = child.relative_indices(self)
+                parts.append(self.contents[last_idx : child_indices[0]])
+                parts.append(str(child.value))
+                last_idx = child_indices[1] + 1
+
+            if last_idx != len(self.contents):
+                parts.append(self.contents[last_idx:])
+
+            if self != self.root:
+                replaced_contents = "".join(parts)
+
+                # Special case '{}'
+                if len(replaced_contents) == 2:
+                    self.value = "{}"
+                    return
+
+                keyword = replaced_contents[1:-1]
+                format_match = format_spec_regex.search(keyword)
+                required_passthrough = False
+
+                if format_match:
+                    keyword = format_match.group("kw")
+                    format_spec = format_match.group("format_spec")
+
+                if keyword in expansion_dict:
+                    used_vars.add(keyword)
+                    # Exit expansion for variables defined as no_expand
+                    if keyword in no_expand_vars:
+                        self.value = expansion_dict[keyword]
+                        return
+                    else:
+                        self.value = expansion_func(
+                            expansion_dict,
+                            expansion_dict[keyword],
+                            allow_passthrough=allow_passthrough,
+                        )
+                else:
+                    self.value = keyword
+                    required_passthrough = True
+
+                # Evaluation should go here
+                try:
+                    old_value = self.value
+                    self.value = evaluation_func(self.value)
+                    logger.debug(f"  Expanded: {old_value} -> {self.value}")
+                    if old_value != self.value:
+                        required_passthrough = False
+                except SyntaxError:
+                    pass
+
+                # If we had a format spec, add it
+                if format_match:
+                    kw_dict = {"value": self.value}
+                    format_str = f"value:{format_spec}"
+                    try:
+                        self.value = formatter.vformat(
+                            VformatDelimiter.left + format_str + VformatDelimiter.right,
+                            [],
+                            kw_dict,
+                        )
+                        required_passthrough = False
+                    except ValueError:
+                        self.value = replaced_contents[1:-1]
+                        required_passthrough = True
+                    except KeyError:
+                        self.value += replaced_contents[1:-1]
+                        required_passthrough = True
+
+                if required_passthrough:
+                    self.value = f"{{{self.value}}}"
+                    if not allow_passthrough:
+                        raise_passthrough_error(self.contents, self.value)
+            else:
+                replaced_contents = "".join(parts)
+                try:
+                    self.value = evaluation_func(replaced_contents)
+                except SyntaxError:
+                    self.value = replaced_contents
+
+                # Replace escaped curly braces with curly braces
+                if isinstance(self.value, str):
+                    self.value = self.value.replace("\\{", "{").replace("\\}", "}")
+
+
+class ExpansionGraph:
+    """Class representing a graph of ExpansionNodes"""
+
+    def __init__(self, in_str):
+        self.str = in_str
+        self.root = ExpansionNode(0, len(in_str) - 1)
+        self.root.contents = in_str
+        self.root.root = self.root
+
+        opened = []
+        children = []
+        escaped = False
+        for i, c in enumerate(self.str):
+            if c == ExpansionDelimiter.left and not escaped:
+                opened.append(i)
+                children.append([])
+            elif c == ExpansionDelimiter.right and len(opened) > 0 and not escaped:
+                left_idx = opened.pop()
+                right_idx = i
+
+                cur_match = ExpansionNode(left_idx, right_idx)
+                cur_match.add_children(children.pop())
+                cur_match.contents = self.str[left_idx : right_idx + 1]  # Define contents
+                cur_match.root = self.root
+
+                if len(opened) > 0:
+                    children[-1].append(cur_match)
+                else:
+                    self.root.add_children(cur_match)
+            elif c == "\n":  # Don't expand across new lines
+                opened = []
+
+            if c == ExpansionDelimiter.escape:
+                escaped = True
+            elif escaped:
+                escaped = False
+
+        if len(opened) > 0:
+            self.root.add_children(children.pop())
+
+    def walk(self, in_node=None):
+        """Perform a DFS walk of the nodes in the graph
+
+        Args:
+            in_node (ExpansionNode): node to begin the walk from, if not set uses self.root
+
+        Yields:
+            (ExpansionNode): nodes following a DFS traversal of the graph
+        """
+        cur_node = in_node
+        if cur_node is None:
+            cur_node = self.root
+
+        for child in cur_node.children:
+            yield from self.walk(in_node=child)
+
+        yield cur_node
+
+    def __str__(self):
+        lines = []
+        lines.append(f"Processing string: {self.str}")
+        for node in self.walk():
+            lines.append(f"{node}")
+        return "\n".join(lines)
 
 
 class ExpansionDict(dict):
     def __missing__(self, key):
-        return '{' + key + '}'
+        return "{" + key + "}"
 
 
-class Expander(object):
+class Expander:
     """A class that will track and expand keyword arguments
 
     This class will track variables and their definitions, to allow for
@@ -42,678 +362,404 @@ class Expander(object):
     Additionally, math will be evaluated as part of expansion.
     """
 
-    app_name_key = 'application_name'
-    app_run_dir_key = 'application_run_dir'
-    app_input_dir_key = 'application_input_dir'
+    _ast_dbg_prefix = "EXPANDER AST:"
 
-    wl_name_key = 'workload_name'
-    wl_run_dir_key = 'workload_run_dir'
-    wl_input_dir_key = 'workload_input_dir'
-    spack_key = 'spack_env'
+    def __init__(self, variables, experiment_set, no_expand_vars=None):
+        if no_expand_vars is None:
+            no_expand_vars = set()
 
-    exp_name_key = 'experiment_name'
-    exp_run_dir_key = 'experiment_run_dir'
+        self._keywords = ramble.keywords.keywords
 
-    ranks_key = 'n_ranks'
-    ppn_key = 'processes_per_node'
-    nodes_key = 'n_nodes'
-    threads_key = 'n_threads'
+        self._variables = variables
+        self._no_expand_vars = no_expand_vars
+        self._used_variables = set()
+        self._used_variable_stage = set()
 
-    mpi_key = 'mpi_command'
-    batch_submit_key = 'batch_submit'
-    spec_name_key = 'spec_name'
+        self._experiment_set = experiment_set
 
-    log_dir_key = 'log_dir'
-    log_file_key = 'log_file'
-    err_file_key = 'err_file'
+        self._application_name = None
+        self._workload_name = None
+        self._experiment_name = None
 
-    def __init__(self, workspace):
-        self.current_level = 'base'
-        self._workspace = workspace
+        self._application_namespace = None
+        self._workload_namespace = None
+        self._experiment_namespace = None
+        self._env_path = None
 
-        self._expansion_dict = None
+        self._application_input_dir = None
+        self._workload_input_dir = None
+        self._license_input_dir = None
 
-        self.workspace_vars = self._workspace.get_workspace_vars().copy()
+        self._application_run_dir = None
+        self._workload_run_dir = None
+        self._experiment_run_dir = None
 
-        self.application_vars = None
-        self.workload_vars = None
-        self.experiment_vars = None
-        self.experiment_matrices = None
+    def add_no_expand_var(self, var: str):
+        """Add a new variable to the no expand set
 
-        self.workspace_env_vars = self._workspace.get_workspace_env_vars()
-        self.workspace_env_vars = self.workspace_env_vars.copy() if \
-            self.workspace_env_vars else None
+        Args:
+            var (str): Variable that should not expand
+        """
+        self._no_expand_vars.add(var)
 
-        self.application_env_vars = None
-        self.workload_env_vars = None
-        self.experiment_env_vars = None
+    def set_no_expand_vars(self, no_expand_vars):
+        self._no_expand_vars = no_expand_vars.copy()
 
-        self.base_vars = {}
-        self.package_paths = {}
-        self.set_var(self.log_dir_key, self._workspace.log_dir)
-        self.set_var(self.mpi_key, self._workspace.mpi_command)
-        self.set_var(self.batch_submit_key,
-                     self._workspace.batch_submit)
+    def flush_used_variable_stage(self):
+        self._used_variable_stage = set()
 
-    def get_level_vars(self, level=None):
-        cur_level = self.current_level
-        if level:
-            cur_level = level
+    def merge_used_variable_stage(self):
+        self._used_variables = self._used_variables.union(self._used_variable_stage)
+        self.flush_used_variable_stage()
 
-        if cur_level == 'application':
-            return self.application_vars
-        elif cur_level == 'workload':
-            return self.workload_vars
-        elif cur_level == 'experiment':
-            return self.experiment_vars
-        else:  # Default to returning the base_vars dict
-            return self.base_vars
-
-    def set_var(self, var, val, level=None):
-        level_vars = self.get_level_vars(level)
-
-        if level_vars is None:
-            tty.die('Level variables for %s not defined yet' % level)
-
-        level_vars[var] = val
-        self._expansion_dict = None
-
-    def remove_var(self, var, level=None):
-        level_vars = self.get_level_vars(level)
-
-        if var in level_vars:
-            del level_vars[var]
-
-        self._expansion_dict = None
-
-    def get_var(self, var, level=None):
-        level_vars = self.get_level_vars(level)
-
-        if var in level_vars:
-            return level_vars[var]
-
-        return None
-
-    def set_package_path(self, package, path):
-        self.package_paths['%s' % package] = path
-        self._expansion_dict = None
-
-    def remove_package_path(self, package):
-        key = '%s_path' % package
-        if key in self.package_paths:
-            del self.package_paths[key]
-        self._expansion_dict = None
-
-    def get_package_path(self, package):
-        key = '%s_path' % package
-        if key in self.package_paths:
-            return self.package_paths[key]
-        return None
-
-    def set_application(self, app_name):
-        tty.debug('Expander: Setting app name %s' % app_name)
-        self.flush_context()
-        self.set_var(self.app_name_key, app_name)
-        self.set_var(self.app_run_dir_key,
-                     os.path.join(self._workspace.experiment_dir, app_name))
-
-        self.set_var(self.app_input_dir_key,
-                     os.path.join(self._workspace.input_dir, app_name))
-
-        # The default spec name used is the same as the application name
-        self.set_var(self.spec_name_key, app_name, level='base')
+    def copy(self):
+        return Expander(self._variables.copy(), self._experiment_set)
 
     @property
     def application_name(self):
-        app_name = self._find_key(self.app_name_key)
+        if not self._application_name:
+            self._application_name = self.expand_var_name(self._keywords.application_name)
 
-        if app_name:
-            return self.expand_var(app_name)
-        return None
-
-    @property
-    def application_run_dir(self):
-        app_dir = self._find_key(self.app_run_dir_key)
-
-        if app_dir:
-            return self.expand_var(app_dir)
-        return None
-
-    @property
-    def application_input_dir(self):
-        app_input_dir = self._find_key(self.app_input_dir_key)
-
-        if app_input_dir:
-            return self.expand_var(app_input_dir)
-        return None
-
-    def set_workload(self, wl_name):
-        tty.debug('Expander: Setting wl name %s' % wl_name)
-        if not self.application_name:
-            raise ApplicationNotDefinedError('Application is not ' +
-                                             'set correctly')
-
-        self.set_var(self.wl_name_key, wl_name)
-        self.set_var(self.wl_run_dir_key,
-                     os.path.join(self.application_run_dir,
-                                  self.workload_name))
-
-        self.set_var(self.wl_input_dir_key,
-                     os.path.join(self.application_input_dir,
-                                  self.workload_name))
-
-        self.remove_var(self.exp_name_key)
-        self.remove_var(self.exp_run_dir_key)
-        self.workload_vars = None
-        self.experiment_vars = None
+        return self._application_name
 
     @property
     def workload_name(self):
-        wl_name = self._find_key(self.wl_name_key)
+        if not self._workload_name:
+            self._workload_name = self.expand_var_name(self._keywords.workload_name)
 
-        if wl_name:
-            return self.expand_var(wl_name)
-        return None
-
-    @property
-    def workload_run_dir(self):
-        wl_run_dir = self._find_key(self.wl_run_dir_key)
-
-        if wl_run_dir:
-            return self.expand_var(wl_run_dir)
-        return None
-
-    @property
-    def workload_input_dir(self):
-        wl_input_dir = self._find_key(self.wl_input_dir_key)
-
-        if wl_input_dir:
-            return self.expand_var(wl_input_dir)
-        return None
-
-    @property
-    def workload_namespace(self):
-        app_name = self.application_name
-        wl_name = self.workload_name
-        if app_name and wl_name:
-            return '%s.%s' % (app_name, wl_name)
-        return None
-
-    def set_experiment(self, exp_name):
-        tty.debug('Expander: Setting exp name %s' % exp_name)
-        if not self.workload_name:
-            raise WorkloadNotDefinedError('Workload is not set correctly.')
-
-        self.set_var(self.exp_name_key, exp_name)
-
-    """Finalize the setup of this experiment
-
-    Perform the last steps of setting up an experiment.
-
-    Compute the mpi variables that are required, and construct the experiment name,
-    run directory, and log file paths.
-
-    Inputs:
-        None
-    Returns:
-        None
-    """
-    def _finalize_experiment(self):
-        self._compute_mpi_vars()
-
-        # Remove potentially generated experiment name
-        self.remove_var(self.exp_name_key, level='experiment')
-
-        # Generate a new experiment name, from the template.
-        # Name template would be stored in base_vars, while
-        # generated name is stored in experiment_vars
-        self.set_var(self.exp_name_key, self.expand_var('{' + self.exp_name_key + '}'),
-                     level='experiment')
-
-        self.set_var(self.exp_run_dir_key,
-                     os.path.join(self.workload_run_dir, self.experiment_name))
-
-        self.set_var(self.log_file_key,
-                     os.path.join(self.experiment_run_dir,
-                                  '%s.out' % self.experiment_name))
-
-        self.set_var(self.err_file_key,
-                     os.path.join(self.experiment_run_dir,
-                                  '%s.err' % self.experiment_name))
-
-    """Render experiments by processing vector and matrix variables.
-
-    Interally collects all matrix and vector variables.
-
-    Before processing vectors and matrices, pull out vector spec_names, if they exist.
-    These are crossed with the remaining experiments.
-
-    Matrices are processed second.
-    Vectors in the same matrix are crossed, sibling matrices are zipped.
-    All matrices are required to result in the same number of elements, but not
-    be the same shape.
-    Matrix elements are only allowed to be the names of variables. These variables
-    are required to be vectors.
-
-    After matrices are processed, any remaining vectors are zipped together.
-    All vectors are required to be of the same size.
-
-    The resulting zip of vectors is then crossed with all of the matrices to
-    build a final list of experiments.
-
-    After collecting the matrices, this method modifies the internal expander
-    data structures, and yields nothing. This allows the experiments to be
-    iterated over without having to perform the expansion again.
-
-        Inputs:
-            - extra_vars: (Dict) Extra variables to use when expanding variables
-        Returns:
-            - Nothing.
-    """
-    def rendered_experiments(self, extra_vars=None):
-        all_expansions = self.get_expansion_dict(extra_vars)
-
-        experiments = []
-        matrix_experiments = []
-
-        if self.experiment_matrices:
-            """ Matrix syntax is:
-               matrix:
-               - <var1>
-               - <var2>
-               - [1, 2, 3, 4] # inline vector
-               matrices:
-               - matrix_a:
-                 - <var1>
-                 - <var2>
-               - matrix:b:
-                 - <var_3>
-                 - <var_4>
-
-                 Matrices consume vector variables.
-            """
-
-            # Perform some error checking
-            last_size = -1
-            matrix_vars = set()
-            matrix_vectors = []
-            matrix_variables = []
-            for matrix in self.experiment_matrices:
-                matrix_size = 1
-                vectors = []
-                variable_names = []
-                for var in matrix:
-                    if var in matrix_vars:
-                        tty.die('Variable %s has been used in multiple matrices.\n' % var
-                                + 'Ensure each variable is only used once across all matrices')
-                    matrix_vars.add(var)
-
-                    if var not in all_expansions:
-                        tty.die('In experiment %s' % self.experiment_name
-                                + ' variable %s has not been defined yet.' % var)
-
-                    if not isinstance(all_expansions[var], list):
-                        tty.die('In experiment %s' % self.experiment_name
-                                + ' variable %s does not refer to a vector.' % var)
-
-                    matrix_size = matrix_size * len(all_expansions[var])
-
-                    tty.debug('MATRIX USING VAR: %s' % var)
-                    vectors.append(all_expansions[var])
-                    variable_names.append(var)
-
-                    # Remove the variable, so it's not proccessed as a vector anymore.
-                    del all_expansions[var]
-
-                if last_size == -1:
-                    last_size = matrix_size
-
-                if last_size != matrix_size:
-                    tty.die('Matrices defined in experiment %s do not ' % self.experiment_name
-                            + 'result in the same number of elements.')
-
-                matrix_vectors.append(vectors)
-                matrix_variables.append(variable_names)
-
-            # Create the empty initial dictionairies
-            matrix_experiments = []
-            for _ in range(matrix_size):
-                matrix_experiments.append({})
-
-            # Generate all of the exp var dicts
-            for names, vectors in zip(matrix_variables, matrix_vectors):
-                for exp_idx, entry in enumerate(itertools.product(*vectors)):
-                    for name_idx, name in enumerate(names):
-                        matrix_experiments[exp_idx][name] = entry[name_idx]
-
-        # After matrices have been processed, extract any remaining vector variables
-        vector_vars = {}
-
-        # Extract vector variables
-        max_vector_size = 0
-        for var, val in all_expansions.items():
-            if isinstance(val, list):
-                vector_vars[var] = val.copy()
-                max_vector_size = max(len(val), max_vector_size)
-
-        if vector_vars:
-            # Check that sizes are the same
-            for var, val in vector_vars.items():
-                if len(val) != max_vector_size:
-                    tty.die('Size of vector %s is not' % var
-                            + ' the same as max %s' % len(val)
-                            + '. In experiment %s' % self.experiment_name)
-
-            # Iterate over the vector length, and set the value in the
-            # experiment dict to the index value.
-            for i in range(0, max_vector_size):
-                exp_vars = {}
-                for var, val in vector_vars.items():
-                    exp_vars[var] = val[i]
-
-                if matrix_experiments:
-                    for matrix_experiment in matrix_experiments:
-                        for var, val in matrix_experiment.items():
-                            exp_vars[var] = val
-
-                        experiments.append(exp_vars.copy())
-                else:
-                    experiments.append(exp_vars.copy())
-
-        elif matrix_experiments:
-            experiments = matrix_experiments
-        else:
-            # Ensure at least one experiment is rendered, if everything was a scalar
-            experiments.append({})
-
-        rendered_experiments = set()
-        for exp in experiments:
-            tty.debug('Rendering experiment:')
-            for var, val in exp.items():
-                self.set_var(var, val, level='experiment')
-            self.set_var(self.spack_key,
-                         os.path.join(self._workspace.software_dir,
-                                      '%s.%s' % ('{spec_name}', all_expansions[self.wl_name_key])),
-                         level='experiment')
-
-            self._finalize_experiment()
-            final_exp_name = self.expand_var('{' + self.exp_name_key + '}')
-            tty.debug('   Exp vars: %s' % exp)
-            tty.debug('   Final name: %s' % final_exp_name)
-
-            if final_exp_name in rendered_experiments:
-                tty.die('Experiment %s is not unique.' % final_exp_name)
-            rendered_experiments.add(final_exp_name)
-            yield
-
-    def set_application_env_vars(self, application_env_vars):
-        if application_env_vars:
-            self.application_env_vars = application_env_vars.copy()
-        else:
-            self.application_env_vars = None
-        self.workload_env_vars = None
-        self.experiment_env_vars = None
-
-    def set_workload_env_vars(self, workload_env_vars):
-        if workload_env_vars:
-            self.workload_env_vars = workload_env_vars.copy()
-        else:
-            self.workload_env_vars = None
-        self.experiment_env_vars = None
-
-    def set_experiment_env_vars(self, experiment_env_vars):
-        if experiment_env_vars:
-            self.experiment_env_vars = experiment_env_vars.copy()
-        else:
-            self.experiment_env_vars = None
-
-    def all_env_var_sets(self):
-        env_vars = [self.workspace_env_vars,
-                    self.application_env_vars,
-                    self.workload_env_vars,
-                    self.experiment_env_vars]
-
-        for var_set in env_vars:
-            if var_set and len(var_set.keys()):
-                yield var_set
-
-    def set_application_vars(self, application_vars):
-        self._expansion_dict = None
-        if application_vars:
-            self.application_vars = application_vars.copy()
-        else:
-            self.application_vars = None
-        self.workload_vars = None
-        self.experiment_vars = None
-
-    def set_workload_vars(self, workload_vars):
-        self._expansion_dict = None
-        if workload_vars:
-            self.workload_vars = workload_vars.copy()
-        else:
-            self.workload_vars = None
-        self.experiment_vars = None
-
-    def set_experiment_vars(self, experiment_vars):
-        self._expansion_dict = None
-        if experiment_vars:
-            self.experiment_vars = experiment_vars.copy()
-        else:
-            self.experiment_vars = None
-
-    def set_experiment_matrices(self, experiment_matrices):
-        self._expansion_dict = None
-        if experiment_matrices:
-            tty.debug('Setting matrices: %s' % experiment_matrices)
-            self.experiment_matrices = experiment_matrices.copy()
-        else:
-            self.experiment_matrices = None
-
-    def _compute_mpi_vars(self):
-        n_ranks = self._find_key(self.ranks_key)
-        ppn = self._find_key(self.ppn_key)
-        n_nodes = self._find_key(self.nodes_key)
-        n_threads = self._find_key(self.threads_key)
-
-        all_expansions = self.get_expansion_dict()
-
-        if n_ranks:
-            n_ranks = int(self.expand_var(n_ranks,
-                                          all_expansions=all_expansions))
-
-        if ppn:
-            ppn = int(self.expand_var(ppn,
-                                      all_expansions=all_expansions))
-
-        if n_nodes:
-            n_nodes = int(self.expand_var(n_nodes,
-                                          all_expansions=all_expansions))
-
-        if n_threads:
-            n_threads = int(self.expand_var(n_threads,
-                                            all_expansions=all_expansions))
-
-        if n_ranks and ppn:
-            test_n_nodes = math.ceil(int(n_ranks) / int(ppn))
-
-            if n_nodes and n_nodes < test_n_nodes:
-                tty.error('n_nodes in %s is %s and should be %s' %
-                          (self.experiment_namespace, n_nodes,
-                           test_n_nodes))
-            elif not n_nodes:
-                tty.debug('Defining n_nodes in %s' %
-                          self.experiment_namespace)
-                self.experiment_vars[self.nodes_key] = test_n_nodes
-        elif n_ranks and n_nodes:
-            ppn = math.ceil(int(n_ranks) / int(n_nodes))
-            tty.debug('Defining processes_per_node in %s' %
-                      self.experiment_namespace)
-            self.experiment_vars[self.ppn_key] = ppn
-        elif ppn and n_nodes:
-            n_ranks = ppn * n_nodes
-            tty.debug('Defining n_ranks in %s' %
-                      self.experiment_namespace)
-            self.experiment_vars[self.ranks_key] = n_ranks
-        elif not n_nodes:
-            self.experiment_vars[self.nodes_key] = 1
-
-        if not n_threads:
-            self.experiment_vars[self.threads_key] = 1
-
-    def _find_key(self, key):
-        if self.experiment_vars and key in self.experiment_vars:
-            return self.experiment_vars[key]
-        elif self.workload_vars and key in self.workload_vars:
-            return self.workload_vars[key]
-        elif self.application_vars and key in self.application_vars:
-            return self.application_vars[key]
-        elif self.workspace_vars and key in self.workspace_vars:
-            return self.workspace_vars[key]
-        elif self.package_paths and key in self.package_paths:
-            return self.package_paths[key]
-        elif self.base_vars and key in self.base_vars:
-            return self.base_vars[key]
-        else:
-            return None
-
-    @property
-    def n_ranks(self):
-        found = self._find_key('n_ranks')
-        return int(found) if found else found
-
-    @property
-    def processes_per_node(self):
-        found = self._find_key('processes_per_node')
-        return int(found) if found else found
-
-    @property
-    def n_nodes(self):
-        found = self._find_key('n_nodes')
-        return int(found) if found else found
+        return self._workload_name
 
     @property
     def experiment_name(self):
-        exp_name = self._find_key(self.exp_name_key)
+        if not self._experiment_name:
+            self._experiment_name = self.expand_var_name(self._keywords.experiment_name)
 
-        if exp_name:
-            return self.expand_var(exp_name)
-        return None
+        return self._experiment_name
 
     @property
-    def experiment_run_dir(self):
-        exp_run_dir = self._find_key(self.exp_run_dir_key)
+    def application_namespace(self):
+        if not self._application_namespace:
+            self._application_namespace = self.application_name
 
-        if exp_run_dir:
-            return self.expand_var(exp_run_dir)
-        return None
+        return self._application_namespace
+
+    @property
+    def workload_namespace(self):
+        if not self._workload_namespace:
+            self._workload_namespace = f"{self.application_name}.{self.workload_name}"
+
+        return self._workload_namespace
 
     @property
     def experiment_namespace(self):
-        app_name = self.application_name
-        wl_name = self.workload_name
-        exp_name = self.experiment_name
-        if app_name and wl_name and exp_name:
-            return '%s.%s.%s' % (app_name,
-                                 wl_name,
-                                 exp_name)
-        return None
+        if not self._experiment_namespace:
+            self._experiment_namespace = "{}.{}.{}".format(
+                self.application_name,
+                self.workload_name,
+                self.experiment_name,
+            )
 
-    def flush_context(self):
-        self.remove_var(self.app_name_key)
-        self.remove_var(self.app_run_dir_key)
-        self.remove_var(self.app_input_dir_key)
+        return self._experiment_namespace
 
-        self.remove_var(self.wl_name_key)
-        self.remove_var(self.wl_run_dir_key)
-        self.remove_var(self.wl_input_dir_key)
+    @property
+    def env_path(self):
+        if not self._env_path:
+            var = self.expansion_str(self._keywords.env_path)
+            self._env_path = self.expand_var(var)
 
-        self.remove_var(self.exp_name_key)
-        self.remove_var(self.exp_run_dir_key)
+        return self._env_path
 
-        self.pacakge_vars = {}
-        self.application_vars = None
-        self.workload_vars = None
-        self.experiment_vars = None
-        self.experiment_matrices = None
-        self._expansion_dict = None
+    @property
+    def application_input_dir(self):
+        if not self._application_input_dir:
+            self._application_input_dir = self.expand_var_name(
+                self._keywords.application_input_dir
+            )
 
-        self.application_env_vars = None
-        self.workload_env_vars = None
-        self.experiment_env_vars = None
+        return self._application_input_dir
 
-    def get_expansion_dict(self, extra_vars=None):
-        """Return a dict of all vars that can be used for expansions"""
-        if not self._expansion_dict:
-            expansions = self.base_vars.copy()
-            if self.package_paths:
-                expansions.update(self.package_paths)
-            if self.workspace_vars:
-                expansions.update(self.workspace_vars)
-            if self.application_vars:
-                expansions.update(self.application_vars)
-            if self.workload_vars:
-                expansions.update(self.workload_vars)
-            if self.experiment_vars:
-                expansions.update(self.experiment_vars)
+    @property
+    def workload_input_dir(self):
+        if not self._workload_input_dir:
+            self._workload_input_dir = self.expand_var_name(self._keywords.workload_input_dir)
 
-            # Cache expansion dict up to here. The builtin expansion dict should not
-            # contain extra_vars
-            self._expansion_dict = expansions.copy()
-        else:
-            expansions = self._expansion_dict.copy()
+        return self._workload_input_dir
 
-        if extra_vars:
-            expansions.update(extra_vars)
+    @property
+    def license_input_dir(self):
+        if not self._license_input_dir:
+            self._license_input_dir = self.expand_var_name(self._keywords.license_input_dir)
 
-        return expansions
+        return self._license_input_dir
 
-    def all_vars(self, extra_vars=None):
-        """Return a dict containing all expanded variables"""
+    @property
+    def application_run_dir(self):
+        if not self._application_run_dir:
+            self._application_run_dir = self.expand_var_name(self._keywords.application_run_dir)
 
-        expansions = self.get_expansion_dict(extra_vars)
+        return self._application_run_dir
 
-        var_dict = {}
+    @property
+    def workload_run_dir(self):
+        if not self._workload_run_dir:
+            self._workload_run_dir = self.expand_var_name(self._keywords.workload_run_dir)
 
-        for var, val in expansions.items():
-            expanded_val = self.expand_var(val, all_expansions=expansions)
-            var_dict[var] = expanded_val
-        return var_dict
+        return self._workload_run_dir
 
-    def expand_var(self, var, extra_vars=None, all_expansions=None):
+    @property
+    def experiment_run_dir(self):
+        if not self._experiment_run_dir:
+            self._experiment_run_dir = self.expand_var_name(self._keywords.experiment_run_dir)
+
+        return self._experiment_run_dir
+
+    def expand_lists(self, var):
+        """Expand a variable into a list if possible
+
+        If expanding a variable would generate a list, this function will
+        return a list. If any error case happens, this function will return
+        the unmodified input value.
+
+        NOTE: This function is generally called early in the expansion. This allows
+        lists to be generated before rendering experiments, but does not support
+        pulling a list from a different experiment.
+        """
+        try:
+            math_ast = ast.parse(str(var), mode="eval")
+            value = self.eval_math(math_ast.body)
+            if isinstance(value, list):
+                return value
+            return var
+        except MathEvaluationError:
+            return var
+        except AttributeError:
+            return var
+        except ValueError:
+            return var
+        except SyntaxError:
+            return var
+
+    def expand_var_name(
+        self,
+        var_name: str,
+        extra_vars: Dict = None,
+        allow_passthrough: bool = True,
+        typed: bool = False,
+        merge_used_stage: bool = True,
+    ):
+        """Convert a variable name to an expansion string, and expand it
+
+        Take a variable name (var) and convert it to an expansion string by
+        calling the expansion_str function. Pass the expansion string into
+        expand_var, and return the result.
+
+        Args:
+            var_name (str): String name of variable to expand
+            extra_vars (dict): Variable definitions to use with highest precedence
+            allow_passthrough (bool): Whether the string is allowed to have keywords
+                                      after expansion
+            typed (bool): Whether the return type should be typed or not
+            merge_used_stage (bool): Whether tracked variables are merged into
+                                     the used variable set or not.
+        """
+        return self.expand_var(
+            self.expansion_str(var_name),
+            extra_vars=extra_vars,
+            allow_passthrough=allow_passthrough,
+            typed=typed,
+            merge_used_stage=merge_used_stage,
+        )
+
+    def expand_var(
+        self,
+        var: str,
+        extra_vars: Dict = None,
+        allow_passthrough: bool = True,
+        typed: bool = False,
+        merge_used_stage: bool = True,
+    ):
         """Perform expansion of a string
 
         Expand a string by building up a dict of all
         expansion variables.
+
+        Args:
+            var (str): String variable to expand
+            extra_vars (dict): Variable definitions to use with highest precedence
+            allow_passthrough (bool): Whether the string is allowed to have keywords
+                                      after expansion
+            typed (bool): Whether the return type should be typed or not
+            merge_used_stage (bool): Whether tracked variables are merged into
+                                     the used variable set or not.
         """
-        if not all_expansions:
-            expansions = self.get_expansion_dict(extra_vars)
-        else:
-            expansions = all_expansions
 
-        expanded = self._partial_expand(expansions, str(var))
+        if var is None or var == "None":
+            return None if typed else "None"
 
-        if self._fully_expanded(expanded):
+        passthrough_setting = allow_passthrough
+
+        # If disable_passthrough is set, override allow_passthrough from caller
+        if ramble.config.get("config:disable_passthrough"):
+            passthrough_setting = False
+
+        logger.debug(f"BEGINNING OF EXPAND_VAR STACK ON {var}")
+        expansions = self._variables
+        if extra_vars:
+            expansions = self._variables.copy()
+            expansions.update(extra_vars)
+
+        try:
+            value = self._partial_expand(
+                expansions, str(var), allow_passthrough=passthrough_setting
+            )
+        except RamblePassthroughError as e:
+            if not passthrough_setting:
+                raise RambleSyntaxError(
+                    f"Encountered a passthrough error while expanding {var}\n" f"{e}"
+                )
+
+        logger.debug(f"END OF EXPAND_VAR STACK {value}")
+        if typed:
+            logger.debug(f"BEGINNING OF TYPING ON {value}")
             try:
-                math_ast = ast.parse(str(expanded), mode='eval')
-                evaluated = self.eval_math(math_ast.body)
-                expanded = evaluated
-            except MathEvaluationError:
-                pass
+                value = ast.literal_eval(value)
+                logger.debug(f"END OF TYPING {value}")
+            except ValueError:
+                logger.debug("END OF TYPING Failed with ValueError")
             except SyntaxError:
-                pass
+                logger.debug("END OF TYPING Failed with SyntaxError")
 
-        return str(expanded).lstrip()
+        if merge_used_stage:
+            self.merge_used_variable_stage()
 
-    def _all_keywords(self, in_str):
-        if isinstance(in_str, six.string_types):
-            for keyword in string.Formatter().parse(in_str):
-                if keyword[1]:
-                    yield keyword[1]
+        return value
 
-    def _fully_expanded(self, in_str):
-        for kw in self._all_keywords(in_str):
+    def evaluate_predicate(self, in_str, extra_vars=None, merge_used_stage: bool = True):
+        """Evaluate a predicate by expanding and evaluating math contained in a string
+
+        Args:
+            in_str: String representing predicate that should be evaluated
+            extra_vars: Variable definitions to use with highest precedence
+
+        Returns:
+            bool: True or False, based on the evaluation of in_str
+        """
+
+        evaluated = self.expand_var(
+            in_str,
+            extra_vars=extra_vars,
+            allow_passthrough=False,
+            merge_used_stage=merge_used_stage,
+        )
+
+        if not isinstance(evaluated, str):
+            logger.die("Logical compute failed to return a string")
+
+        if evaluated == "True":
+            return True
+        elif evaluated == "False":
             return False
-        return True
+        else:
+            logger.die(
+                f"When evaluating {in_str}, evaluate_predicate returned "
+                f'a non-boolean string: "{evaluated}"'
+            )
+
+    def satisfies(
+        self,
+        reqs: Union[str, List[str], FrozenSet[str], None] = None,
+        variant_set=None,
+        extra_vars=None,
+        merge_used_stage: bool = True,
+    ):
+        """Determine an experiment's variants satisfy a query
+
+        Args:
+            reqs: List of string requirements to check if experiment satisfies
+            extra_vars: Variable definitions to use with highest precedence
+            merged_used_stage: Whether used variables are merged into the
+                               set of used variables or not.
+
+        Returns:
+            boolean: True or False, based if the experiment's variants satisfy
+                     the input requirement.
+        """
+
+        if variant_set is not None:
+            variant_definitions = variant_set.as_set()
+        else:
+            variant_definitions = set()
+
+        satisfied = True
+        if reqs is not None:
+            if isinstance(reqs, str):
+                reqs = [reqs]
+            elif isinstance(reqs, frozenset):
+                reqs = list(reqs)
+
+            for req in reqs:
+                exp_req = self.expand_var(
+                    req, extra_vars=extra_vars, merge_used_stage=merge_used_stage
+                )
+
+                satisfied = satisfied and exp_req in variant_definitions
+        return satisfied
+
+    @staticmethod
+    def expansion_str(in_str):
+        return f"{ExpansionDelimiter.left}{in_str}{ExpansionDelimiter.right}"
+
+    def _partial_expand(self, expansion_vars, in_str, allow_passthrough=True):
+        """Perform expansion of a string with some variables
+
+        args:
+          expansion_vars (dict): Variables to perform expansion with
+          in_str (str): Input template string to expand
+          allow_passthrough (bool): Define if variables are allowed to passthrough
+                                    without being expanded.
+
+        returns:
+          in_str (str): Expanded version of input string
+        """
+
+        if isinstance(in_str, str):
+            str_graph = ExpansionGraph(in_str)
+            for node in str_graph.walk():
+                node.define_value(
+                    expansion_vars,
+                    allow_passthrough=allow_passthrough,
+                    expansion_func=self._partial_expand,
+                    evaluation_func=self.perform_math_eval,
+                    no_expand_vars=self._no_expand_vars,
+                    used_vars=self._used_variable_stage,
+                )
+
+            return str(str_graph.root.value)
+
+        return str(in_str)
+
+    def perform_math_eval(self, in_str):
+        """Attempt to evaluate in_str
+
+        Args:
+            in_str (str): string representing math to attempt to evaluate
+
+        Returns:
+            (str) either the evaluation of in_str (if successful) or in_str
+            unmodified (if unsuccessful)
+
+        """
+        try:
+            math_ast = ast.parse(in_str, mode="eval")
+            out_str = self.eval_math(math_ast.body)
+            return out_str
+        except MathEvaluationError as e:
+            logger.debug(f'   Math input is: "{in_str}"')
+            logger.debug(e)
+        except RambleSyntaxError as e:
+            raise RambleSyntaxError(f'{str(e)} in "{in_str}"')
+
+        return in_str
 
     def eval_math(self, node):
         """Evaluate math from parsing the AST
@@ -722,52 +768,297 @@ class Expander(object):
         Some operators will generate floating point, while
         others will generate integers (if the inputs are integers).
         """
-        if isinstance(node, ast.Num):
-            return node.n
-        elif isinstance(node, ast.BinOp):
+        try:
+            if isinstance(node, ast.Num):
+                return self._ast_num(node)
+            elif isinstance(node, ast.Constant):
+                return self._ast_constant(node)
+            elif isinstance(node, ast.Name):
+                return self._ast_name(node)
+            # TODO: Remove when we drop support for 3.6
+            # DEPRECATED: Remove due to python 3.8
+            # See: https://docs.python.org/3/library/ast.html#node-classes
+            elif isinstance(node, ast.Str):
+                return node.s
+            elif isinstance(node, ast.Attribute):
+                return self._ast_attr(node)
+            elif isinstance(node, ast.Compare):
+                return self._eval_comparisons(node)
+            elif isinstance(node, ast.BoolOp):
+                return self._eval_bool_op(node)
+            elif isinstance(node, ast.BinOp):
+                return self._eval_binary_ops(node)
+            elif isinstance(node, ast.UnaryOp):
+                return self._eval_unary_ops(node)
+            elif isinstance(node, ast.Call):
+                return self._eval_function_call(node)
+            elif isinstance(node, ast.Subscript):
+                return self._eval_subscript_op(node)
+            else:
+                node_type = str(type(node))
+                raise MathEvaluationError(
+                    f"Unsupported math AST node {node_type}:\n" + f"\t{node.__dict__}"
+                )
+        except SyntaxError as e:
+            logger.debug(str(e))
+            raise e
+
+    # Ast logic helper methods
+    def __raise_syntax_error(self, node):
+        node_type = str(type(node))
+        raise RambleSyntaxError(
+            f"Syntax error while processing {node_type} node:\n" + f"{node.__dict__}"
+        )
+
+    def __dbg_syntax_error(self, msg, node):
+        node_type = str(type(node))
+        raise SyntaxError(
+            self._ast_dbg_prefix
+            + f" {msg}\n"
+            + f"Occurred while processing {node_type} node:\n"
+            + f"{node.__dict__}"
+        )
+
+    def _ast_num(self, node):
+        """Handle a number node in the ast"""
+        return node.n
+
+    def _ast_constant(self, node):
+        """Handle a constant node in the ast"""
+        return node.value
+
+    def _ast_name(self, node):
+        """Handle a name node in the ast"""
+        return node.id
+
+    def _ast_attr(self, node):
+        """Handle an attribute node in the ast"""
+        if isinstance(node.value, ast.Attribute):
+            base = self._ast_attr(node.value)
+        elif isinstance(node.value, ast.Name):
+            base = self._ast_name(node.value)
+        else:
+            self.__dbg_syntax_error(
+                " Unknown attribute syntax used.\nreturning unexpanded string", node
+            )
+
+        val = f"{base}.{node.attr}"
+        return val
+
+    def _eval_function_call(self, node):
+        """Handle a subset of function call nodes in the ast"""
+
+        args = []
+        kwargs = {}
+        for arg in node.args:
+            args.append(self.eval_math(arg))
+        for kw in node.keywords:
+            kwargs[self.eval_math(kw.arg)] = self.eval_math(kw.value)
+
+        if node.func.id in supported_scalar_function_pointers.keys():
+            func = supported_scalar_function_pointers[node.func.id]
+            return func(*args, **kwargs)
+        elif node.func.id in supported_list_function_pointers.keys():
+            func = supported_list_function_pointers[node.func.id]
+            return list(func(*args, **kwargs))
+        elif node.func.id == "replace":
+            return str(args[0]).replace(*args[1:], **kwargs)
+        elif node.func.id in supported_scalar_function_with_self_arg_pointers.keys():
+            func = supported_scalar_function_with_self_arg_pointers[node.func.id]
+            return func(self, *args, **kwargs)
+        else:
+            raise MathEvaluationError(
+                f"Undefined function {node.func.id} used.\n" "returning unexapanded string"
+            )
+
+    def _eval_bool_op(self, node):
+        """Handle a boolean operator node in the ast"""
+        try:
+            op = supported_math_operators[type(node.op)]
+
+            result = self.eval_math(node.values[0])
+
+            for value in node.values[1:]:
+                result = op(result, self.eval_math(value))
+
+            return result
+
+        except TypeError:
+            self.__dbg_syntax_error("Unsupported operand type in boolean operator", node)
+        except KeyError:
+            self.__dbg_syntax_error("Unsupported boolean operator", node)
+
+    def _eval_comparisons(self, node):
+        """Handle a comparison node in the ast"""
+
+        # Extract In or NotIn nodes, and call their helper
+        if len(node.ops) == 1 and isinstance(node.ops[0], (ast.In, ast.NotIn)):
+            is_in = self._eval_comp_in(node)
+            if isinstance(node.ops[0], ast.NotIn):
+                return not is_in
+            return is_in
+
+        if len(node.ops) == 1 and isinstance(node.ops[0], ast.Is):
+            raise RambleSyntaxError("Encountered unsupported operator `is`")
+
+        # Try to evaluate the comparison logic, if not return the node as is.
+        try:
+            cur_left = self.eval_math(node.left)
+
+            op = supported_math_operators[type(node.ops[0])]
+            cur_right = self.eval_math(node.comparators[0])
+
+            result = op(cur_left, cur_right)
+
+            if len(node.ops) > 1:
+                cur_left = cur_right
+                for comp, right in zip(node.ops, node.comparators)[1:]:
+                    op = supported_math_operators[type(comp)]
+                    cur_right = self.eval_math(right)
+
+                    result = result and op(cur_left, cur_right)
+
+                    cur_left = cur_right
+            return result
+        except TypeError:
+            self.__dbg_syntax_error("Unsupported operand type in binary comparison operator", node)
+        except KeyError:
+            self.__dbg_syntax_error("Unsupported binary comparison operator", node)
+
+    def _eval_comp_in(self, node):
+        """Handle in node in the ast
+
+        Perform extraction of `<variable> in <experiment>` syntax.
+        Raises an exception if the experiment does not exist.
+
+        Also, evaluated `<value> in [list, of, values]` and `<value> in "str"` syntaxes.
+        """
+        if isinstance(node.left, ast.Name):
+            var_name = self._ast_name(node.left)
+            if isinstance(node.comparators[0], ast.Attribute):
+                namespace = self.eval_math(node.comparators[0])
+                val = self._experiment_set.get_var_from_experiment(
+                    namespace, self.expansion_str(var_name)
+                )
+                if not val:
+                    raise RambleSyntaxError(
+                        f"{namespace} does not exist in: " + f'"{var_name} in {namespace}"'
+                    )
+                    self.__raise_syntax_error(node)
+                return val
+        # TODO: Remove `or` logic after 3.6 & 3.7 series python are unsupported
+        elif isinstance(node.left, ast.Constant) or _safe_str_node_check(node.left):
+            lhs_value = self.eval_math(node.left)
+
+            found = False
+            for comp in node.comparators:
+                if isinstance(comp, (ast.List, ast.Set)):
+                    for elt in comp.elts:
+                        rhs_value = self.eval_math(elt)
+                        if lhs_value == rhs_value:
+                            found = True
+                elif isinstance(comp, ast.Constant) or _safe_str_node_check(comp):
+                    # Attempt evaluating `"str" in "string"`
+                    rhs_value = self.eval_math(comp)
+                    if isinstance(rhs_value, str) and lhs_value in rhs_value:
+                        found = True
+            return found
+
+        self.__raise_syntax_error(node)
+
+    def _eval_binary_ops(self, node):
+        """Evaluate binary operators in the ast
+
+        Extract the binary operator, and evaluate it.
+        """
+        try:
             left_eval = self.eval_math(node.left)
             right_eval = self.eval_math(node.right)
             op = supported_math_operators[type(node.op)]
+            if isinstance(left_eval, str) or isinstance(right_eval, str):
+                self.__dbg_syntax_error("Unsupported operand type in binary operator", node)
             return op(left_eval, right_eval)
-        elif isinstance(node, ast.UnaryOp):
+        except TypeError:
+            self.__dbg_syntax_error("Unsupported operand type in binary operator", node)
+        except KeyError:
+            self.__dbg_syntax_error("Unsupported binary operator", node)
+
+    def _eval_unary_ops(self, node):
+        """Evaluate unary operators in the ast
+
+        Extract the unary operator, and evaluate it.
+        """
+        try:
             operand = self.eval_math(node.operand)
+            if isinstance(operand, str):
+                self.__dbg_syntax_error("Unsupported operand type in unary operator", node)
             op = supported_math_operators[type(node.op)]
             return op(operand)
-        else:
-            raise MathEvaluationError('Invalid node')
+        except TypeError:
+            self.__dbg_syntax_error("Unsupported operand type in unary operator", node)
+        except KeyError:
+            self.__dbg_syntax_error("Unsupported unary operator", node)
 
-    def _partial_expand(self, expansion_vars, in_str):
-        """Perform expansion of a string with some variables
+    def _eval_subscript_op(self, node):
+        """Evaluate subscript operation in the ast"""
+        try:
+            operand = self.eval_math(node.value)
+            slice_node = node.slice
 
-        args:
-          expansion_vars (dict): Variables to perform expansion with
-          in_str (str): Input template string to expand
+            if isinstance(operand, str):
+                if isinstance(slice_node, ast.Slice):
 
-        returns:
-          in_str (str): Expanded version of input string
-        """
+                    def _get_with_default(s_node, attr, default):
+                        v_node = getattr(s_node, attr)
+                        if v_node is None:
+                            return default
+                        return self.eval_math(v_node)
 
-        exp_dict = ExpansionDict()
-        if isinstance(in_str, six.string_types):
-            for kw in self._all_keywords(in_str):
-                if kw in expansion_vars:
-                    exp_dict[kw] = \
-                        self._partial_expand(expansion_vars,
-                                             expansion_vars[kw])
+                    lower = _get_with_default(slice_node, "lower", 0)
+                    upper = _get_with_default(slice_node, "upper", len(operand))
+                    step = _get_with_default(slice_node, "step", 1)
+                    return operand[slice(lower, upper, step)]
+                elif operand in self._variables and isinstance(self._variables[operand], dict):
+                    op_dict = self.expand_var_name(operand, typed=True)
 
-            for kw, val in exp_dict.items():
-                if self._fully_expanded(val):
-                    try:
-                        math_ast = ast.parse(str(val), mode='eval')
-                        evaluated = self.eval_math(math_ast.body)
-                        exp_dict[kw] = evaluated
-                    except MathEvaluationError:
-                        pass
-                    except SyntaxError:
-                        pass
+                    key = None
+                    # TODO: Remove after support for python 3.9 is dropped
+                    # DEPRECATED: ast.Index was dropped in python 3.9
+                    if hasattr(ast, "Index") and isinstance(slice_node, ast.Index):
+                        key = self.eval_math(slice_node.value)
+                    elif isinstance(slice_node, ast.Constant) or _safe_str_node_check(slice_node):
+                        key = self.eval_math(slice_node)
 
-            return in_str.format_map(exp_dict)
-        return in_str
+                    if key is None:
+                        msg = (
+                            "During dictionary extraction, key is None. " + "Skipping extraction."
+                        )
+                        self.__dbg_syntax_error(msg, node)
+
+                    if key not in op_dict:
+                        msg = (
+                            f"Key {key} is not in dictionary {operand}. " + "Cannot extract value."
+                        )
+                        self.__dbg_syntax_error(msg, node)
+
+                    return op_dict[key]
+
+            msg = (
+                "Currently subscripts are only support "
+                + "for string slicing, and key extraction from dictionaries"
+            )
+            self.__dbg_syntax_error(msg, node)
+        except TypeError:
+            msg = "Unsupported operand type in subscript operator"
+            self.__dbg_syntax_error(msg, node)
+
+
+def raise_passthrough_error(in_str, out_str):
+    """Raise an error when passthrough is disabled but variables are not all expanded"""
+
+    logger.debug(f"Expansion stack errors: attempted to expand " f'"{in_str}"')
+    logger.debug(f"  As: {out_str}")
+    raise RamblePassthroughError("Error Stack:\n" f'Input: "{in_str}"\n' f'Output: "{out_str}"\n')
 
 
 class ExpanderError(ramble.error.RambleError):
@@ -778,6 +1069,14 @@ class MathEvaluationError(ExpanderError):
     """Raised when an error happens while evaluating math during
     expansion
     """
+
+
+class RambleSyntaxError(ExpanderError):
+    """Raised when a syntax error happens within variable definitions"""
+
+
+class RamblePassthroughError(ExpanderError):
+    """Raised when passthrough is disabled and variables fail to expand"""
 
 
 class ApplicationNotDefinedError(ExpanderError):

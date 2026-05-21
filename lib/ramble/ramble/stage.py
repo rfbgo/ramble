@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,8 +6,6 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-
-from __future__ import print_function
 
 import errno
 import getpass
@@ -17,45 +15,47 @@ import os
 import shutil
 import stat
 import sys
-from six import string_types
-from six import iteritems
 
 import llnl.util.lang
 import llnl.util.tty as tty
-from llnl.util.filesystem import mkdirp, can_access, install, install_tree
-from llnl.util.filesystem import partition_path, remove_linked_tree
+from llnl.util.filesystem import (
+    can_access,
+    install,
+    install_tree,
+    mkdirp,
+    partition_path,
+    remove_linked_tree,
+)
 
-import spack.paths
-import spack.caches
-import spack.config
-import spack.mirror
-import spack.util.pattern as pattern
-import spack.util.path as sup
-import spack.util.url as url_util
-
-from spack.util.crypto import prefix_bits, bit_length
-
-import ramble.fetch_strategy as fs
-import ramble.util.lock
+import ramble.caches
 import ramble.error
+import ramble.fetch_strategy as fs
+import ramble.mirror
+import ramble.util.lock
+from ramble.util.logger import logger
 
+import spack.config
+import spack.paths
+import spack.util.path as sup
+import spack.util.pattern as pattern
+import spack.util.url as url_util
+from spack.util.crypto import bit_length, prefix_bits
 
 # The well-known stage source subdirectory name.
-_input_subdir = 'input'
+_input_subdir = "input"
 
 
 def create_stage_root(path):
     """Create the stage root directory and ensure appropriate access perms."""
     assert path.startswith(os.path.sep) and len(path.strip()) > 1
 
-    err_msg = 'Cannot create stage root {0}: Access to {1} is denied'
+    err_msg = "Cannot create stage root {0}: Access to {1} is denied"
 
-    # TODO: (dwjacobsen) Reomve when owner_uid is removed below
+    # TODO: (dwjacobsen) Remove when owner_uid is removed below
     # user_uid = os.getuid()
 
     # Obtain lists of ancestor and descendant paths of the $user node, if any.
-    group_paths, user_node, user_paths = partition_path(path,
-                                                        getpass.getuser())
+    group_paths, user_node, user_paths = partition_path(path, getpass.getuser())
 
     for p in group_paths:
         if not os.path.exists(p):
@@ -66,12 +66,15 @@ def create_stage_root(path):
 
             p_stat = os.stat(p)
             if par_stat.st_gid != p_stat.st_gid:
-                tty.warn("Expected {0} to have group {1}, but it is {2}"
-                         .format(p, par_stat.st_gid, p_stat.st_gid))
+                logger.warn(
+                    f"Expected {p} to have group " f"{par_stat.st_gid}, but it is {p_stat.st_gid}"
+                )
 
             if par_stat.st_mode & p_stat.st_mode != par_stat.st_mode:
-                tty.warn("Expected {0} to support mode {1}, but it is {2}"
-                         .format(p, par_stat.st_mode, p_stat.st_mode))
+                logger.warn(
+                    f"Expected {p} to support mode "
+                    f"{par_stat.st_mode}, but it is {p_stat.st_mode}"
+                )
 
             if not can_access(p):
                 raise OSError(errno.EACCES, err_msg.format(path, p))
@@ -89,8 +92,9 @@ def create_stage_root(path):
 
             p_stat = os.stat(p)
             if p_stat.st_mode & stat.S_IRWXU != stat.S_IRWXU:
-                tty.error("Expected {0} to support mode {1}, but it is {2}"
-                          .format(p, stat.S_IRWXU, p_stat.st_mode))
+                logger.error(
+                    f"Expected {p} to support mode " f"{stat.S_IRWXU}, but it is {p_stat.st_mode}"
+                )
 
                 raise OSError(errno.EACCES, err_msg.format(path, p))
         else:
@@ -123,8 +127,7 @@ def _first_accessible_path(paths):
                 return path
 
         except OSError as e:
-            tty.debug('OSError while checking stage path %s: %s' % (
-                      path, str(e)))
+            logger.debug(f"OSError while checking stage path {path}: {e}")
 
     return None
 
@@ -136,7 +139,7 @@ def _resolve_paths(candidates):
     Adjustments involve removing extra $user from $tempdir if $tempdir includes
     $user and appending $user if it is not present in the path.
     """
-    temp_path = sup.canonicalize_path('$tempdir')
+    temp_path = sup.canonicalize_path("$tempdir")
     user = getpass.getuser()
     tmp_has_usr = user in temp_path.split(os.path.sep)
 
@@ -144,7 +147,7 @@ def _resolve_paths(candidates):
     for path in candidates:
         # Remove the extra `$user` node from a `$tempdir/$user` entry for
         # hosts that automatically append `$user` to `$tempdir`.
-        if path.startswith(os.path.join('$tempdir', '$user')) and tmp_has_usr:
+        if path.startswith(os.path.join("$tempdir", "$user")) and tmp_has_usr:
             path = path.replace("/$user", "", 1)
 
         # Ensure the path is unique per user.
@@ -164,14 +167,18 @@ _stage_root = None
 # TODO (dwj): If we want to support multiple mirrors, we'll need to
 #             figure out how to pass them to the stage.
 def _mirror_roots():
-    mirrors = spack.config.get('mirrors')
+    mirrors = ramble.config.get("mirrors")
     return [
-        sup.substitute_path_variables(root) if root.endswith(os.sep)
-        else sup.substitute_path_variables(root) + os.sep
-        for root in mirrors.values()]
+        (
+            sup.substitute_path_variables(root)
+            if root.endswith(os.sep)
+            else sup.substitute_path_variables(root) + os.sep
+        )
+        for root in mirrors.values()
+    ]
 
 
-class InputStage(object):
+class InputStage:
     """Manages a stage directory for containing input files.
 
     A Stage object is a context manager that handles a directory where
@@ -212,52 +219,57 @@ class InputStage(object):
     managed_by_ramble = True
 
     def __init__(
-            self, url_or_fetch_strategy,
-            name=None, path=None, mirror_paths=None, keep=True, lock=True,
-            search_fn=None):
+        self,
+        url_or_fetch_strategy,
+        name=None,
+        path=None,
+        mirror_paths=None,
+        keep=True,
+        lock=True,
+        search_fn=None,
+    ):
         """Create a stage object.
-           Parameters:
-             url_or_fetch_strategy
-                 URL of the archive to be downloaded into this stage, OR
-                 a valid FetchStrategy.
+        Parameters:
+          url_or_fetch_strategy
+              URL of the archive to be downloaded into this stage, OR
+              a valid FetchStrategy.
 
-             name
-                 If a name is provided, then this stage is a named stage
-                 and will persist between runs (or if you construct another
-                 stage object later).  If name is not provided, then this
-                 stage will be given a unique name automatically.
+          name
+              If a name is provided, then this stage is a named stage
+              and will persist between runs (or if you construct another
+              stage object later).  If name is not provided, then this
+              stage will be given a unique name automatically.
 
-             mirror_paths
-                 If provided, Stage will search Rambles's mirrors for
-                 this archive at each of the provided relative mirror paths
-                 before using the default fetch strategy.
+          mirror_paths
+              If provided, Stage will search Rambles's mirrors for
+              this archive at each of the provided relative mirror paths
+              before using the default fetch strategy.
 
-             keep
-                 By default, when used as a context manager, the Stage
-                 is deleted on exit when no exceptions are raised.
-                 Pass True to keep the stage intact even if no
-                 exceptions are raised.
+          keep
+              By default, when used as a context manager, the Stage
+              is deleted on exit when no exceptions are raised.
+              Pass True to keep the stage intact even if no
+              exceptions are raised.
 
-            path
-                 If provided, the stage path to use for associated builds.
+         path
+              If provided, the stage path to use for associated builds.
 
-            lock
-                 True if the stage directory file lock is to be used, False
-                 otherwise.
+         lock
+              True if the stage directory file lock is to be used, False
+              otherwise.
 
-            search_fn
-                 The search function that provides the fetch strategy
-                 instance.
+         search_fn
+              The search function that provides the fetch strategy
+              instance.
         """
         # TODO: fetch/stage coupling needs to be reworked -- the logic
         # TODO: here is convoluted and not modular enough.
-        if isinstance(url_or_fetch_strategy, string_types):
+        if isinstance(url_or_fetch_strategy, str):
             self.fetcher = fs.from_url_scheme(url_or_fetch_strategy)
         elif isinstance(url_or_fetch_strategy, fs.FetchStrategy):
             self.fetcher = url_or_fetch_strategy
         else:
-            raise ValueError(
-                "Can't construct Stage without url or fetch strategy")
+            raise ValueError("Can't construct Stage without url or fetch strategy")
         self.fetcher.stage = self
         # self.fetcher can change with mirrors.
         self.default_fetcher = self.fetcher
@@ -286,13 +298,14 @@ class InputStage(object):
         self._lock = None
         if lock:
             if self.name not in InputStage.stage_locks:
-                sha1 = hashlib.sha1(self.name.encode('utf-8')).digest()
+                sha1 = hashlib.sha1(self.name.encode("utf-8")).digest()
                 lock_id = prefix_bits(sha1, bit_length(sys.maxsize))
-                stage_lock_path = os.path.join(self.path, '.lock')
+                stage_lock_path = os.path.join(self.path, ".lock")
 
-                tty.debug("Creating stage lock {0}".format(self.name))
+                logger.debug(f"Creating stage lock {self.name}")
                 InputStage.stage_locks[self.name] = ramble.util.lock.Lock(
-                    stage_lock_path, lock_id, 1, desc=self.name)
+                    stage_lock_path, lock_id, 1, desc=self.name
+                )
 
             self._lock = InputStage.stage_locks[self.name]
 
@@ -389,7 +402,7 @@ class InputStage(object):
 
         Args:
             mirror_only (bool): only fetch from a mirror
-            err_msg (str or None): the error message to display if all fetchers
+            err_msg (str | None): the error message to display if all fetchers
                 fail or ``None`` for the default fetch failure message
         """
         fetchers = []
@@ -405,10 +418,9 @@ class InputStage(object):
             # urljoin() will strip everything past the final '/' in
             # the root, so we add a '/' if it is not present.
             mirror_urls = []
-            for mirror in spack.mirror.MirrorCollection().values():
+            for mirror in ramble.mirror.MirrorCollection().values():
                 for rel_path in self.mirror_paths:
-                    mirror_urls.append(
-                        url_util.join(mirror.fetch_url, rel_path))
+                    mirror_urls.append(url_util.join(mirror.fetch_url, rel_path))
 
             # If this archive is normally fetched from a tarball URL,
             # then use the same digest.  `spack mirror` ensures that
@@ -429,29 +441,27 @@ class InputStage(object):
             # Insert fetchers in the order that the URLs are provided.
             for url in reversed(mirror_urls):
                 fetchers.insert(
-                    0, fs.from_url_scheme(
-                        url, digest, expand=expand, extension=extension))
+                    0, fs.from_url_scheme(url, digest, expand=expand, extension=extension)
+                )
 
             if self.default_fetcher.cachable:
                 for rel_path in reversed(list(self.mirror_paths)):
-                    cache_fetcher = spack.caches.fetch_cache.fetcher(
-                        rel_path, digest, expand=expand,
-                        extension=extension)
+                    cache_fetcher = ramble.caches.fetch_cache.fetcher(
+                        rel_path, digest, expand=expand, extension=extension
+                    )
                     fetchers.insert(0, cache_fetcher)
 
         def generate_fetchers():
-            for fetcher in fetchers:
-                yield fetcher
+            yield from fetchers
             # The search function may be expensive, so wait until now to
             # call it so the user can stop if a prior fetcher succeeded
             if self.search_fn and not mirror_only:
                 dynamic_fetchers = self.search_fn()
-                for fetcher in dynamic_fetchers:
-                    yield fetcher
+                yield from dynamic_fetchers
 
         def print_errors(errors):
             for msg in errors:
-                tty.debug(msg)
+                logger.debug(msg)
 
         errors = []
         for fetcher in generate_fetchers():
@@ -464,14 +474,19 @@ class InputStage(object):
                 # Don't bother reporting when something is not cached.
                 continue
             except ramble.error.RambleError as e:
-                errors.append('Fetching from {0} failed.'.format(fetcher))
-                tty.debug(e)
+                errors.append(f"Fetching from {fetcher} failed.")
+                logger.debug(e)
                 continue
+            except spack.util.web.SpackWebError as e:
+                errors.append(f"Fetching from {fetcher} failed.")
+                logger.debug(e)
+                continue
+
         else:
             print_errors(errors)
 
             self.fetcher = self.default_fetcher
-            raise fs.FetchError(err_msg or 'All fetchers failed', None)
+            raise fs.FetchError(err_msg or "All fetchers failed", None)
 
         print_errors(errors)
 
@@ -491,8 +506,8 @@ class InputStage(object):
             mkdirp(dest)
 
         # glob all files and directories in the source path
-        hidden_entries = glob.glob(os.path.join(self.source_path, '.*'))
-        entries = glob.glob(os.path.join(self.source_path, '*'))
+        hidden_entries = glob.glob(os.path.join(self.source_path, ".*"))
+        entries = glob.glob(os.path.join(self.source_path, "*"))
 
         # Move all files from stage to destination directory
         # Include hidden files for VCS repo history
@@ -512,28 +527,28 @@ class InputStage(object):
 
     def check(self):
         """Check the downloaded archive against a checksum digest.
-           No-op if this stage checks code out of a repository."""
-        if self.fetcher is not self.default_fetcher and \
-           self.skip_checksum_for_mirror:
-            tty.warn("Fetching from mirror without a checksum!",
-                     "This package is normally checked out from a version "
-                     "control system, but it has been archived on a "
-                     "mirror.  This means we cannot know a checksum for the "
-                     "tarball in advance. Be sure that your connection to "
-                     "this mirror is secure!")
-        elif ramble.config.get('config:checksum'):
+        No-op if this stage checks code out of a repository."""
+        if self.fetcher is not self.default_fetcher and self.skip_checksum_for_mirror:
+            logger.warn(
+                "Fetching from mirror without a checksum!",
+                "This input is normally checked out from a version "
+                "control system, but it has been archived on a "
+                "mirror.  This means we cannot know a checksum for the "
+                "tarball in advance. Be sure that your connection to "
+                "this mirror is secure!",
+            )
+        elif ramble.config.get("config:checksum"):
             self.fetcher.check()
 
     def cache_local(self):
-        spack.caches.fetch_cache.store(
-            self.fetcher, self.mirror_paths.storage_path)
+        ramble.caches.fetch_cache.store(self.fetcher, self.mirror_paths.storage_path)
 
     def cache_mirror(self, mirror, stats):
         """Perform a fetch if the resource is not already cached
 
         Arguments:
-            mirror (MirrorCache): the mirror to cache this Stage's resource in
-            stats (MirrorStats): this is updated depending on whether the
+            mirror (ramble.caches.MirrorCache): the mirror to cache this Stage's resource in
+            stats (ramble.mirror.MirrorStats): this is updated depending on whether the
                 caching operation succeeded or failed
         """
         if isinstance(self.default_fetcher, fs.BundleFetchStrategy):
@@ -546,21 +561,24 @@ class InputStage(object):
             # must examine the type of the fetcher.
             return
 
-        if (mirror.skip_unstable_versions and
-            not fs.stable_target(self.default_fetcher)):
+        if not fs.stable_target(self.default_fetcher):
             return
 
-        absolute_storage_path = os.path.join(
-            mirror.root, self.mirror_paths.storage_path)
+        absolute_storage_path = os.path.join(mirror.root, self.mirror_paths.storage_path)
 
         if os.path.exists(absolute_storage_path):
+            logger.debug(f"Already existed: {absolute_storage_path}")
             stats.already_existed(absolute_storage_path)
+            logger.debug(f"   Stats? {stats.present}")
         else:
             self.fetch()
             self.check()
-            mirror.store(
-                self.fetcher, self.mirror_paths.storage_path)
+            mirror.store(self.fetcher, self.mirror_paths.storage_path)
+            logger.debug(f"Added: {absolute_storage_path}")
             stats.added(absolute_storage_path)
+
+        if not os.path.exists(absolute_storage_path):
+            stats.error(absolute_storage_path)
 
         mirror.symlink(self.mirror_paths)
 
@@ -570,13 +588,13 @@ class InputStage(object):
         downloaded."""
         if not self.expanded:
             self.fetcher.expand()
-            tty.debug('Created stage in {0}'.format(self.path))
+            logger.debug(f"Created stage in {self.path}")
         else:
-            tty.debug('Already staged {0} in {1}'.format(self.name, self.path))
+            logger.debug(f"Already staged {self.name} in {self.path}")
 
     def restage(self):
         """Removes the expanded archive path if it exists, then re-expands
-           the archive.
+        the archive.
         """
         self.fetcher.reset()
 
@@ -603,7 +621,7 @@ class InputStage(object):
         try:
             os.getcwd()
         except OSError as e:
-            tty.debug(e)
+            logger.debug(e)
             os.chdir(os.path.dirname(self.path))
 
         # mark as destroyed
@@ -613,16 +631,16 @@ class InputStage(object):
 class ResourceStage(InputStage):
 
     def __init__(self, url_or_fetch_strategy, root, resource, **kwargs):
-        super(ResourceStage, self).__init__(url_or_fetch_strategy, **kwargs)
+        super().__init__(url_or_fetch_strategy, **kwargs)
         self.root_stage = root
         self.resource = resource
 
     def restage(self):
-        super(ResourceStage, self).restage()
+        super().restage()
         self._add_to_root_stage()
 
     def expand_archive(self):
-        super(ResourceStage, self).expand_archive()
+        super().expand_archive()
         self._add_to_root_stage()
 
     def _add_to_root_stage(self):
@@ -640,29 +658,30 @@ class ResourceStage(InputStage):
             placement = self.source_path
 
         if not isinstance(placement, dict):
-            placement = {'': placement}
+            placement = {"": placement}
 
-        target_path = os.path.join(
-            root_stage.source_path, resource.destination)
+        target_path = os.path.join(root_stage.source_path, resource.destination)
 
         try:
             os.makedirs(target_path)
         except OSError as err:
-            tty.debug(err)
+            logger.debug(err)
             if err.errno == errno.EEXIST and os.path.isdir(target_path):
                 pass
             else:
                 raise
 
-        for key, value in iteritems(placement):
+        for key, value in placement.items():
             destination_path = os.path.join(target_path, value)
             source_path = os.path.join(self.source_path, key)
 
             if not os.path.exists(destination_path):
-                tty.info('Moving resource stage\n\tsource : '
-                         '{stage}\n\tdestination : {destination}'.format(
-                             stage=source_path, destination=destination_path
-                         ))
+                logger.info(
+                    "Moving resource stage\n\tsource : "
+                    "{stage}\n\tdestination : {destination}".format(
+                        stage=source_path, destination=destination_path
+                    )
+                )
 
                 src = os.path.realpath(source_path)
 
@@ -676,15 +695,27 @@ class StageComposite(pattern.Composite):
     """Composite for Stage type objects. The first item in this composite is
     considered to be the root workload, and operations that return a value are
     forwarded to it."""
+
     #
     # __enter__ and __exit__ delegate to all stages in the composite.
     #
 
     def __init__(self):
-        super(StageComposite, self).__init__([
-            'fetch', 'create', 'created', 'check', 'expand_archive', 'restage',
-            'destroy', 'cache_local', 'cache_mirror', 'steal_source',
-            'managed_by_ramble'])
+        super().__init__(
+            [
+                "fetch",
+                "create",
+                "created",
+                "check",
+                "expand_archive",
+                "restage",
+                "destroy",
+                "cache_local",
+                "cache_mirror",
+                "steal_source",
+                "managed_by_ramble",
+            ]
+        )
 
     def __enter__(self):
         for item in self:
@@ -693,7 +724,7 @@ class StageComposite(pattern.Composite):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         for item in reversed(self):
-            item.keep = getattr(self, 'keep', False)
+            item.keep = getattr(self, "keep", False)
             item.__exit__(exc_type, exc_val, exc_tb)
 
     #
@@ -716,7 +747,7 @@ class StageComposite(pattern.Composite):
         return self[0].archive_file
 
 
-class DIYStage(object):
+class DIYStage:
     """
     Simple class that allows any directory to be a ramble input stage.
     Consequently, it does not expect or require that the source path adhere to
@@ -730,8 +761,7 @@ class DIYStage(object):
         if path is None:
             raise ValueError("Cannot construct DIYStage without a path.")
         elif not os.path.isdir(path):
-            raise StagePathError("The stage path directory does not exist:",
-                                 path)
+            raise StagePathError("The stage path directory does not exist:", path)
 
         self.archive_file = None
         self.path = path
@@ -746,13 +776,13 @@ class DIYStage(object):
         pass
 
     def fetch(self, *args, **kwargs):
-        tty.debug('No need to fetch for DIY.')
+        logger.debug("No need to fetch for DIY.")
 
     def check(self):
-        tty.debug('No checksum needed for DIY.')
+        logger.debug("No checksum needed for DIY.")
 
     def expand_archive(self):
-        tty.debug('Using source directory: {0}'.format(self.source_path))
+        logger.debug(f"Using source directory: {self.source_path}")
 
     @property
     def expanded(self):
@@ -770,19 +800,19 @@ class DIYStage(object):
         pass
 
     def cache_local(self):
-        tty.debug('Sources for DIY stages are not cached')
+        logger.debug("Sources for DIY stages are not cached")
 
 
 def ensure_access(file):
     """Ensure we can access a directory and die with an error if we can't."""
     if not can_access(file):
-        tty.die("Insufficient permissions for %s" % file)
+        logger.die(f"Insufficient permissions for {file}")
 
 
 # TODO (dwj): Need to add checksums for inputs.
 def get_checksums_for_versions(
-        url_dict, name, first_stage_function=None, keep_stage=False,
-        fetch_options=None, batch=False):
+    url_dict, name, first_stage_function=None, keep_stage=False, fetch_options=None, batch=False
+):
     """Fetches and checksums archives from URLs.
 
     This function is called by both ``ramble checksum`` and ``ramble
@@ -792,8 +822,8 @@ def get_checksums_for_versions(
 
     Args:
         url_dict (dict): A dictionary of the form: version -> URL
-        name (str): The name of the package
-        first_stage_function (callable): function that takes a Stage and a URL;
+        name (str): The name of the input
+        first_stage_function (Callable): function that takes a Stage and a URL;
             this is run on the stage of the first URL downloaded
         keep_stage (bool): whether to keep staging area when command completes
         batch (bool): whether to ask user how many versions to fetch (false)
@@ -811,35 +841,36 @@ def get_checksums_for_versions(
     max_len = max(len(str(v)) for v in sorted_versions)
     num_ver = len(sorted_versions)
 
-    tty.msg('Found {0} version{1} of {2}:'.format(
-            num_ver, '' if num_ver == 1 else 's', name),
-            '',
-            *llnl.util.lang.elide_list(
-                ['{0:{1}}  {2}'.format(str(v), max_len, url_dict[v])
-                 for v in sorted_versions]))
+    logger.msg(
+        "Found {} version{} of {}:".format(num_ver, "" if num_ver == 1 else "s", name),
+        "",
+        *llnl.util.lang.elide_list(
+            ["{0:{1}}  {2}".format(str(v), max_len, url_dict[v]) for v in sorted_versions]
+        ),
+    )
     print()
 
     if batch:
         archives_to_fetch = len(sorted_versions)
     else:
         archives_to_fetch = tty.get_number(
-            "How many would you like to checksum?", default=1, abort='q')
+            "How many would you like to checksum?", default=1, abort="q"
+        )
 
     if not archives_to_fetch:
-        tty.die("Aborted.")
+        logger.die("Aborted.")
 
     versions = sorted_versions[:archives_to_fetch]
     urls = [url_dict[v] for v in versions]
 
-    tty.debug('Downloading...')
+    logger.debug("Downloading...")
     version_hashes = []
     i = 0
     errors = []
     for url, version in zip(urls, versions):
         try:
             if fetch_options:
-                url_or_fs = fs.URLFetchStrategy(
-                    url, fetch_options=fetch_options)
+                url_or_fs = fs.URLFetchStrategy(url, fetch_options=fetch_options)
             else:
                 url_or_fs = url
             with InputStage(url_or_fs, keep=keep_stage) as stage:
@@ -851,50 +882,54 @@ def get_checksums_for_versions(
                     first_stage_function(stage, url)
 
                 # Checksum the archive and add it to the list
-                version_hashes.append((version, spack.util.crypto.checksum(
-                    hashlib.sha256, stage.archive_file)))
+                version_hashes.append(
+                    (version, spack.util.crypto.checksum(hashlib.sha256, stage.archive_file))
+                )
                 i += 1
         except FailedDownloadError:
-            errors.append('Failed to fetch {0}'.format(url))
+            errors.append(f"Failed to fetch {url}")
         except Exception as e:
-            tty.msg('Something failed on {0}, skipping.  ({1})'.format(url, e))
+            logger.msg(f"Something failed on {url}, skipping.  ({e})")
 
     for msg in errors:
-        tty.debug(msg)
+        logger.debug(msg)
 
     if not version_hashes:
-        tty.die("Could not fetch any versions for {0}".format(name))
+        logger.die(f"Could not fetch any versions for {name}")
 
     # Find length of longest string in the list for padding
     max_len = max(len(str(v)) for v, h in version_hashes)
 
     # Generate the version directives to put in a package.py
-    version_lines = "\n".join([
-        "    version('{0}', {1}sha256='{2}')".format(
-            v, ' ' * (max_len - len(str(v))), h) for v, h in version_hashes
-    ])
+    version_lines = "\n".join(
+        [
+            "    version('{}', {}sha256='{}')".format(v, " " * (max_len - len(str(v))), h)
+            for v, h in version_hashes
+        ]
+    )
 
     num_hash = len(version_hashes)
-    tty.debug('Checksummed {0} version{1} of {2}:'.format(
-              num_hash, '' if num_hash == 1 else 's', name))
+    logger.debug(
+        "Checksummed {} version{} of {}:".format(num_hash, "" if num_hash == 1 else "s", name)
+    )
 
     return version_lines
 
 
 class StageError(ramble.error.RambleError):
-    """"Superclass for all errors encountered during staging."""
+    """ "Superclass for all errors encountered during staging."""
 
 
 class StagePathError(StageError):
-    """"Error encountered with stage path."""
+    """ "Error encountered with stage path."""
 
 
 class RestageError(StageError):
-    """"Error encountered during restaging."""
+    """ "Error encountered during restaging."""
 
 
 class VersionFetchError(StageError):
-    """Raised when we can't determine a URL to fetch a package."""
+    """Raised when we can't determine a URL to fetch an input."""
 
 
 # Keep this in namespace for convenience

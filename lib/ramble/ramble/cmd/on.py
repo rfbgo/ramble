@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -6,36 +6,74 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-import sys
-
-import ramble.workspace
+import ramble.cmd.common.arguments as arguments
+import ramble.config
 import ramble.expander
+import ramble.filters
+import ramble.pipeline
+import ramble.workspace
 
-if sys.version_info >= (3, 3):
-    from collections.abc import Sequence  # novm noqa: F401
-else:
-    from collections import Sequence  # noqa: F401
-
-
-description = "And now's the time, the time is now"
-section = 'secret'
-level = 'long'
+description = '"And now\'s the time, the time is now" (execute workspace experiments)'
+section = "workspaces"
+level = "short"
 
 
 def setup_parser(subparser):
     subparser.add_argument(
-        '-w', '--workspace', metavar='workspace', dest='ramble_workspace',
-        help='name of workspace to `ramble on`',
-             required=False)
+        "--executor",
+        metavar="executor",
+        dest="executor",
+        help="execution template for each experiment",
+        required=False,
+    )
+
+    subparser.add_argument(
+        "--enable-per-experiment-prints",
+        action="store_true",
+        dest="per_experiment_prints_on",
+        help="Enable per experiment prints (phases and log paths).",
+    )
+
+    subparser.add_argument(
+        "--suppress-run-header",
+        action="store_true",
+        dest="run_header_off",
+        help="Disable the logger header.",
+    )
+
+    arguments.add_common_arguments(subparser, ["where", "exclude_where", "filter_tags"])
 
 
 def ramble_on(args):
-    ws = ramble.cmd.require_active_workspace(cmd_name='workspace info')
+    current_pipeline = ramble.pipeline.pipelines.execute
+    ws = ramble.cmd.require_active_workspace(cmd_name="on")
 
-    with ws.write_transaction():
-        ws.run_experiments()
+    executor = args.executor if args.executor else "{batch_submit}"
+
+    filters = ramble.filters.Filters(
+        phase_filters=["*"],
+        include_where_filters=args.where,
+        exclude_where_filters=args.exclude_where,
+        tags=args.filter_tags,
+    )
+
+    debug = ramble.config.get("config:debug")
+    suppress_per_experiment_prints = not debug and not args.per_experiment_prints_on
+    suppress_run_header = not debug and args.run_header_off
+
+    pipeline_cls = ramble.pipeline.pipeline_class(current_pipeline)
+    pipeline = pipeline_cls(
+        ws,
+        filters,
+        executor=executor,
+        suppress_per_experiment_prints=suppress_per_experiment_prints,
+        suppress_run_header=suppress_run_header,
+    )
+
+    with ws.read_transaction():
+        pipeline.run()
 
 
 def on(parser, args):
-    """Look for a function called environment_<name> and call it."""
+    """Execute `ramble_on` command"""
     ramble_on(args)

@@ -1,4 +1,4 @@
-# Copyright 2022 Google LLC
+# Copyright 2022-2025 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -7,150 +7,74 @@
 # except according to those terms.
 
 from ramble.appkit import *
+from ramble.base_app.builtin.openfoam import Openfoam as OpenfoamBase
 
 
-class Openfoam(SpackApplication):
-    '''Define the Openfoam application'''
-    name = 'openfoam'
+class Openfoam(OpenfoamBase):
+    """Define the Openfoam application"""
 
-    tags = ['cfd', 'fluid', 'dynamics']
+    name = "openfoam"
 
-    default_compiler('gcc9', base='gcc', version='9.3.0')
-    mpi_library('ompi412', base='openmpi', version='4.1.2',
-                variants='+legacylaunchers +pmi +thread_multiple +cxx')
+    maintainers("douglasjacobsen")
 
-    software_spec('flex', base='flex', version='2.6.4', compiler='gcc9')
-    software_spec('openfoam', base='openfoam-org', version='7', compiler='gcc9',
-                  mpi='ompi412', dependencies=['flex'])
+    with when("package_manager_family=spack"):
+        define_compiler("gcc9", pkg_spec="gcc@9.3.0")
 
-    workload('motorbike', executables=['get_inputs', 'configure', 'serial_decompose',
-                                       'snappyHexMesh', 'patchSummary', 'potentialFoam',
-                                       'simpleFoam', 'reconstructParMesh', 'reconstructPar'])
+        software_spec("impi2018", pkg_spec="intel-mpi@2018.4.274")
 
-    workload_variable('input_path', default='$FOAM_TUTORIALS/incompressible/simpleFoam/motorBike',
-                      description='Path to the tutorial input',
-                      workload='motorbike')
-    workload_variable('geometry_path', default='$FOAM_TUTORIALS/resources/geometry/motorBike.obj.gz',
-                      description='Path to the geometry resource',
-                      workload='motorbike')
-    workload_variable('decomposition_path', default='system/decomposeParDict*',
-                      description='Path to decomposition files',
-                      workloads=['hpc_motorbike', 'motorbike'])
-    workload_variable('control_path', default='system/controlDict',
-                      description='Path to control file',
-                      workloads=['hpc_motorbike', 'motorbike'])
-    workload_variable('block_mesh_path', default='system/blockMeshDict',
-                      description='Path to block mesh file',
-                      workloads=['hpc_motorike', 'motorbike'])
-    workload_variable('hex_mesh_path', default='system/snappyHexMeshDict',
-                      description='Path to hexh mesh file',
-                      workloads=['hpc_motorbike', 'motorbike'])
+        software_spec(
+            "openfoam",
+            pkg_spec="openfoam@2312",
+            compiler="gcc9",
+        )
 
-    workload_variable('timestep', default='500',
-                      description='Timestep for simulation',
-                      workload='motorbike')
-    workload_variable('mesh_size', default='(20 8 8)',
-                      description='Timestep for simulation',
-                      workload='motorbike')
-    workload_variable('mesh_size', default='(50 20 20)',
-                      description='Timestep for simulation',
-                      workload='hpc_motorbike')
-    workload_variable('max_local_cells', default='100000',
-                      description='Max local cells for simulation',
-                      workload='motorbike')
-    workload_variable('max_local_cells', default='10000000',
-                      description='Max local cells for simulation',
-                      workload='hpc_motorbike')
-    workload_variable('max_global_cells', default='200000',
-                      description='Max global cells for simulation',
-                      workload='motorbike')
-    workload_variable('max_global_cells', default='200000000',
-                      description='Max global cells for simulation',
-                      workload='hpc_motorbike')
+        required_package("openfoam")
 
-    workload_variable('hex_flags', default='-overwrite -parallel',
-                      description='Flags for snappyHexMesh',
-                      workloads=['hpc_motorbike', 'motorbike'])
-    workload_variable('potential_flags', default='-parallel',
-                      description='Flags for potentialFoam',
-                      workloads=['hpc_motorbike', 'motorbike'])
-    workload_variable('simple_flags', default='-parallel',
-                      description='Flags for simpleFoam',
-                      workloads=['hpc_motorbike', 'motorbike'])
+    executable(
+        "surfaceFeatures",
+        "surfaceFeatureExtract",
+        use_mpi=False,
+        redirect="{experiment_run_dir}/log.surfaceFeatures",
+    )
 
-    workload('hpc_motorbike', executables=['build_mesh', 'allRun'],
-             input='hpc_motorbike')
-    workload_variable('size', default='Large',
-                      description='Size of HPC motorbike workload. Can be Large, Medium, or Small.',
-                      workload='hpc_motorbike')
-    workload_variable('input_version', default='v1912',
-                      description='Version of Openfoam the input was made for. Options are v8 and v1912.',
-                      workload='hpc_motorbike')
-    workload_variable('input_path', default='{hpc_motorbike}/HPC_motorbike/{size}/{input_version}',
-                      description='Path to the HPC_motorbike input',
-                      workload='hpc_motorbike')
+    executable(
+        "get_inputs",
+        template=[
+            "cp -Lr {input_path}/* {experiment_run_dir}/.",
+            "mkdir -p constant/triSurface",
+            "mkdir -p constant/geometry",
+            "cp {geometry_path} constant/triSurface/.",
+            "cp {geometry_path} constant/geometry/.",
+            "cp system/decomposeParDict.* system/decomposeParDict",
+            "ln -sf {experiment_run_dir}/0.orig {experiment_run_dir}/0",
+        ],
+        use_mpi=False,
+    )
 
-    input_file('hpc_motorbike',
-               url='https://develop.openfoam.com/committees/hpc/-/archive/develop/hpc-develop.tar.gz',
-               description='HPC Benchmarking version of the Motorbike input')
+    workload_variable(
+        "dict_delim",
+        description="Delimiter for dictionary entries",
+        default=".",
+        workloads=["motorbike*"],
+    )
 
-    executable('get_inputs', template=['cp -R {input_path}/* {experiment_run_dir}/.',
-                                       'mkdir -p constant/triSurface',
-                                       'mkdir -p constant/geometry',
-                                       'cp {geometry_path} constant/triSurface/.',
-                                       'cp {geometry_path} constant/geometry/.'],
-               use_mpi=False)
+    workload_variable(
+        "coeffs_dict",
+        description="Coeffs dictionary name",
+        default="coeffs",
+        workloads=["motorbike*"],
+    )
 
-    executable('build_mesh', template=['cp -R {input_path}/* {experiment_run_dir}/.',
-                                       'sed "/^numberOfSubdomains/ c\\numberOfSubdomains {n_ranks};" -i {decomposition_path}',
-                                       'chmod a+x All*',
-                                       'mv Allmesh* Allmesh',
-                                       './Allmesh'],
-               use_mpi=False)
-
-    executable('configure', template=['sed "/^numberOfSubdomains/ c\\numberOfSubdomains {n_ranks};" -i {decomposition_path}',
-                                      'sed "/^method/c\\method          scotch;" -i {decomposition_path}',
-                                      'sed "/^endTime/c\\endTime {timestep};" -i {control_path}',
-                                      'sed "/^writeInterval/c\\writeInterval {timestep};" -i {control_path}',
-                                      'sed "s/(20 8 8)/{mesh_size}/" -i {block_mesh_path}',
-                                      'sed "s/maxLocalCells 100000/maxLocalCells {max_local_cells}/" -i {hex_mesh_path}',
-                                      'sed "s/maxGlobalCells 2000000/maxGlobalCells {max_global_cells}/" -i {hex_mesh_path}',
-                                      'ln -s 0.orig 0'],
-               use_mpi=False)
-
-    executable('serial_decompose', template=['surfaceFeatures',
-                                             'blockMesh',
-                                             'decomposePar -copyZero'],
-               use_mpi=False)
-
-    executable('snappyHexMesh', 'snappyHexMesh {hex_flags}', use_mpi=True,
-               redirect='{experiment_run_dir}/log.snappyHexMesh')
-    executable('patchSummary', 'patchSummary', use_mpi=True,
-               redirect='{experiment_run_dir}/log.patchSummary')
-    executable('potentialFoam', 'potentialFoam {potential_flags}', use_mpi=True,
-               redirect='{experiment_run_dir}/log.potentialFoam')
-    executable('simpleFoam', 'simpleFoam {simple_flags}', use_mpi=True,
-               redirect='{experiment_run_dir}/log.simpleFoam')
-
-    executable('reconstructParMesh', 'reconstructParMesh -constant', use_mpi=False,
-               redirect='{experiment_run_dir}/log.reconstructParMesh')
-    executable('reconstructPar', 'reconstructPar -latestTime', use_mpi=False,
-               redirect='{experiment_run_dir}/log.reconstructPar')
-
-    executable('allRun', template=['sed "s/writephi/writePhi/g" -i Allrun',
-                                   'sed "s/rm.*log\./#/g" -i Allclean',
-                                   'chmod a+x Allrun',
-                                   './Allrun'],
-               use_mpi=False)
-
-    figure_of_merit('snappyHexMesh Time', log_file='{experiment_run_dir}/log.snappyHexMesh',
-                    fom_regex='Finished meshing in = (?P<mesh_time>[0-9]+\.?[0-9]*).*',
-                    group_name='mesh_time', units='s')
-
-    figure_of_merit('simpleFoam Time', log_file='{experiment_run_dir}/log.simpleFoam',
-                    fom_regex='\s*ExecutionTime = (?P<foam_time>[0-9]+\.?[0-9]*).*',
-                    group_name='foam_time', units='s')
-
-    figure_of_merit('potentialFoam Time', log_file='{experiment_run_dir}/log.potentialFoam',
-                    fom_regex='\s*ExecutionTime = (?P<foam_time>[0-9]+\.?[0-9]*).*',
-                    group_name='foam_time', units='s')
+    workload_variable(
+        "export_variables",
+        description="Comma separated list of all env-var names that need to be exported",
+        default="PATH,LD_LIBRARY_PATH,FOAM_API,FOAM_APP,FOAM_APPBIN,FOAM_ETC,"
+        + "FOAM_LIBBIN,FOAM_MPI,FOAM_RUN,FOAM_SITE_APPBIN,FOAM_SITE_LIBBIN,"
+        + "FOAM_SOLVERS,FOAM_SRC,FOAM_TUTORIALS,FOAM_USER_APPBIN,"
+        + "FOAM_USER_LIBBIN,FOAM_UTILITIES,LD_LIBRARY_PATH,PATH,"
+        + "WM_ARCH,WM_COMPILER,WM_COMPILER_LIB_ARCH,WM_COMPILER_TYPE,"
+        + "WM_COMPILE_OPTION,WM_DIR,WM_LABEL_OPTION,WM_LABEL_SIZE,"
+        + "WM_MPLIB,WM_OPTIONS,WM_PRECISION_OPTION,WM_PROJECT,WM_PROJECT_DIR,"
+        + "WM_PROJECT_USER_DIR,WM_PROJECT_VERSION,WM_THIRD_PARTY_DIR",
+        workloads=["*"],
+    )

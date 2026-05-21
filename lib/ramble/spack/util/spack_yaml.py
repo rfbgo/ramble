@@ -14,12 +14,12 @@
 """
 import collections
 import ctypes
+import io
 import re
 from typing import List  # novm
 
 import ruamel.yaml as yaml
 from ruamel.yaml import RoundTripDumper, RoundTripLoader
-from six import StringIO, string_types
 
 from llnl.util.compat import Mapping
 from llnl.util.tty.color import cextra, clen, colorize
@@ -52,7 +52,7 @@ class syaml_int(int):
 
 #: mapping from syaml type -> primitive type
 syaml_types = {
-    syaml_str: string_types,
+    syaml_str: str,
     syaml_int: int,
     syaml_dict: dict,
     syaml_list: list,
@@ -186,6 +186,8 @@ class OrderedLineDumper(RoundTripDumper):
     def represent_str(self, data):
         if hasattr(data, 'override') and data.override:
             data = data + ':'
+        if len(data.splitlines()) > 1:
+            return super(OrderedLineDumper, self).represent_scalar('tag:yaml.org,2002:str', data, style='|')
         return super(OrderedLineDumper, self).represent_str(data)
 
 
@@ -208,9 +210,9 @@ OrderedLineDumper.add_representer(syaml_str, OrderedLineDumper.represent_str)
 maxint = 2 ** (ctypes.sizeof(ctypes.c_int) * 8 - 1) - 1
 
 
-def dump(obj, default_flow_style=False, stream=None):
+def dump(obj, default_flow_style=False, stream=None, Dumper=SafeDumper):
     return yaml.dump(obj, default_flow_style=default_flow_style, width=maxint,
-                     Dumper=SafeDumper, stream=stream)
+                     Dumper=Dumper, stream=stream)
 
 
 def file_line(mark):
@@ -262,7 +264,7 @@ class LineAnnotationDumper(OrderedLineDumper):
         result = super(LineAnnotationDumper, self).represent_data(data)
         if data is None:
             result.value = syaml_str("null")
-        elif isinstance(result.value, string_types):
+        elif isinstance(result.value, str):
             result.value = syaml_str(data)
         if markable(result.value):
             mark(result.value, data)
@@ -317,7 +319,7 @@ def dump_config(*args, **kwargs):
 def dump_annotated(data, stream=None, *args, **kwargs):
     kwargs['Dumper'] = LineAnnotationDumper
 
-    sio = StringIO()
+    sio = io.StringIO()
     yaml.dump(data, sio, *args, **kwargs)
 
     # write_line_break() is not called by YAML for empty lines, so we
@@ -326,7 +328,7 @@ def dump_annotated(data, stream=None, *args, **kwargs):
 
     getvalue = None
     if stream is None:
-        stream = StringIO()
+        stream = io.StringIO()
         getvalue = stream.getvalue
 
     # write out annotations and lines, accounting for color

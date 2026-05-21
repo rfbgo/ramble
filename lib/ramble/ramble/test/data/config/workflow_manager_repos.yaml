@@ -1,0 +1,2 @@
+workflow_manager_repos:
+  - $ramble/var/ramble/repos/builtin

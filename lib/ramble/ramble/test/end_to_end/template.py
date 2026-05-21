@@ -1,0 +1,200 @@
+# Copyright 2022-2025 The Ramble Authors
+#
+# Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+# https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+# <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your
+# option. This file may not be copied, modified, or distributed
+# except according to those terms.
+
+import os
+
+import pytest
+
+import ramble.workspace
+from ramble.application import ApplicationError
+from ramble.main import RambleCommand
+from ramble.util import constants
+
+pytestmark = pytest.mark.usefixtures(
+    "mutable_config", "mutable_mock_workspace_path", "mutable_mock_apps_repo"
+)
+
+workspace = RambleCommand("workspace")
+
+
+def test_template():
+    test_config = """
+ramble:
+  variables:
+    mpi_command: mpirun -n {n_ranks}
+    batch_submit: 'batch_submit {execute_experiment}'
+    processes_per_node: 1
+  applications:
+    template:
+      workloads:
+        test_template:
+          experiments:
+            test:
+              variables:
+                n_nodes: 1
+                hello_name: santa
+"""
+    workspace_name = "test_template"
+    ws = ramble.workspace.create(workspace_name)
+    ws.write()
+    config_path = os.path.join(ws.config_dir, ramble.workspace.config_file_name)
+    with open(config_path, "w+") as f:
+        f.write(test_config)
+    ws._re_read()
+
+    workspace("setup", "--dry-run", global_args=["-w", workspace_name])
+    run_dir = os.path.join(ws.experiment_dir, "template/test_template/test/")
+    script_path = os.path.join(run_dir, "bar.sh")
+    assert os.path.isfile(script_path)
+    with open(script_path) as f:
+        content = f.read()
+        assert "echo foobar" in content
+        assert "echo hello santa" in content
+        assert "echo not_exist" not in content
+    execute_path = os.path.join(run_dir, "execute_experiment")
+    script2_path = os.path.join(ws.shared_dir, "script.sh")
+    script3_path = os.path.join(run_dir, "expansion_script.sh")
+    script4_path = os.path.join(run_dir, "bar")
+    with open(execute_path) as f:
+        content = f.read()
+        assert script_path in content
+        # The workspace path should be expanded
+        assert "$workspace_shared" not in content
+        assert script2_path in content
+        assert script3_path in content
+    assert os.path.isfile(script2_path)
+    assert os.path.isfile(script3_path)
+    assert os.path.isfile(script4_path)
+
+    # Test template archival
+    workspace("archive", global_args=["-w", workspace_name])
+    exp_archive_path = os.path.join(
+        ws.latest_archive_path, "experiments", "template", "test_template", "test"
+    )
+    files = os.listdir(exp_archive_path)
+    assert "bar.sh" in files
+    assert "script.sh" in files
+
+
+def test_template_inherited():
+    test_config = """
+ramble:
+  variables:
+    mpi_command: mpirun -n {n_ranks}
+    batch_submit: 'batch_submit {execute_experiment}'
+    processes_per_node: 1
+    n_nodes: 1
+  applications:
+    template-inherited:
+      workloads:
+        test_template:
+          experiments:
+            test: {}
+"""
+    workspace_name = "test_template_inherited"
+    ws = ramble.workspace.create(workspace_name)
+    ws.write()
+    config_path = os.path.join(ws.config_dir, ramble.workspace.config_file_name)
+    with open(config_path, "w+") as f:
+        f.write(test_config)
+    ws._re_read()
+
+    workspace("setup", "--dry-run", global_args=["-w", workspace_name])
+    run_dir = os.path.join(ws.experiment_dir, "template-inherited/test_template/test/")
+    script_path = os.path.join(run_dir, "bar.sh")
+    assert os.path.isfile(script_path)
+    with open(script_path) as f:
+        content = f.read()
+        assert "echo hello world-inherited" in content
+    execute_path = os.path.join(run_dir, "execute_experiment")
+    with open(execute_path) as f:
+        content = f.read()
+        assert script_path in content
+
+    script_path = os.path.join(ws.shared_dir, "script.sh")
+    assert os.path.isfile(script_path)
+
+
+def test_executable_templates_no_trailing_spaces(mutable_mock_apps_repo):
+    test_config = """
+ramble:
+  variables:
+    mpi_command: mpirun -n {n_ranks}
+    batch_submit: 'batch_submit {execute_experiment}'
+    processes_per_node: 1
+  applications:
+    basic:
+      workloads:
+        template_wl:
+          experiments:
+            test:
+              variables:
+                n_ranks: '1'
+  software:
+    packages: {}
+    environments: {}
+"""
+    workspace_name = "test_executable_templates_no_trailing_spaces"
+    ws = ramble.workspace.create(workspace_name)
+    ws.write()
+    config_path = os.path.join(ws.config_dir, ramble.workspace.config_file_name)
+    with open(config_path, "w+") as f:
+        f.write(test_config)
+    ws._re_read()
+
+    workspace("setup", "--dry-run", global_args=["-w", workspace_name])
+    run_dir = os.path.join(ws.experiment_dir, "basic/template_wl/test/")
+    execute_path = os.path.join(run_dir, "execute_experiment")
+
+    with open(execute_path) as f:
+        content = f.read()
+        assert "EOF" in content
+        assert "EOF " not in content
+
+
+def test_template_wrong_extension(mutable_mock_apps_repo):
+    template_src_name = "template_wrong_extension.sh"
+    ext = constants.TEMPLATE_EXTENSION
+    test_config = f"""
+ramble:
+  variables:
+    mpi_command: mpirun -n {{n_ranks}}
+    batch_submit: 'batch_submit {{execute_experiment}}'
+    processes_per_node: 1
+    n_nodes: 1
+    src_script_path: $workspace_configs/{template_src_name}
+  applications:
+    template:
+      workloads:
+        test_template:
+          experiments:
+            test: {{}}
+"""
+    workspace_name = "test_template_wrong_extension"
+    ws = ramble.workspace.create(workspace_name)
+    ws.write()
+    config_path = os.path.join(ws.config_dir, ramble.workspace.config_file_name)
+    with open(config_path, "w+") as f:
+        f.write(test_config)
+    ws._re_read()
+
+    # Create a template file without the correct extension
+    open(os.path.join(ws.config_dir, template_src_name), "w")
+
+    with pytest.raises(
+        ApplicationError,
+        match=f"Template file .*template_wrong_extension.sh{ext} does not exist",
+    ):
+        workspace("setup", "--dry-run", global_args=["-w", workspace_name])
+
+    # It should pick up the correctly named template
+    open(os.path.join(ws.config_dir, template_src_name + ext), "w")
+    workspace("setup", "--dry-run", global_args=["-w", workspace_name])
+    assert os.path.isfile(
+        os.path.join(ws.experiment_dir, f"template/test_template/test/{template_src_name}")
+    )
