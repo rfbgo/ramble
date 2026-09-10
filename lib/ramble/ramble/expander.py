@@ -228,6 +228,20 @@ supported_list_function_pointers = {
 }
 
 
+def is_dynamic_list_expression(val) -> bool:
+    """Check if a variable value is an unexpanded call to a supported list function.
+
+    Returns True if val is a string matching a call to any function registered in
+    `supported_list_function_pointers`.
+    """
+    if not isinstance(val, str):
+        return False
+    if not supported_list_function_pointers:
+        return False
+    func_names = "|".join(re.escape(fn) for fn in supported_list_function_pointers)
+    return bool(re.search(rf"\b(?:{func_names})\s*\(", val))
+
+
 supported_modules = {
     "math": math,
 }

@@ -468,6 +468,15 @@ class Renderer:
         # Also expand all variables that generate lists
         object_variables = self._expand_variables(variables, expander)
 
+        if render_group.object == "experiment":
+            has_dynamic_ranges = any(
+                ramble.expander.is_dynamic_list_expression(val)
+                for val in object_variables.values()
+            )
+            if has_dynamic_ranges:
+                yield object_variables, ramble.repeats.Repeats()
+                return
+
         # Expand zip and matrix members to allow indirections like
         # ```
         # variables:

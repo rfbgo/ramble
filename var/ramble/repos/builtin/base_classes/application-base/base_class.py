@@ -259,6 +259,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
         # A dict storing fom values, currently it only stores inmem FOMs
         self._fom_map = {}
         self._template_paths_defined = False
+        self._dynamic_range_variables = None
 
         # Ensure we always have the application name, and this is never empty
         self._file_path = file_path
@@ -730,6 +731,7 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
         self.expander = ramble.expander.Expander(
             self.variables, self.experiment_set
         )
+        self._dynamic_range_variables = None
 
         # Set application version or use preferred version if none specified
         _, _, maybe_version = self.expander.application_spec.partition("@")
@@ -892,14 +894,72 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
         for key in remove_keys:
             cleaned_variables.pop(key, None)
 
-        for template_name, _ in workspace.all_templates():
-            cleaned_variables.pop(template_name, None)
+        if workspace:
+            for template_name, _ in workspace.all_templates():
+                cleaned_variables.pop(template_name, None)
 
         for _, tpl_configs in self._object_templates():
             for tpl_config in tpl_configs:
                 cleaned_variables.pop(tpl_config["var_name"], None)
 
         return cleaned_variables
+
+    @property
+    def has_dynamic_range_variables(self) -> bool:
+        """Check if any variables define dynamic ranges that evaluate to lists."""
+        return bool(self.dynamic_range_variables())
+
+    def dynamic_range_variables(self) -> Dict[str, list]:
+        """Identify any variables defined as dynamic ranges that can now be evaluated into lists.
+
+        Returns:
+            dict: Mapping of variable name to evaluated list
+        """
+        if self._dynamic_range_variables is None:
+            ranges = {}
+            for var, val in self.variables.items():
+                if ramble.expander.is_dynamic_list_expression(val):
+                    try:
+                        expanded = self.expander.expand_var(val, typed=True)
+                        if isinstance(expanded, list):
+                            ranges[var] = expanded
+                    except Exception:
+                        pass
+            self._dynamic_range_variables = ranges
+        return self._dynamic_range_variables
+
+    def render_range_experiments(
+        self,
+        experiment_context,
+        warn_validation=True,
+        die_on_validate_error=True,
+        chained=False,
+    ) -> list:
+        """Render range experiments using the finalized variables.
+
+        Args:
+            experiment_context (ramble.context.Context): Context object for the experiment
+            warn_validation (bool): Whether validation warnings should print
+            die_on_validate_error (bool): Whether validation errors should be fatal
+            chained (bool): Whether the experiments are chained experiments or not
+
+        Returns:
+            list: List of application instances from the rendered set of experiments
+        """
+        ranges = self.dynamic_range_variables()
+        if not ranges:
+            return []
+
+        sub_context = copy.deepcopy(experiment_context)
+        for range_var, range_list in ranges.items():
+            sub_context.variables[range_var] = range_list
+
+        return self.experiment_set.set_experiment_context(
+            sub_context,
+            warn_validation=warn_validation,
+            die_on_validate_error=die_on_validate_error,
+            chained=chained,
+        )
 
     def register_missing_command_variable(self, var):
         """Register a missing command variable, so we can report it later in
