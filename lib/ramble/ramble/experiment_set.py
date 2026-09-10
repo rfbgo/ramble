@@ -685,7 +685,7 @@ class ExperimentSet:
             try:
                 for dyn_inst in all_dynamic_range_experiments:
                     range_rendered = dyn_inst.render_range_experiments(
-                        self._context[self._contexts.experiment],
+                        saved_contexts[self._contexts.experiment],
                         warn_validation=warn_validation,
                         die_on_validate_error=die_on_validate_error,
                         chained=chained,

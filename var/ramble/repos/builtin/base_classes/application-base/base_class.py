@@ -951,8 +951,45 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
             return []
 
         sub_context = copy.deepcopy(experiment_context)
+        # Propagate any variables that were resolved to scalars in this seed instance
+        for var_name, var_val in self.variables.items():
+            if var_name in sub_context.variables and not isinstance(
+                var_val, list
+            ):
+                sub_context.variables[var_name] = var_val
+
         for range_var, range_list in ranges.items():
             sub_context.variables[range_var] = range_list
+
+        # Remove any variables from matrices that became scalars in this seed
+        if sub_context.matrices:
+            new_matrices = []
+            for mat in sub_context.matrices:
+                new_mat = [
+                    v
+                    for v in mat
+                    if isinstance(sub_context.variables.get(v), list)
+                ]
+                if len(new_mat) > 1:
+                    new_matrices.append(new_mat)
+                elif len(new_mat) == 1 and isinstance(
+                    sub_context.variables.get(new_mat[0]), list
+                ):
+                    new_matrices.append(new_mat)
+            sub_context.matrices = new_matrices
+
+        # Remove any variables from zips that became scalars in this seed
+        if sub_context.zips:
+            new_zips = {}
+            for z_name, z_vars in sub_context.zips.items():
+                new_z = [
+                    v
+                    for v in z_vars
+                    if isinstance(sub_context.variables.get(v), list)
+                ]
+                if len(new_z) > 1:
+                    new_zips[z_name] = new_z
+            sub_context.zips = new_zips
 
         return self.experiment_set.set_experiment_context(
             sub_context,

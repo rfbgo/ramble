@@ -228,9 +228,9 @@ def pow2_range(start, stop=None, inclusive=True):
 
     Args:
         start (int): Starting value (if stop is provided), or stop value (if stop is None).
-        stop (int, optional): Ending value. If None, start is treated as stop,
-                              and sequence starts at 1.
-        inclusive (bool, optional): Whether stop is inclusive. Defaults to True.
+        stop (int): Optional ending value. If None, start is treated as stop,
+            and sequence starts at 1.
+        inclusive (bool): Whether stop is inclusive. Defaults to True.
 
     Returns:
         list[int]: Sequence of doubling values / powers of 2.

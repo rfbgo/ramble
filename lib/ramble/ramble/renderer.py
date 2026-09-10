@@ -7,6 +7,7 @@
 # except according to those terms.
 
 import itertools
+import re
 
 import ramble.expander
 import ramble.repeats
@@ -469,12 +470,59 @@ class Renderer:
         object_variables = self._expand_variables(variables, expander)
 
         if render_group.object == "experiment":
-            has_dynamic_ranges = any(
-                ramble.expander.is_dynamic_list_expression(val)
-                for val in object_variables.values()
-            )
-            if has_dynamic_ranges:
-                yield object_variables, ramble.repeats.Repeats()
+            dynamic_list_vars = {
+                k: v
+                for k, v in object_variables.items()
+                if ramble.expander.is_dynamic_list_expression(v)
+            }
+            if dynamic_list_vars:
+                dependent_vector_vars = set()
+                for val in dynamic_list_vars.values():
+                    for var_ref in re.findall(r"\{\s*([a-zA-Z_][a-zA-Z0-9_\.]*)", val):
+                        if var_ref in object_variables and isinstance(
+                            object_variables[var_ref], list
+                        ):
+                            dependent_vector_vars.add(var_ref)
+
+                if not dependent_vector_vars:
+                    yield object_variables, ramble.repeats.Repeats()
+                    return
+
+                # If dynamic ranges depend on vectors, expand those vectors first
+                # to produce separate seed instances for each vector value.
+                static_vars = {
+                    k: v for k, v in object_variables.items() if k not in dynamic_list_vars
+                }
+                sub_group = RenderGroup(render_group.object, render_group.action)
+                sub_group.variables = static_vars
+                # Filter out dynamic list variables from matrices
+                sub_matrices = []
+                for mat in render_group.matrices:
+                    filtered_mat = [v for v in mat if v not in dynamic_list_vars]
+                    if len(filtered_mat) > 1:
+                        sub_matrices.append(filtered_mat)
+                    elif len(filtered_mat) == 1 and isinstance(
+                        static_vars.get(filtered_mat[0]), list
+                    ):
+                        sub_matrices.append(filtered_mat)
+                sub_group.matrices = sub_matrices
+
+                # Filter out dynamic list variables from zips
+                sub_zips = {}
+                for z_name, z_vars in render_group.zips.items():
+                    filtered_z = [v for v in z_vars if v not in dynamic_list_vars]
+                    if len(filtered_z) > 1:
+                        sub_zips[z_name] = filtered_z
+                sub_group.zips = sub_zips
+                sub_group.n_repeats = 1
+                sub_group.used_variables = render_group.used_variables.union(dependent_vector_vars)
+
+                for rendered_static_vars, _ in self.render_objects(
+                    sub_group, ignore_used=ignore_used, fatal=fatal
+                ):
+                    seed_vars = rendered_static_vars.copy()
+                    seed_vars.update(dynamic_list_vars)
+                    yield seed_vars, ramble.repeats.Repeats()
                 return
 
         # Expand zip and matrix members to allow indirections like
