@@ -348,6 +348,9 @@ class ExperimentSet:
     ):
         app_inst = self._setup_experiment_minimal(workload_template_name, variables, context)
 
+        if getattr(app_inst, "has_dynamic_range_variables", False):
+            return set()
+
         # The `_get_used_variables` is only called for the base experiment,
         # so no need to consider repeat suffix.
         exp_name = app_inst.expander.expand_var(exp_template_name, allow_passthrough=False)
@@ -685,7 +688,7 @@ class ExperimentSet:
             try:
                 for dyn_inst in all_dynamic_range_experiments:
                     range_rendered = dyn_inst.render_range_experiments(
-                        self._context[self._contexts.experiment],
+                        saved_contexts[self._contexts.experiment],
                         warn_validation=warn_validation,
                         die_on_validate_error=die_on_validate_error,
                         chained=chained,

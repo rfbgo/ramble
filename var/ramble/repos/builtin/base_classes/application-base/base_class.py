@@ -906,8 +906,21 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
 
     @property
     def has_dynamic_range_variables(self) -> bool:
-        """Check if any variables define dynamic ranges that evaluate to lists."""
-        return bool(self.dynamic_range_variables())
+        """Check if any variables define dynamic ranges that evaluate to lists or depend on vectors."""
+        if self.dynamic_range_variables():
+            return True
+        dyn_vars = {
+            var: val
+            for var, val in self.variables.items()
+            if ramble.expander.is_dynamic_list_expression(val)
+        }
+        if not dyn_vars:
+            return False
+        return bool(
+            ramble.expander.find_dependent_vector_vars(
+                dyn_vars, self.variables, self.expander
+            )
+        )
 
     def dynamic_range_variables(self) -> Dict[str, list]:
         """Identify any variables defined as dynamic ranges that can now be evaluated into lists.
@@ -947,12 +960,79 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
             list: List of application instances from the rendered set of experiments
         """
         ranges = self.dynamic_range_variables()
+        sub_context = copy.deepcopy(experiment_context)
         if not ranges:
+            dyn_vars = {
+                var: val
+                for var, val in self.variables.items()
+                if ramble.expander.is_dynamic_list_expression(val)
+            }
+            if dyn_vars:
+                added = False
+                for var_name, var_val in self.variables.items():
+                    if (
+                        var_name not in sub_context.variables
+                        and var_val is not None
+                    ):
+                        sub_context.variables[var_name] = var_val
+                        added = True
+                if added:
+                    return self.experiment_set.set_experiment_context(
+                        sub_context,
+                        warn_validation=warn_validation,
+                        die_on_validate_error=die_on_validate_error,
+                        chained=chained,
+                    )
             return []
 
-        sub_context = copy.deepcopy(experiment_context)
+        matrix_and_zip_vars = set()
+        if sub_context.matrices:
+            for mat in sub_context.matrices:
+                matrix_and_zip_vars.update(mat)
+        if sub_context.zips:
+            for z_vars in sub_context.zips.values():
+                matrix_and_zip_vars.update(z_vars)
+
+        # Propagate any variables that were resolved to scalars in this seed instance
+        for var_name, var_val in self.variables.items():
+            if (
+                var_name in sub_context.variables
+                or var_name in matrix_and_zip_vars
+            ) and not isinstance(var_val, list):
+                sub_context.variables[var_name] = var_val
+
         for range_var, range_list in ranges.items():
             sub_context.variables[range_var] = range_list
+
+        effective_vars = self.variables.copy()
+        effective_vars.update(sub_context.variables)
+
+        # Remove any variables from zips that became scalars in this seed
+        if sub_context.zips:
+            new_zips = {}
+            for z_name, z_vars in sub_context.zips.items():
+                new_z = [
+                    v
+                    for v in z_vars
+                    if isinstance(effective_vars.get(v), list)
+                ]
+                if len(new_z) > 1:
+                    new_zips[z_name] = new_z
+            sub_context.zips = new_zips
+
+        # Remove any variables from matrices that became scalars in this seed
+        if sub_context.matrices:
+            new_matrices = []
+            for mat in sub_context.matrices:
+                new_mat = [
+                    v
+                    for v in mat
+                    if isinstance(effective_vars.get(v), list)
+                    or (sub_context.zips and v in sub_context.zips)
+                ]
+                if len(new_mat) >= 1:
+                    new_matrices.append(new_mat)
+            sub_context.matrices = new_matrices
 
         return self.experiment_set.set_experiment_context(
             sub_context,
@@ -2288,11 +2368,14 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                             n_nodes = self.expander.expand_var_name(
                                 self.keywords.n_nodes
                             )
-                            n_nodes = (
-                                1
-                                if n_nodes in ("{n_nodes}", None, "")
-                                else int(n_nodes)
-                            )
+                            try:
+                                n_nodes = (
+                                    1
+                                    if n_nodes in ("{n_nodes}", None, "")
+                                    else int(n_nodes)
+                                )
+                            except (ValueError, TypeError):
+                                n_nodes = 1
                             if not raw_mpi_cmd and n_nodes > 1:
                                 logger.warn(
                                     f"Command {cmd_conf.name} requires a non-empty `mpi_command` "
@@ -4737,9 +4820,14 @@ class ApplicationBase(ObjectMixin, metaclass=ApplicationMeta):
                 value = None
                 # If two variables are defined, use the formula to compute the missing ones.
                 if len(mpi_vars_defined) >= 2:
-                    value = self.expander.expand_var(
+                    val = self.expander.expand_var(
                         formula, allow_passthrough=False
                     )
+                    try:
+                        int(val)
+                        value = val
+                    except (ValueError, TypeError):
+                        value = None
                 # If there is not enough information to use the formulas, or they are not required.
                 # Set missing vars to 0
                 elif not mpi_required:
