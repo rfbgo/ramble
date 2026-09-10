@@ -223,8 +223,47 @@ supported_scalar_function_with_self_arg_pointers = {
 }
 
 
+def pow2_range(start, stop=None, inclusive=True):
+    """Generate a sequence of numbers by doubling from start up to stop.
+
+    Args:
+        start (int): Starting value (if stop is provided), or stop value (if stop is None).
+        stop (int, optional): Ending value. If None, start is treated as stop,
+                              and sequence starts at 1.
+        inclusive (bool, optional): Whether stop is inclusive. Defaults to True.
+
+    Returns:
+        list[int]: Sequence of doubling values / powers of 2.
+    """
+    if stop is None:
+        start, stop = 1, start
+
+    start = int(start)
+    stop = int(stop)
+    if isinstance(inclusive, str):
+        inclusive = inclusive.lower() in ("true", "1", "yes")
+
+    if start <= 0 or stop < start:
+        return []
+
+    values = []
+    current = start
+    if inclusive:
+        while current <= stop:
+            values.append(current)
+            current *= 2
+    else:
+        while current < stop:
+            values.append(current)
+            current *= 2
+
+    return values
+
+
 supported_list_function_pointers = {
     "range": range,
+    "pow2_range": pow2_range,
+    "power2_range": pow2_range,
 }
 
 

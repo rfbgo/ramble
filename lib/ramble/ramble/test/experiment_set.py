@@ -2722,3 +2722,38 @@ def test_dynamic_custom_list_function(workspace_name, monkeypatch):
         assert "basic.test_wl.sweep_1" in exp_set.experiments
         assert "basic.test_wl.sweep_2" in exp_set.experiments
         assert "basic.test_wl.sweep_3" in exp_set.experiments
+
+
+def test_dynamic_pow2_range_in_experiment_set(workspace_name):
+    workspace("create", workspace_name)
+
+    with ramble.workspace.read(workspace_name) as ws:
+        exp_set = ramble.experiment_set.ExperimentSet(ws)
+
+        app_context = ramble.context.Context()
+        app_context.context_name = "basic"
+        app_context.variables = {
+            "processes_per_node": "1",
+            "mpi_command": "",
+            "batch_submit": "",
+        }
+        exp_set.set_application_context(app_context)
+
+        workload_context = ramble.context.Context()
+        workload_context.context_name = "test_wl"
+        exp_set.set_workload_context(workload_context)
+
+        experiment_context = ramble.context.Context()
+        experiment_context.context_name = "sweep_{nodes}"
+        experiment_context.variables = {
+            "max_nodes": "16",
+            "nodes": "pow2_range(1, {max_nodes})",
+            "n_ranks": "1",
+        }
+        rendered = exp_set.set_experiment_context(experiment_context)
+        assert len(rendered) == 5
+        assert "basic.test_wl.sweep_1" in exp_set.experiments
+        assert "basic.test_wl.sweep_2" in exp_set.experiments
+        assert "basic.test_wl.sweep_4" in exp_set.experiments
+        assert "basic.test_wl.sweep_8" in exp_set.experiments
+        assert "basic.test_wl.sweep_16" in exp_set.experiments
