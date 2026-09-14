@@ -75,7 +75,9 @@ class ObjectMixin:
         directive_dicts = getattr(self, "_directive_dict_names", set())
 
         def _copy_val(val, name=None):
-            if val is None or isinstance(val, (int, float, str, bool, tuple, frozenset)):
+            if val is None or isinstance(
+                val, (int, float, str, bool, tuple, frozenset)
+            ):
                 return val
             if not val:
                 return type(val)()
@@ -92,14 +94,23 @@ class ObjectMixin:
 
         for dict_name in directive_dicts:
             private_name = f"_{dict_name}"
-            if private_name in self.__dict__ and self.__dict__[private_name] is not _UNSET:
-                target.__dict__[private_name] = _copy_val(self.__dict__[private_name], dict_name)
+            if (
+                private_name in self.__dict__
+                and self.__dict__[private_name] is not _UNSET
+            ):
+                target.__dict__[private_name] = _copy_val(
+                    self.__dict__[private_name], dict_name
+                )
 
         # Preserve custom preferred_version if set on instance
         if "_preferred_version" in self.__dict__:
-            target.__dict__["_preferred_version"] = copy.copy(self.__dict__["_preferred_version"])
+            target.__dict__["_preferred_version"] = copy.copy(
+                self.__dict__["_preferred_version"]
+            )
         if "_preferred_version_class" in self.__dict__:
-            target.__dict__["_preferred_version_class"] = self.__dict__["_preferred_version_class"]
+            target.__dict__["_preferred_version_class"] = self.__dict__[
+                "_preferred_version_class"
+            ]
 
     def copy(self):
         """Generic copy method for Ramble objects."""

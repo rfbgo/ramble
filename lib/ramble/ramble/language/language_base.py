@@ -17,8 +17,6 @@ import functools
 import inspect
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Type, Union
 
-import llnl.util.lang
-
 import ramble.language.language_helpers
 from ramble.error import DirectiveError
 from ramble.util import directives
@@ -232,9 +230,10 @@ class DirectiveMeta(abc.ABCMeta):
             relevant_dicts = set()
             for d in DirectiveMeta._directive_dict_names:
                 dirs = DirectiveMeta._dict_to_directives.get(d, [])
-                non_shared = {
-                    DirectiveMeta._directive_types.get(fn) for fn in dirs
-                } - {"shared", None}
+                non_shared = {DirectiveMeta._directive_types.get(fn) for fn in dirs} - {
+                    "shared",
+                    None,
+                }
                 if not non_shared:
                     if "shared" in lang_types:
                         relevant_dicts.add(d)
@@ -252,14 +251,13 @@ class DirectiveMeta(abc.ABCMeta):
         class_directive_values = {}
         for base in bases:
             if hasattr(base, "_class_directive_values"):
-                class_directive_values.update(getattr(base, "_class_directive_values"))
+                class_directive_values.update(base._class_directive_values)
 
         # Add descriptors for known directive dictionaries
         for dict_name in relevant_dicts:
-            if (
-                dict_name in attr_dict
-                and attr_dict[dict_name] is not DirectiveMeta._get_descriptor(dict_name)
-            ):
+            if dict_name in attr_dict and attr_dict[
+                dict_name
+            ] is not DirectiveMeta._get_descriptor(dict_name):
                 class_directive_values[dict_name] = attr_dict.pop(dict_name)
             attr_dict.setdefault(f"_{dict_name}", _UNSET)
             attr_dict[dict_name] = DirectiveMeta._get_descriptor(dict_name)
