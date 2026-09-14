@@ -30,11 +30,6 @@ class SystemBase(ObjectMixin, metaclass=DirectiveMeta):
     _language_types = ["system", "shared"]
     _language_classes = _language_types
 
-    system_default_platform = None
-    system_default_workflow_manager = None
-    system_default_package_manager = None
-    system_available_platforms = []
-
     variant(
         "validate_system",
         default=True,

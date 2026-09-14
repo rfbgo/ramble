@@ -11,7 +11,7 @@ import pytest
 import ramble.language.application_language
 import ramble.language.shared_language
 from ramble.appkit import ExecutableApplication
-from ramble.language.language_base import _UNSET, DirectiveError
+from ramble.language.language_base import _UNSET, DirectiveError, DirectiveMeta
 
 
 def test_lazy_directive_evaluation():
@@ -263,3 +263,94 @@ def test_subclass_preferred_version_override():
             ramble.language.shared_language.version("2.0", preferred=True)
 
         _ = ConflictVerApp.preferred_version
+
+
+def test_class_level_attribute_preservation():
+    """Verify that class-level attributes matching directive names are preserved."""
+
+    class ClassAttrApp(metaclass=ramble.language.application_language.ApplicationMeta):
+        name = "class_attr_app"
+        __module__ = "ramble.app"
+        maintainers = ["alice", "bob"]
+        tags = ["tag_custom"]
+
+    assert ClassAttrApp.maintainers == ["alice", "bob"]
+    assert ClassAttrApp.tags == ["tag_custom"]
+
+
+def test_instance_preferred_version_preservation_on_clone(mutable_mock_apps_repo):
+    """Verify that dynamically setting preferred_version on an instance is preserved across clone."""
+    import spack.version
+
+    app = mutable_mock_apps_repo.get("basic")
+    app.set_variables_and_variants({"workload_name": "test_wl"}, {}, None, None)
+
+    class CustomVer:
+        version = spack.version.Version("99.99")
+
+    app.preferred_version = CustomVer()
+    assert str(app.preferred_version.version) == "99.99"
+
+    clone = app.clone()
+    assert clone.preferred_version is not None
+    assert str(clone.preferred_version.version) == "99.99"
+
+
+def test_family_directive_single_execution():
+    """Verify that family directives do not execute multiple times."""
+    import ramble.language.workflow_manager_language
+
+    class TestWM(
+        metaclass=ramble.language.workflow_manager_language.WorkflowManagerMeta
+    ):
+        name = "test_wm"
+        __module__ = "ramble.wm"
+        ramble.language.workflow_manager_language.workflow_manager_family("fam_test")
+
+    exec_count = 0
+    wrapped_list = []
+    for d_name, d_fn in TestWM._directives_to_be_executed:
+        def make_wrapper(target_fn):
+            def _wrapped(cls):
+                nonlocal exec_count
+                exec_count += 1
+                return target_fn(cls)
+            return _wrapped
+        wrapped_list.append((d_name, make_wrapper(d_fn)))
+
+    TestWM._directives_to_be_executed = wrapped_list
+    assert "fam_test" in TestWM.class_families
+    assert exec_count == 1
+
+
+def test_language_types_descriptor_scoping():
+    """Verify descriptors are scoped to declared language types."""
+    import ramble.repository
+
+    app_cls = ramble.repository.paths[ramble.repository.ObjectTypes.applications].get_obj_class("basic")
+    app = app_cls("test")
+    assert hasattr(app, "workloads")
+    assert not hasattr(app, "modes")
+
+    mod_cls = ramble.repository.paths[ramble.repository.ObjectTypes.modifiers].get_obj_class("spack-mod")
+    mod = mod_cls("test")
+    assert hasattr(mod, "modes")
+    assert not hasattr(mod, "workloads")
+
+
+def test_eager_directive_execution_without_dicts():
+    """Verify that directives declared with dicts=() execute eagerly at class definition."""
+    executed = []
+
+    @DirectiveMeta.directive(dicts=())
+    def custom_eager_directive(val):
+        def _exec(cls):
+            executed.append(val)
+        return _exec
+
+    class EagerApp(metaclass=DirectiveMeta):
+        name = "eager_app"
+        __module__ = "ramble.app"
+        custom_eager_directive("eager_ran")
+
+    assert executed == ["eager_ran"]

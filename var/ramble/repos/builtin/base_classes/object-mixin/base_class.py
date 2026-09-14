@@ -73,19 +73,33 @@ class ObjectMixin:
         from ramble.language.language_base import _UNSET
 
         directive_dicts = getattr(self, "_directive_dict_names", set())
+
+        def _copy_val(val, name=None):
+            if val is None or isinstance(val, (int, float, str, bool, tuple, frozenset)):
+                return val
+            if not val:
+                return type(val)()
+            if name == "workloads":
+                return copy.deepcopy(val)
+            if hasattr(val, "copy"):
+                return val.copy()
+            return copy.deepcopy(val)
+
+        for dict_name in directive_dicts.intersection(self.__dict__):
+            val = self.__dict__[dict_name]
+            if val is not _UNSET:
+                target.__dict__[dict_name] = _copy_val(val, dict_name)
+
         for dict_name in directive_dicts:
             private_name = f"_{dict_name}"
-            if (
-                private_name in self.__dict__
-                and self.__dict__[private_name] is not _UNSET
-            ):
-                target.__dict__[private_name] = copy.deepcopy(
-                    self.__dict__[private_name]
-                )
-            elif dict_name in self.__dict__:
-                target.__dict__[dict_name] = copy.deepcopy(
-                    self.__dict__[dict_name]
-                )
+            if private_name in self.__dict__ and self.__dict__[private_name] is not _UNSET:
+                target.__dict__[private_name] = _copy_val(self.__dict__[private_name], dict_name)
+
+        # Preserve custom preferred_version if set on instance
+        if "_preferred_version" in self.__dict__:
+            target.__dict__["_preferred_version"] = copy.copy(self.__dict__["_preferred_version"])
+        if "_preferred_version_class" in self.__dict__:
+            target.__dict__["_preferred_version_class"] = self.__dict__["_preferred_version_class"]
 
     def copy(self):
         """Generic copy method for Ramble objects."""

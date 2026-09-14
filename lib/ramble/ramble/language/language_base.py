@@ -84,22 +84,33 @@ class DirectiveDictDescriptor:
         if val is not _UNSET:
             return val
 
-        dicts_to_init, directives_to_run = DirectiveMeta._get_execution_plan(self.name)
+        dicts_to_init, directives_to_run = DirectiveMeta.get_cached_execution_plan(self.name)
+        class_values = getattr(cls, "_class_directive_values", {})
         for dictionary in dicts_to_init:
             if cls.__dict__.get(f"_{dictionary}", _UNSET) is _UNSET:
-                init_val = DirectiveMeta._directive_init_values.get(dictionary, {})
-                setattr(cls, f"_{dictionary}", copy.deepcopy(init_val))
+                if dictionary in class_values:
+                    init_val = class_values[dictionary]
+                else:
+                    init_val = DirectiveMeta._directive_init_values.get(dictionary, {})
+                init_copy = (
+                    init_val
+                    if init_val is None
+                    or isinstance(init_val, (int, float, str, bool, tuple, frozenset))
+                    else copy.deepcopy(init_val)
+                )
+                setattr(cls, f"_{dictionary}", init_copy)
 
         directives_list = getattr(cls, "_directives_to_be_executed", [])
         DirectiveMeta._executing_directives_depth += 1
         try:
             for directive_name, directive in directives_list:
                 if directive_name in directives_to_run:
+                    prev_directive = DirectiveMeta._current_directive
                     DirectiveMeta._current_directive = directive
                     try:
                         directive(cls)
                     finally:
-                        DirectiveMeta._current_directive = None
+                        DirectiveMeta._current_directive = prev_directive
         finally:
             DirectiveMeta._executing_directives_depth -= 1
 
@@ -114,7 +125,12 @@ class DirectiveDictDescriptor:
 
         target_cls = objtype if objtype is not None else type(obj)
         cls_val = self._evaluate_class(target_cls)
-        inst_val = copy.deepcopy(cls_val) if cls_val is not None else None
+        if cls_val is None or isinstance(cls_val, (int, float, str, bool, tuple, frozenset)):
+            inst_val = cls_val
+        elif not cls_val:
+            inst_val = type(cls_val)()
+        else:
+            inst_val = copy.deepcopy(cls_val)
         obj.__dict__[self.name] = inst_val
         return inst_val
 
@@ -132,6 +148,8 @@ class DirectiveMeta(abc.ABCMeta):
     _dict_to_directives: Dict[str, List[str]] = collections.defaultdict(list)
     # Cache of DirectiveDictDescriptor instances
     _descriptor_cache: Dict[str, DirectiveDictDescriptor] = {}
+    # Cache of execution plans: dict_name -> (dicts_to_init, set_of_directives_to_run)
+    _execution_plan_cache: Dict[str, Tuple[List[str], Set[str]]] = {}
     # Set of all known directive dictionary names
     _directive_dict_names: Set[str] = set()
     # Map of dict_name -> initial value template
@@ -187,27 +205,87 @@ class DirectiveMeta(abc.ABCMeta):
             except (AttributeError, TypeError):
                 pass
 
-        merged = list(llnl.util.lang.dedupe(merged))
         merged.extend(DirectiveMeta._directives_to_be_executed)
-
-        attr_dict["_directives_to_be_executed"] = merged
         DirectiveMeta._directives_to_be_executed.clear()
 
-        # Add descriptors for all known directive dictionaries
-        for dict_name in DirectiveMeta._directive_dict_names:
-            attr_dict[f"_{dict_name}"] = _UNSET
+        # Deduplicate directives by callable identity to prevent double execution
+        seen_fns = set()
+        deduped: List[Tuple[str, Callable[..., Any]]] = []
+        for directive_name, fn in merged:
+            if fn not in seen_fns:
+                seen_fns.add(fn)
+                deduped.append((directive_name, fn))
+        merged = deduped
+
+        attr_dict["_directives_to_be_executed"] = merged
+
+        # Determine language types to scope descriptors
+        lang_types = set(attr_dict.get("_language_types", [])) | set(
+            attr_dict.get("_language_classes", [])
+        )
+        for base in bases:
+            lang_types |= set(getattr(base, "_language_types", [])) | set(
+                getattr(base, "_language_classes", [])
+            )
+
+        if lang_types:
+            relevant_dicts = set()
+            for d in DirectiveMeta._directive_dict_names:
+                dirs = DirectiveMeta._dict_to_directives.get(d, [])
+                non_shared = {
+                    DirectiveMeta._directive_types.get(fn) for fn in dirs
+                } - {"shared", None}
+                if not non_shared:
+                    if "shared" in lang_types:
+                        relevant_dicts.add(d)
+                elif len(non_shared) > 1:
+                    if (non_shared & lang_types) or ("shared" in lang_types):
+                        relevant_dicts.add(d)
+                else:
+                    required_type = next(iter(non_shared))
+                    if required_type in lang_types:
+                        relevant_dicts.add(d)
+        else:
+            relevant_dicts = set(DirectiveMeta._directive_dict_names)
+
+        # Collect class-level attribute initial values
+        class_directive_values = {}
+        for base in bases:
+            if hasattr(base, "_class_directive_values"):
+                class_directive_values.update(getattr(base, "_class_directive_values"))
+
+        # Add descriptors for known directive dictionaries
+        for dict_name in relevant_dicts:
+            if (
+                dict_name in attr_dict
+                and attr_dict[dict_name] is not DirectiveMeta._get_descriptor(dict_name)
+            ):
+                class_directive_values[dict_name] = attr_dict.pop(dict_name)
+            attr_dict.setdefault(f"_{dict_name}", _UNSET)
             attr_dict[dict_name] = DirectiveMeta._get_descriptor(dict_name)
+
+        attr_dict["_class_directive_values"] = class_directive_values
 
         attr_dict["_directive_functions"] = dict(DirectiveMeta._directive_functions)
         attr_dict["_directive_classes"] = dict(DirectiveMeta._directive_classes)
         attr_dict["_directive_types"] = dict(DirectiveMeta._directive_types)
-        attr_dict["_directive_dict_names"] = set(DirectiveMeta._directive_dict_names)
+        attr_dict["_directive_dict_names"] = relevant_dicts
 
         return super().__new__(cls, name, bases, attr_dict)
 
     def __init__(cls: "DirectiveMeta", name: str, bases: tuple, attr_dict: dict) -> None:
         super().__init__(name, bases, attr_dict)
         directives.define_directive_methods_on_class(cls)
+
+        # Execute eager directives (directives without target dictionaries)
+        for directive_name, directive in getattr(cls, "_directives_to_be_executed", []):
+            if not DirectiveMeta._directive_to_dicts.get(directive_name):
+                prev_directive = DirectiveMeta._current_directive
+                DirectiveMeta._current_directive = directive
+                try:
+                    directive(cls)
+                finally:
+                    DirectiveMeta._current_directive = prev_directive
 
     def __setattr__(cls: "DirectiveMeta", name: str, value: Any) -> None:
         if name in DirectiveMeta._directive_dict_names:
@@ -218,6 +296,7 @@ class DirectiveMeta(abc.ABCMeta):
     @classmethod
     def register_directive(cls, name: str, dicts: Tuple[str, ...]) -> None:
         """Called by directive decorator to register relationships."""
+        DirectiveMeta._execution_plan_cache.clear()
         DirectiveMeta._directive_to_dicts[name] = dicts
         for d in dicts:
             if name not in DirectiveMeta._dict_to_directives[d]:
@@ -229,6 +308,17 @@ class DirectiveMeta(abc.ABCMeta):
         if name not in DirectiveMeta._descriptor_cache:
             DirectiveMeta._descriptor_cache[name] = DirectiveDictDescriptor(name)
         return DirectiveMeta._descriptor_cache[name]
+
+    @staticmethod
+    def get_cached_execution_plan(target_dict: str) -> Tuple[List[str], Set[str]]:
+        """Returns cached execution plan with directives as a set for O(1) membership check."""
+        if target_dict not in DirectiveMeta._execution_plan_cache:
+            dicts_to_init, directives_to_run = DirectiveMeta._get_execution_plan(target_dict)
+            DirectiveMeta._execution_plan_cache[target_dict] = (
+                dicts_to_init,
+                set(directives_to_run),
+            )
+        return DirectiveMeta._execution_plan_cache[target_dict]
 
     @property
     def preferred_version(cls: "DirectiveMeta") -> Optional[Any]:
@@ -363,7 +453,7 @@ class DirectiveMeta(abc.ABCMeta):
                         DirectiveMeta._directives_to_be_executed = [
                             (n, fn)
                             for n, fn in DirectiveMeta._directives_to_be_executed
-                            if fn != arg
+                            if fn is not arg
                         ]
 
                 remove_directives(args)
