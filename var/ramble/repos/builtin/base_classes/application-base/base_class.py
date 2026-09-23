@@ -1633,12 +1633,16 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
             mod = self.modifiers[mod_idx]
             mod_idx += 1
 
+            mod_name, _, maybe_mod_ver = mod["name"].partition("@")
+
             if "mode" in mod:
                 mode_name = self.expander.expand_var(mod["mode"])
-                if mode_name == "disabled":
+                if mode_name and mode_name.strip().lower() == "disabled":
+                    logger.debug(
+                        f"Modifier '{mod_name}' is disabled; skipping."
+                    )
                     continue
 
-            mod_name, _, maybe_mod_ver = mod["name"].partition("@")
             mod_inst = ramble.repository.get(mod_name, mod_type).copy()
 
             if "on_executable" in mod:
@@ -1650,9 +1654,6 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
                 mod_inst.set_usage_mode(mode_name)
             else:
                 mod_inst.set_usage_mode(None)
-
-            if mod_inst.disabled:
-                continue
 
             if maybe_mod_ver:
                 mod_inst.set_version(
