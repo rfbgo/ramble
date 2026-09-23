@@ -25,12 +25,15 @@ class DisabledModifier(ModifierBase):
 
     modifier_conflict(None)
 
-    def __init__(self, instance_to_disable):
-        super().__init__(instance_to_disable._file_path)
+    def __init__(self, target):
+        if isinstance(target, ModifierBase):
+            super().__init__(target._file_path)
 
-        self.name = instance_to_disable.name
-        self.maintainers = instance_to_disable.maintainers.copy()
-        self.tags = instance_to_disable.tags.copy()
+            self.name = target.name
+            self.maintainers = target.maintainers.copy()
+            self.tags = target.tags.copy()
+        else:
+            super().__init__(target)
 
     def define_variable(self, var_name, var_value):
         """Given this modifier is disabled, never define variables in it"""

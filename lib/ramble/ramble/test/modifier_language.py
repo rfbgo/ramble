@@ -16,7 +16,7 @@ import ramble.language.language_helpers
 from ramble.error import DirectiveError
 from ramble.modkit import *  # noqa
 
-mod_types = [ModifierBase, BasicModifier]  # noqa: F405
+mod_types = [ModifierBase, BasicModifier, DisabledModifier]  # noqa: F405
 
 _FS: FrozenSet[str] = frozenset()
 
@@ -526,3 +526,16 @@ def test_modifier_conflict_usage_error():
     )
     with pytest.raises(DirectiveError, match=err_str):
         broken_mod.modifier_conflict(80)
+
+
+def test_disabled_modifier():
+    mod_path = "/path/to/mod"
+    direct_mod = DisabledModifier(mod_path)  # noqa: F405
+    assert direct_mod.disabled is True
+    assert direct_mod._file_path == mod_path
+
+    basic_mod = BasicModifier(mod_path)  # noqa: F405
+    wrapped_mod = DisabledModifier(basic_mod)  # noqa: F405
+    assert wrapped_mod.disabled is True
+    assert wrapped_mod._file_path == mod_path
+    assert wrapped_mod.name == basic_mod.name

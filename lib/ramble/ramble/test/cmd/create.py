@@ -50,6 +50,13 @@ def test_create_help():
             None,
         ),
         (
+            "modifier",
+            "my-disabled-mod",
+            ["--base", "DisabledModifier"],
+            ["class MyDisabledMod(DisabledModifier):", 'name = "my-disabled-mod"'],
+            None,
+        ),
+        (
             "application",
             "my-ns-app",
             ["--repo", "mockrepo"],

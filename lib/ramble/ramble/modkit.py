@@ -29,3 +29,4 @@ from ramble.util.output_capture import OUTPUT_CAPTURE
 
 ModifierBase = ramble.repository.get_base_class("modifier-base")
 BasicModifier = ramble.repository.get_base_class("basic-modifier")
+DisabledModifier = ramble.repository.get_base_class("disabled-modifier")
