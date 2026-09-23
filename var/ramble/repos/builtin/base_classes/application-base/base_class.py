@@ -1633,6 +1633,11 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
             mod = self.modifiers[mod_idx]
             mod_idx += 1
 
+            if "mode" in mod:
+                mode_name = self.expander.expand_var(mod["mode"])
+                if mode_name == "disabled":
+                    continue
+
             mod_name, _, maybe_mod_ver = mod["name"].partition("@")
             mod_inst = ramble.repository.get(mod_name, mod_type).copy()
 
@@ -1642,10 +1647,12 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
                 mod_inst.set_on_executables(None)
 
             if "mode" in mod:
-                mode_name = self.expander.expand_var(mod["mode"])
                 mod_inst.set_usage_mode(mode_name)
             else:
                 mod_inst.set_usage_mode(None)
+
+            if mod_inst.disabled:
+                continue
 
             if maybe_mod_ver:
                 mod_inst.set_version(
@@ -1653,16 +1660,9 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
                     description=f"{mod_name} {maybe_mod_ver}",
                 )
 
-            if not mod_inst.disabled:
-                mod_inst.inherit_from_application(self)
-                mod_inst.modify_experiment(self)
-                mod_inst.set_modifier_variants()
-            else:
-                base_class_type = ramble.repository.ObjectTypes.base_classes
-                DisabledModifier = ramble.repository.get_obj_class(
-                    "disabled-modifier", object_type=base_class_type
-                )
-                mod_inst = DisabledModifier(mod_inst)
+            mod_inst.inherit_from_application(self)
+            mod_inst.modify_experiment(self)
+            mod_inst.set_modifier_variants()
 
             mod_inst.check_conflicts(self._modifier_instances)
             self._modifier_instances.append(mod_inst)
