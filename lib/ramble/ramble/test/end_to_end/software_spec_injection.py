@@ -128,7 +128,7 @@ def test_existing_software_spec_does_not_inject(
             global_args=global_args,
         )
 
-        workspace("concretize", "-f", global_args=global_args)
+        workspace("concretize", "-f", "--include-injected-packages", global_args=global_args)
         info_output = workspace("info", "--software", global_args=global_args)
 
         assert "missing_mod_package" in info_output
