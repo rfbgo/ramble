@@ -446,3 +446,39 @@ def test_pow2_range_in_expander():
 
     res_alias = expander.expand_var("power2_range(1, {max_nodes})", typed=True)
     assert res_alias == [1, 2, 4, 8, 16]
+
+
+def test_referenced_variables():
+    expander = ramble.expander.Expander(
+        {
+            "n_nodes": "{base_nodes}",
+            "base_nodes": "4",
+            "procs": [1, 2, 4],
+            "n_ranks": "range(1, {n_nodes} * {procs_per_node})",
+            "procs_per_node": "{procs}",
+            "unrelated": "hello",
+        },
+        None,
+    )
+
+    # Transitive references are followed through nested definitions
+    assert expander.referenced_variables("{n_ranks}") == {
+        "n_ranks",
+        "n_nodes",
+        "base_nodes",
+        "procs_per_node",
+        "procs",
+    }
+    assert expander.referenced_variables("pow2_range(1, {n_nodes})") == {
+        "n_nodes",
+        "base_nodes",
+    }
+
+    # Undefined names, escaped braces, and bare math names are not references
+    assert expander.referenced_variables("{undefined} \\{unrelated\\}") == set()
+    assert expander.referenced_variables("{base_nodes * 2}") == set()
+    assert expander.referenced_variables("{base_nodes:>5}") == {"base_nodes"}
+
+    # Used-variable tracking is not affected
+    assert expander._used_variables == set()
+    assert expander._used_variable_stage == set()

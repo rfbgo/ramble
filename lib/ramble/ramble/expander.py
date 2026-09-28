@@ -18,7 +18,7 @@ import string
 import sys
 from contextlib import contextmanager
 from enum import Enum
-from typing import Any, Dict, FrozenSet, List, Optional, Set, Union
+from typing import Dict, FrozenSet, List, Optional, Set, Union
 
 import ramble.config
 import ramble.error
@@ -279,76 +279,6 @@ def is_dynamic_list_expression(val) -> bool:
         return False
     func_names = "|".join(re.escape(fn) for fn in supported_list_function_pointers)
     return bool(re.search(rf"\b(?:{func_names})\s*\(", val))
-
-
-def extract_var_refs(expr) -> Set[str]:
-    """Extract variable references enclosed in braces from an expression string."""
-    if not isinstance(expr, str):
-        return set()
-    refs = set(re.findall(r"\{\s*([a-zA-Z_][a-zA-Z0-9_]*)", expr))
-    in_brace = 0
-    cur_ident: List[str] = []
-    for ch in expr:
-        if ch == "{":
-            in_brace += 1
-        elif ch == "}":
-            if cur_ident:
-                refs.add("".join(cur_ident))
-                cur_ident = []
-            in_brace = max(0, in_brace - 1)
-        elif in_brace > 0:
-            if ch.isalnum() or ch == "_":
-                cur_ident.append(ch)
-            else:
-                if cur_ident:
-                    refs.add("".join(cur_ident))
-                    cur_ident = []
-    if cur_ident and in_brace > 0:
-        refs.add("".join(cur_ident))
-    return {r for r in refs if r and not r[0].isdigit()}
-
-
-def find_dependent_vector_vars(
-    dynamic_list_vars: Dict[str, Any],
-    variables: Dict[str, Any],
-    expander: Optional["Expander"] = None,
-) -> Set[str]:
-    """Find all vector variables in `variables` that `dynamic_list_vars` transitively depend on."""
-    dependent_vector_vars = set()
-    visited = set()
-    queue = list(dynamic_list_vars.values())
-
-    if expander is not None:
-        for val in dynamic_list_vars.values():
-            saved_used = expander._used_variables.copy()
-            expander._used_variables = set()
-            try:
-                expander.expand_var(val)
-            except Exception:
-                pass
-            used = expander._used_variables
-            expander._used_variables = saved_used
-            for var_ref in used:
-                if var_ref in variables and var_ref not in dynamic_list_vars:
-                    if isinstance(variables[var_ref], list):
-                        dependent_vector_vars.add(var_ref)
-                    elif var_ref not in visited:
-                        visited.add(var_ref)
-                        queue.append(str(variables[var_ref]))
-
-    while queue:
-        expr = queue.pop(0)
-        if not isinstance(expr, str):
-            continue
-        for var_ref in extract_var_refs(expr):
-            if var_ref in variables and var_ref not in dynamic_list_vars:
-                if isinstance(variables[var_ref], list):
-                    dependent_vector_vars.add(var_ref)
-                elif var_ref not in visited:
-                    visited.add(var_ref)
-                    queue.append(str(variables[var_ref]))
-
-    return dependent_vector_vars
 
 
 supported_modules = {
@@ -681,6 +611,34 @@ class Expander:
         self._used_variables = self._used_variables.union(self._used_variable_stage)
         self.flush_used_variable_stage()
 
+    def referenced_variables(self, in_str, extra_vars: Optional[Dict] = None) -> Set[str]:
+        """Find the variables referenced when expanding a string.
+
+        This walks the expansion graph of ``in_str`` (following nested variable
+        definitions) and collects every defined variable it resolves. The
+        expander's used-variable tracking is left untouched.
+
+        Args:
+            in_str (str): String to inspect
+            extra_vars (dict): Variable definitions to use with highest precedence
+
+        Returns:
+            set: Names of all variables transitively referenced by ``in_str``
+        """
+        saved_stage = self._used_variable_stage
+        self._used_variable_stage = set()
+        try:
+            self.expand_var(in_str, extra_vars=extra_vars, merge_used_stage=False)
+        except Exception:
+            # Values may not be fully resolvable yet (e.g. a list function
+            # applied to a passthrough). The references collected before the
+            # failure are still valid dependencies.
+            pass
+        finally:
+            referenced = self._used_variable_stage
+            self._used_variable_stage = saved_stage
+        return referenced
+
     def copy(self):
         return Expander(
             self._variables.copy(),
@@ -820,6 +778,13 @@ class Expander:
         lists to be generated before rendering experiments, but does not support
         pulling a list from a different experiment.
         """
+        if isinstance(var, str) and is_dynamic_list_expression(var):
+            try:
+                value = self.expand_var(var, typed=True)
+                if isinstance(value, list):
+                    return value
+            except Exception:
+                pass
         try:
             math_ast = _ast_parse(str(var))
             value = self.eval_math(math_ast.body)

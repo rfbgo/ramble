@@ -2984,3 +2984,37 @@ ramble:
     assert exp_set.experiments["basic.test_wl2.node_sweep_1"].variables["n_ranks"] == "4"
     assert exp_set.experiments["basic.test_wl2.node_sweep_2"].variables["n_ranks"] == "8"
     assert exp_set.experiments["basic.test_wl2.node_sweep_3"].variables["n_ranks"] == "12"
+
+
+def test_dynamic_ranges_dependent_on_vector_in_zip(make_workspace_from_config):
+    test_config = """
+ramble:
+  variables:
+    processes_per_node: 1
+    mpi_command: ''
+    batch_submit: '{execute_experiment}'
+    n_ranks: 1
+  applications:
+    basic:
+      workloads:
+        test_wl:
+          experiments:
+            sweep_{max_nodes}_{nodes}_{cores}:
+              variables:
+                max_nodes: [2, 3]
+                nodes: 'range(1, {max_nodes} + 1)'
+                cores: 'range(10, 10 + {max_nodes})'
+              zips:
+                node_cores:
+                - nodes
+                - cores
+"""
+    ws, _ = make_workspace_from_config(test_config, activate=True)
+    exp_set = ws.build_experiment_set()
+    assert set(exp_set.experiments) == {
+        "basic.test_wl.sweep_2_1_10",
+        "basic.test_wl.sweep_2_2_11",
+        "basic.test_wl.sweep_3_1_10",
+        "basic.test_wl.sweep_3_2_11",
+        "basic.test_wl.sweep_3_3_12",
+    }
