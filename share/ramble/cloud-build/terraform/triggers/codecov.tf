@@ -32,6 +32,8 @@ resource "google_cloudbuild_trigger" "codecov_pr" {
     ]
   )
 
+  include_build_logs = "INCLUDE_BUILD_LOGS_WITH_STATUS"
+
   filename = "share/ramble/cloud-build/ramble-pr-unit-tests.yaml"
 
   substitutions = {
@@ -56,6 +58,8 @@ resource "google_cloudbuild_trigger" "codecov_push" {
       branch = "(?:main|develop)"
     }
   }
+
+  include_build_logs = "INCLUDE_BUILD_LOGS_WITH_STATUS"
 
   filename = "share/ramble/cloud-build/ramble-pr-unit-tests.yaml"
 
