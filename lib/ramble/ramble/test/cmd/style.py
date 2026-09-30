@@ -255,3 +255,36 @@ def test_changed_files_fallback(monkeypatch):
     assert files == ["file1.py"]
     # Check that it tried None, origin/develop, and origin/main in order
     assert calls == [None, "origin/develop", "origin/main"]
+
+
+def test_style_invalid_root(tmpdir):
+    with tmpdir.as_cwd():
+        out = style_cmd("--root", str(tmpdir), fail_on_error=False)
+        assert style_cmd.returncode != 0
+        assert "This does not look like a valid ramble root" in out
+
+
+def test_style_valid_root_fix(tmpdir):
+    _require_tools("isort", "flake8")
+    bin_dir = tmpdir.join("bin")
+    bin_dir.ensure(dir=True)
+    ramble_bin = bin_dir.join("ramble")
+    ramble_bin.write("#!/bin/sh\n")
+
+    lib_dir = tmpdir.join("lib", "ramble", "ramble")
+    lib_dir.ensure(dir=True)
+    sample_file = lib_dir.join("sample.py")
+    sample_file.write("import sys\nimport os\n\nprint(os.name, sys.platform)\n")
+
+    out = style_cmd("--root", str(tmpdir), "-a", "-t", "isort", fail_on_error=False)
+    assert style_cmd.returncode != 0
+    assert "Imports are incorrectly sorted" in out
+
+    out = style_cmd("--root", str(tmpdir), "--fix", "-a", "-t", "isort", "-t", "flake8")
+    assert "style checks were clean" in out
+    assert sample_file.read().startswith("import os\nimport sys\n")
+
+
+def test_style_root_and_repo_path_mutually_exclusive(tmpdir):
+    with pytest.raises(SystemExit):
+        style_cmd("--root", str(tmpdir), "--repo-path", str(tmpdir), fail_on_error=False)
