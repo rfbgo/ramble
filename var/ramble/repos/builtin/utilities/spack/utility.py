@@ -17,7 +17,7 @@ class Spack(UtilityBase):
 
     variable(
         name="path",
-        default="system",
+        default=UtilityBase.SYSTEM_PATH,
         description="Path to Spack",
         scoped=True,
     )

@@ -332,7 +332,7 @@ class Hpl(ExecutableApplication):
     # Integer sqrt
     def _isqrt(self, n):
         if n < 0:
-            raise Exception
+            raise ValueError(f"_isqrt requires a non-negative value, got {n}")
         elif n < 2:
             return n
         else:

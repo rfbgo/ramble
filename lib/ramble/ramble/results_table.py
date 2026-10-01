@@ -144,7 +144,7 @@ class ResultsColumn:
 class ResultsAutoColumn:
     """Class representing a template for auto-generated columns"""
 
-    _where_name = "where"
+    _where_name = namespace.where
     _sort_by_name = "sort_by"
     _column_attrs = [
         "name",
@@ -187,7 +187,7 @@ class ResultsTable:
     _sort_by_name = "sort_by"
     _columns_name = "columns"
     _autocolumns_name = "autocolumns"
-    _where_name = "where"
+    _where_name = namespace.where
     _transpose_name = "transpose"
 
     def __init__(self, conf_dict):
