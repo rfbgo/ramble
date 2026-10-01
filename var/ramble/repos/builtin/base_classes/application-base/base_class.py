@@ -899,8 +899,9 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         for key in remove_keys:
             cleaned_variables.pop(key, None)
 
-        for template_name, _ in workspace.all_templates():
-            cleaned_variables.pop(template_name, None)
+        if workspace:
+            for template_name, _ in workspace.all_templates():
+                cleaned_variables.pop(template_name, None)
 
         for _, tpl_configs in self._object_templates():
             for tpl_config in tpl_configs:
@@ -2386,11 +2387,14 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
                             n_nodes = self.expander.expand_var_name(
                                 self.keywords.n_nodes
                             )
-                            n_nodes = (
-                                1
-                                if n_nodes in ("{n_nodes}", None, "")
-                                else int(n_nodes)
-                            )
+                            try:
+                                n_nodes = (
+                                    1
+                                    if n_nodes in ("{n_nodes}", None, "")
+                                    else int(n_nodes)
+                                )
+                            except (ValueError, TypeError):
+                                n_nodes = 1
                             if not raw_mpi_cmd and n_nodes > 1:
                                 logger.warn(
                                     f"Command {cmd_conf.name} requires a non-empty `mpi_command` "
@@ -4898,9 +4902,14 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
                 value = None
                 # If two variables are defined, use the formula to compute the missing ones.
                 if len(mpi_vars_defined) >= 2:
-                    value = self.expander.expand_var(
+                    val = self.expander.expand_var(
                         formula, allow_passthrough=False
                     )
+                    try:
+                        int(val)
+                        value = val
+                    except (ValueError, TypeError):
+                        value = None
                 # If there is not enough information to use the formulas, or they are not required.
                 # Set missing vars to 0
                 elif not mpi_required:

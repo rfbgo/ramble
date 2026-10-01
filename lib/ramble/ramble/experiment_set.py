@@ -553,6 +553,16 @@ class ExperimentSet:
         workload_template_name = final_context.variables[self.keywords.workload_name]
         experiment_template_name = final_context.variables[self.keywords.experiment_name]
 
+        if any(
+            ramble.expander.is_dynamic_list_expression(v) for v in final_context.variables.values()
+        ):
+            app_inst = self._setup_experiment_minimal(
+                workload_template_name, final_context.variables.copy(), final_context
+            )
+            for var_name, var_val in app_inst.variables.items():
+                if var_name not in final_context.variables and var_val is not None:
+                    final_context.variables[var_name] = var_val
+
         renderer = ramble.renderer.Renderer()
 
         render_group = ramble.renderer.RenderGroup("experiment", "create")

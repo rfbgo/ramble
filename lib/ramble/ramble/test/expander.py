@@ -417,3 +417,68 @@ def test_expander_short_circuit_plain_and_escaped_strings():
 
     enum_expander = ramble.expander.Expander({"status": StatusEnum.SETUP}, None)
     assert enum_expander.expand_var("{status}") == "SETUP"
+
+
+def test_pow2_range_function():
+    from ramble.expander import pow2_range
+
+    assert pow2_range(8) == [1, 2, 4, 8]
+    assert pow2_range(1, 16) == [1, 2, 4, 8, 16]
+    assert pow2_range(2, 16) == [2, 4, 8, 16]
+    assert pow2_range(1, 15) == [1, 2, 4, 8]
+    assert pow2_range(1, 16, inclusive=False) == [1, 2, 4, 8]
+    assert pow2_range(1, 1) == [1]
+    assert pow2_range(1, 1, inclusive=False) == []
+    assert pow2_range(16, 4) == []
+    assert pow2_range(0) == []
+    assert pow2_range(-1, 8) == []
+    assert pow2_range(3, 24) == [3, 6, 12, 24]
+
+
+def test_pow2_range_in_expander():
+    expander = ramble.expander.Expander({"max_nodes": "16"}, None)
+
+    assert expander.expand_lists("pow2_range(1, 16)") == [1, 2, 4, 8, 16]
+    assert expander.expand_lists("power2_range(1, 16)") == [1, 2, 4, 8, 16]
+
+    res = expander.expand_var("pow2_range(1, {max_nodes})", typed=True)
+    assert res == [1, 2, 4, 8, 16]
+
+    res_alias = expander.expand_var("power2_range(1, {max_nodes})", typed=True)
+    assert res_alias == [1, 2, 4, 8, 16]
+
+
+def test_referenced_variables():
+    expander = ramble.expander.Expander(
+        {
+            "n_nodes": "{base_nodes}",
+            "base_nodes": "4",
+            "procs": [1, 2, 4],
+            "n_ranks": "range(1, {n_nodes} * {procs_per_node})",
+            "procs_per_node": "{procs}",
+            "unrelated": "hello",
+        },
+        None,
+    )
+
+    # Transitive references are followed through nested definitions
+    assert expander.referenced_variables("{n_ranks}") == {
+        "n_ranks",
+        "n_nodes",
+        "base_nodes",
+        "procs_per_node",
+        "procs",
+    }
+    assert expander.referenced_variables("pow2_range(1, {n_nodes})") == {
+        "n_nodes",
+        "base_nodes",
+    }
+
+    # Undefined names, escaped braces, and bare math names are not references
+    assert expander.referenced_variables("{undefined} \\{unrelated\\}") == set()
+    assert expander.referenced_variables("{base_nodes * 2}") == set()
+    assert expander.referenced_variables("{base_nodes:>5}") == {"base_nodes"}
+
+    # Used-variable tracking is not affected
+    assert expander._used_variables == set()
+    assert expander._used_variable_stage == set()

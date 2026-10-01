@@ -118,7 +118,9 @@ class Renderer:
             if isinstance(unexpanded, dict):
                 unexpanded = dict(unexpanded)
                 variables[name] = unexpanded
-            object_variables[name] = expander.expand_lists(unexpanded)
+            expanded_val = expander.expand_lists(unexpanded)
+            object_variables[name] = expanded_val
+            expander._variables[name] = expanded_val
         return object_variables
 
     def _expand_zip_and_matrix_members(self, matrices, zips, expander):
@@ -394,6 +396,98 @@ class Renderer:
         else:
             return [{}]
 
+    def _find_deferred_list_vars(
+        self, render_group, object_variables, used_variables, expander, exclude_where, ignore_used
+    ):
+        """Find dynamic list variables that depend on vector variables.
+
+        A definition like ``range(1, {max_nodes})`` cannot be evaluated while
+        ``max_nodes`` is still a vector, so it has to wait until the vectors it
+        depends on have been rendered into scalars.
+
+        Returns:
+            dict: Mapping of deferred variable name to the vector variables it depends on
+        """
+        dynamic_vars = {
+            name: val
+            for name, val in object_variables.items()
+            if ramble.expander.is_dynamic_list_expression(val)
+        }
+        if not dynamic_vars:
+            return {}
+
+        if ignore_used and used_variables:
+            # A dynamic variable only matters if something that is used refers to it
+            used = set(used_variables)
+            self._filter_used_variables(render_group.matrices, dict(render_group.zips), used)
+            for where in exclude_where or []:
+                used |= expander.referenced_variables(where)
+            for name in list(used):
+                used |= expander.referenced_variables(expander.expansion_str(name))
+            dynamic_vars = {name: val for name, val in dynamic_vars.items() if name in used}
+
+        deferred = {}
+        for name, val in dynamic_vars.items():
+            vector_deps = {
+                ref
+                for ref in expander.referenced_variables(val)
+                if isinstance(object_variables.get(ref), list)
+            }
+            if vector_deps:
+                deferred[name] = vector_deps
+        return deferred
+
+    def _render_deferred_list_vars(
+        self, render_group, deferred, used_variables, exclude_where, ignore_used, fatal
+    ):
+        """Render a group containing dynamic list variables that depend on vectors.
+
+        This happens in two passes, both using ``render_objects``:
+          1. Render everything except the deferred variables (and any zips
+             containing them). This turns the vectors they depend on into scalars.
+          2. For each object from the first pass, render the deferred variables,
+             which can now be evaluated into lists.
+
+        Nested dependencies (a range depending on another range) are handled by
+        the recursion in the second pass.
+        """
+        deferred_zips = {
+            z_name: z_vars
+            for z_name, z_vars in render_group.zips.items()
+            if z_name in deferred or any(v in deferred for v in z_vars)
+        }
+        later = set(deferred) | set(deferred_zips)
+        for z_vars in deferred_zips.values():
+            later.update(z_vars)
+
+        def split_matrices(keep):
+            matrices = ([v for v in mat if keep(v)] for mat in render_group.matrices)
+            return [mat for mat in matrices if mat]
+
+        first_pass = RenderGroup(render_group.object, render_group.action)
+        first_pass.variables = {k: v for k, v in render_group.variables.items() if k not in later}
+        first_pass.zips = {
+            z_name: list(z_vars)
+            for z_name, z_vars in render_group.zips.items()
+            if z_name not in deferred_zips
+        }
+        first_pass.matrices = split_matrices(lambda v: v not in later)
+        first_pass.used_variables = used_variables.union(*deferred.values())
+
+        for first_pass_vars, _ in self.render_objects(
+            first_pass, ignore_used=ignore_used, fatal=fatal
+        ):
+            second_pass = RenderGroup(render_group.object, render_group.action)
+            second_pass.variables = {**render_group.variables, **first_pass_vars}
+            second_pass.zips = {z_name: list(z_vars) for z_name, z_vars in deferred_zips.items()}
+            second_pass.matrices = split_matrices(lambda v: v in later)
+            second_pass.used_variables = used_variables | later
+            second_pass.n_repeats = render_group.n_repeats
+
+            yield from self.render_objects(
+                second_pass, exclude_where=exclude_where, ignore_used=ignore_used, fatal=fatal
+            )
+
     def _filter_and_yield_objects(
         self, render_group, object_variables, new_objects, exclude_where, n_repeats
     ):
@@ -467,6 +561,21 @@ class Renderer:
         # cannot be evaled using ast.literal_eval.
         # Also expand all variables that generate lists
         object_variables = self._expand_variables(variables, expander)
+
+        if render_group.object == "experiment":
+            deferred = self._find_deferred_list_vars(
+                render_group,
+                object_variables,
+                used_variables,
+                expander,
+                exclude_where,
+                ignore_used,
+            )
+            if deferred:
+                yield from self._render_deferred_list_vars(
+                    render_group, deferred, used_variables, exclude_where, ignore_used, fatal
+                )
+                return
 
         # Expand zip and matrix members to allow indirections like
         # ```

@@ -18,7 +18,7 @@ import string
 import sys
 from contextlib import contextmanager
 from enum import Enum
-from typing import Dict, FrozenSet, List, Optional, Union
+from typing import Dict, FrozenSet, List, Optional, Set, Union
 
 import ramble.config
 import ramble.error
@@ -230,9 +230,62 @@ supported_scalar_function_with_self_arg_pointers = {
 }
 
 
+def pow2_range(start, stop=None, inclusive=True):
+    """Generate a sequence of numbers by doubling from start up to stop.
+
+    Args:
+        start (int): Starting value (if stop is provided), or stop value (if stop is None).
+        stop (int): Optional ending value. If None, start is treated as stop,
+            and sequence starts at 1.
+        inclusive (bool): Whether stop is inclusive. Defaults to True.
+
+    Returns:
+        list[int]: Sequence of doubling values / powers of 2.
+    """
+    if stop is None:
+        start, stop = 1, start
+
+    start = int(start)
+    stop = int(stop)
+    if isinstance(inclusive, str):
+        inclusive = inclusive.lower() in ("true", "1", "yes")
+
+    if start <= 0 or stop < start:
+        return []
+
+    values = []
+    current = start
+    if inclusive:
+        while current <= stop:
+            values.append(current)
+            current *= 2
+    else:
+        while current < stop:
+            values.append(current)
+            current *= 2
+
+    return values
+
+
 supported_list_function_pointers = {
     "range": range,
+    "pow2_range": pow2_range,
+    "power2_range": pow2_range,
 }
+
+
+def is_dynamic_list_expression(val) -> bool:
+    """Check if a variable value is an unexpanded call to a supported list function.
+
+    Returns True if val is a string matching a call to any function registered in
+    `supported_list_function_pointers`.
+    """
+    if not isinstance(val, str):
+        return False
+    if not supported_list_function_pointers:
+        return False
+    func_names = "|".join(re.escape(fn) for fn in supported_list_function_pointers)
+    return bool(re.search(rf"\b(?:{func_names})\s*\(", val))
 
 
 supported_modules = {
@@ -565,6 +618,34 @@ class Expander:
         self._used_variables = self._used_variables.union(self._used_variable_stage)
         self.flush_used_variable_stage()
 
+    def referenced_variables(self, in_str, extra_vars: Optional[Dict] = None) -> Set[str]:
+        """Find the variables referenced when expanding a string.
+
+        This walks the expansion graph of ``in_str`` (following nested variable
+        definitions) and collects every defined variable it resolves. The
+        expander's used-variable tracking is left untouched.
+
+        Args:
+            in_str (str): String to inspect
+            extra_vars (dict): Variable definitions to use with highest precedence
+
+        Returns:
+            set: Names of all variables transitively referenced by ``in_str``
+        """
+        saved_stage = self._used_variable_stage
+        self._used_variable_stage = set()
+        try:
+            self.expand_var(in_str, extra_vars=extra_vars, merge_used_stage=False)
+        except Exception:
+            # Values may not be fully resolvable yet (e.g. a list function
+            # applied to a passthrough). The references collected before the
+            # failure are still valid dependencies.
+            pass
+        finally:
+            referenced = self._used_variable_stage
+            self._used_variable_stage = saved_stage
+        return referenced
+
     def copy(self):
         return Expander(
             self._variables.copy(),
@@ -704,6 +785,13 @@ class Expander:
         lists to be generated before rendering experiments, but does not support
         pulling a list from a different experiment.
         """
+        if isinstance(var, str) and is_dynamic_list_expression(var):
+            try:
+                value = self.expand_var(var, typed=True)
+                if isinstance(value, list):
+                    return value
+            except Exception:
+                pass
         try:
             math_ast = _ast_parse(str(var))
             value = self.eval_math(math_ast.body)
