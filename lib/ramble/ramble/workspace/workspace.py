@@ -605,7 +605,7 @@ class Workspace:
                 self.results["metadata"] = self.metadata
 
     @classmethod
-    def _template_execute_script(self):
+    def _template_execute_script(cls):
         shell = ramble.config.get("config:shell")
         shell_path = os.path.join("/bin/", shell)
         script = f"#!{shell_path}\n" + """\
@@ -634,7 +634,7 @@ cd "{experiment_run_dir}"
         return script
 
     @classmethod
-    def _default_config_yaml(self):
+    def _default_config_yaml(cls):
 
         # Construct string for default variants
         variant_string = ""
@@ -1143,8 +1143,8 @@ ramble:
         workspace_dict = self._get_workspace_dict()
 
         # Remove includes if they were defined before.
-        if "include" in workspace_dict["ramble"]:
-            del workspace_dict["ramble"]["include"]
+        if namespace.include in workspace_dict[namespace.ramble]:
+            del workspace_dict[namespace.ramble][namespace.include]
 
         for section in ramble.config.section_schemas:
             keep = True
@@ -1163,7 +1163,7 @@ ramble:
             if keep:
                 section_dict = ramble.config.get(section)
                 if section_dict:
-                    workspace_dict["ramble"][section] = section_dict
+                    workspace_dict[namespace.ramble][section] = section_dict
 
         print(f"\n{syaml.dump(workspace_dict, Dumper=syaml.OrderedLineDumper)}")
 
@@ -1298,10 +1298,10 @@ ramble:
 
         # TODO: Deprecate / remove in favor of explicit variant definitions
         if package_manager:
-            exp_context.variants["package_manager"] = package_manager
+            exp_context.variants[namespace.package_manager] = package_manager
 
         if workflow_manager:
-            exp_context.variants["workflow_manager"] = workflow_manager
+            exp_context.variants[namespace.workflow_manager] = workflow_manager
 
         if application not in apps_dict:
             apps_dict[application] = syaml.syaml_dict()
@@ -2676,7 +2676,7 @@ ramble:
         # load config scopes added via 'include:', in reverse so that
         # highest-precedence scopes are last.
         includes = config_dict(self.config_sections[namespace.workspace]["yaml"]).get(
-            "include", []
+            namespace.include, []
         )
         missing = []
         for full_config_path in reversed(includes):

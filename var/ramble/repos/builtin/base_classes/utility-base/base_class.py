@@ -31,6 +31,9 @@ class UtilityBase(ObjectMixin, metaclass=DirectiveMeta):
 
     utility_class = "UtilityBase"
 
+    #: Value of a utility's ``path`` variable meaning "use the system-installed copy"
+    SYSTEM_PATH = "system"
+
     def __init__(self, file_path):
         super().__init__()
 
@@ -133,7 +136,7 @@ class UtilityBase(ObjectMixin, metaclass=DirectiveMeta):
             self._runner_env.apply_modifications(check_env)
 
         env_path = check_env.get("PATH", os.environ.get("PATH", ""))
-        if path and path != "system":
+        if path and path != self.SYSTEM_PATH:
             bin_path = os.path.join(path, "bin")
             search_path = f"{bin_path}{os.pathsep}{path}"
         else:
@@ -207,7 +210,7 @@ class UtilityBase(ObjectMixin, metaclass=DirectiveMeta):
         check_env = env if env is not None else os.environ.copy()
 
         env_path = check_env.get("PATH", os.environ.get("PATH", ""))
-        if path and path != "system":
+        if path and path != self.SYSTEM_PATH:
             bin_path = os.path.join(path, "bin")
             search_path = f"{bin_path}{os.pathsep}{path}"
         else:
@@ -387,7 +390,7 @@ class UtilityBase(ObjectMixin, metaclass=DirectiveMeta):
             return self._runner_env_cache[cache_key]
 
         env_mod = spack.util.environment.EnvironmentModifications()
-        if utility_path == "system":
+        if utility_path == self.SYSTEM_PATH:
             self._runner_env = env_mod
             self._runner_env_cache[cache_key] = env_mod
             return env_mod
@@ -449,7 +452,7 @@ class UtilityBase(ObjectMixin, metaclass=DirectiveMeta):
 
         commands = []
         utility_path = app_inst.variables.get(f"utility::{self.name}::path")
-        if utility_path == "system":
+        if utility_path == self.SYSTEM_PATH:
             return ""
 
         expander = getattr(app_inst, "expander", None)

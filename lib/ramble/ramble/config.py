@@ -718,10 +718,10 @@ class Configuration:
             scopes = [self._validate_scope(scope)]
 
         merged_section = syaml.syaml_dict()
-        for scope in scopes:
+        for cfg_scope in scopes:
             # read potentially cached data from the scope.
 
-            data = scope.get_section(section)
+            data = cfg_scope.get_section(section)
 
             # Skip empty configs
             if not data or not isinstance(data, dict):
@@ -734,7 +734,7 @@ class Configuration:
             # thus read data and update it in memory if need be.
             changed = _update_in_memory(data, section)
             if changed:
-                self.format_updates[section].append(scope)
+                self.format_updates[section].append(cfg_scope)
 
             merged_section = merge_yaml(merged_section, data)
 
