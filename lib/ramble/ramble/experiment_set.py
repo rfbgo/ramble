@@ -837,14 +837,14 @@ class ExperimentSet:
 
     def define_scoped_tables(self, workload_names, experiment_template_name):
         # Generate focused tables for results
-        app_context = self._context[self._contexts["application"]]
+        app_context = self._context[self._contexts.application]
         for table in app_context.tables:
             results_table = self._workspace.results_tables.add_table_template(table)
             results_table.add_where(
                 f"'{{application_name}}' == '{app_context.context_name}'",
             )
 
-        wl_context = self._context[self._contexts["workload"]]
+        wl_context = self._context[self._contexts.workload]
         for table in wl_context.tables:
             for workload_name in workload_names:
                 results_table = self._workspace.results_tables.add_table_template(table)
@@ -855,7 +855,7 @@ class ExperimentSet:
                     ]
                 )
 
-        exp_context = self._context[self._contexts["experiment"]]
+        exp_context = self._context[self._contexts.experiment]
         for table in exp_context.tables:
             for workload_name in workload_names:
                 results_table = self._workspace.results_tables.add_table_template(table)

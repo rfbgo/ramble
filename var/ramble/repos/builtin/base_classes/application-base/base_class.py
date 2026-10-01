@@ -3750,9 +3750,9 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
             value = fom["value"]
             try:
                 value = float(value)
-                if (
-                    fom["fom_type"]["name"] is FomType.CATEGORY.name
-                    or fom["fom_type"]["name"] is FomType.INFO.name
+                if fom["fom_type"]["name"] in (
+                    FomType.CATEGORY.name,
+                    FomType.INFO.name,
                 ):
                     return False
                 return True
