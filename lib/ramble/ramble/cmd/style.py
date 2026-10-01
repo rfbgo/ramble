@@ -270,11 +270,18 @@ def setup_parser(subparser):
         action="append",
         help=f"specify tools to skip (choose from {','.join(tool_names)})",
     )
-    subparser.add_argument(
+    path_group = subparser.add_mutually_exclusive_group()
+    path_group.add_argument(
         "--repo-path",
         action="store",
         default=None,
         help="apply style checks and fixes to the given repository",
+    )
+    path_group.add_argument(
+        "--root",
+        action="store",
+        default=None,
+        help="style check a different ramble instance",
     )
     subparser.add_argument(
         "--tool-args",
@@ -283,6 +290,14 @@ def setup_parser(subparser):
         help="specify extra arguments to pass to tools (e.g., --tool-args ruff:'--unsafe-fixes')",
     )
     subparser.add_argument("files", nargs=argparse.REMAINDER, help="specific files to check")
+
+
+def _get_root(args):
+    if getattr(args, "repo_path", None) is not None:
+        return args.repo_path
+    if getattr(args, "root", None) is not None:
+        return os.path.abspath(os.path.realpath(args.root))
+    return ramble.paths.prefix
 
 
 def print_tool_header(tool, file_list):
@@ -304,7 +319,7 @@ def print_tool_result(tool, returncode):
 
 
 def print_output(output, args):
-    root = args.repo_path if args.repo_path is not None else ramble.paths.prefix
+    root = _get_root(args)
     if args.root_relative:
         # print results relative to repo root.
         print(output)
@@ -423,7 +438,7 @@ def run_flake8(flake8_cmd, file_list, args):
         print_tool_header("flake8", file_list)
 
         # run flake8 on the temporary tree, once for core, once for objects
-        root = args.repo_path if args.repo_path is not None else ramble.paths.prefix
+        root = _get_root(args)
         primary_file_list, object_file_list = _split_file_list(file_list, args)
 
         returncode = 0
@@ -631,13 +646,20 @@ def validate_toolset(arg_value):
 
 def style(parser, args):
     file_list = args.files
-    root = args.repo_path if args.repo_path is not None else ramble.paths.prefix
+    root = _get_root(args)
 
     if args.repo_path is not None:
         try:
             repository.Repo(args.repo_path)
         except repository.BadRepoError as e:
             logger.die(f"'{args.repo_path}' is not a valid Ramble repository: {e}")
+
+    if args.root is not None:
+        ramble_script = os.path.join(root, "bin", "ramble")
+        if not os.path.isfile(ramble_script):
+            logger.die(
+                f"This does not look like a valid ramble root. No such file: '{ramble_script}'"
+            )
 
     if file_list:
 
