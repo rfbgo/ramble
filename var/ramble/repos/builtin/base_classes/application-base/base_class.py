@@ -3277,10 +3277,9 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
 
             self._render_object_templates(exec_vars)
 
-            with open(
-                workspace.all_experiments_path, "a", encoding="utf-8"
-            ) as f:
-                f.write(self.expander.expand_var("{batch_submit}\n"))
+            workspace.experiments_script.append(
+                self.expander.expand_var("{batch_submit}\n")
+            )
 
         self.set_status(status=ExperimentStatus.SETUP)
 
