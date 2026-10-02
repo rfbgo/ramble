@@ -730,7 +730,7 @@ _ramble_workspace_create() {
 }
 
 _ramble_workspace_concretize() {
-    RAMBLE_COMPREPLY="-h --help -f --force-concretize --simplify --quiet -q --dry-run"
+    RAMBLE_COMPREPLY="-h --help -f --force-concretize --simplify --quiet -q --include-injected-packages --dry-run"
 }
 
 _ramble_workspace_config() {

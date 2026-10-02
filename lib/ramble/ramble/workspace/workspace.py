@@ -1471,7 +1471,7 @@ ramble:
             workspace_dict = self._get_workspace_dict()
             workspace_dict[namespace.ramble][namespace.application] = apps_dict
 
-    def concretize(self, force=False, quiet=False):
+    def concretize(self, force=False, quiet=False, include_injected=False):
         """Concretize software definitions for defined experiments
 
         Extract suggested software for experiments defined in a workspace, and
@@ -1480,7 +1480,8 @@ ramble:
         Args:
             force (bool): Whether to overwrite conflicting definitions of named packages or not
             quiet (bool): Whether to silently ignore conflicts or not
-
+            include_injected (bool): Whether to include inject_if_missing packages/compilers
+                in configuration
 
         """
         full_software_dict = copy.deepcopy(ramble.config.get(namespace.software))
@@ -1531,6 +1532,11 @@ ramble:
             )
             for comp, definitions in compiler_packages.items():
                 for info in definitions:
+                    # Avoid writing inject_if_missing compilers to workspace config
+                    # by default (include_injected=False) as they are resolved at runtime.
+                    if info.inject_if_missing and not include_injected:
+                        continue
+
                     if (
                         not quiet
                         and comp in packages_dict
@@ -1588,13 +1594,29 @@ ramble:
                         info.pkg_spec
                     )
 
-                if info.inject_if_missing:
-                    if pm_package_name and pm_package_name in defined_pm_packages:
-                        logger.debug(
-                            f"    Skipping inject_if_missing spec {spec_name} "
-                            f"because package {pm_package_name} is already defined."
-                        )
-                        continue
+                # If an inject_if_missing spec is already defined by the application or
+                # workspace, it will not be injected and should be skipped before marking
+                # its compiler as used.
+                if (
+                    info.inject_if_missing
+                    and pm_package_name
+                    and pm_package_name in defined_pm_packages
+                ):
+                    logger.debug(
+                        f"    Skipping inject_if_missing spec {spec_name} "
+                        f"because package {pm_package_name} is already defined."
+                    )
+                    continue
+
+                # Check for usage of compilers
+                expanded_compiler = app_inst.expander.expand_var(info.compiler)
+                if expanded_compiler in compiler_packages:
+                    compiler_packages[expanded_compiler] = True
+
+                # Avoid writing inject_if_missing packages to workspace config
+                # by default (include_injected=False) as they are resolved at runtime.
+                if info.inject_if_missing and not include_injected:
+                    continue
 
                 if (
                     not quiet
@@ -1611,11 +1633,6 @@ ramble:
                     force and spec_name not in newly_created_packages
                 ):
                     packages_dict[spec_name] = syaml.syaml_dict()
-
-                # Check for usage of compilers
-                expanded_compiler = app_inst.expander.expand_var(info.compiler)
-                if expanded_compiler in compiler_packages:
-                    compiler_packages[expanded_compiler] = True
 
                 packages_dict[spec_name].update(info.to_dict(apply_prefix=force_prefix))
 
@@ -1634,7 +1651,7 @@ ramble:
             # Ensure all compilers in this experiment are used.
             comp_list = []
             for name, used in compiler_packages.items():
-                if not used:
+                if not used and (name in packages_dict or include_injected):
                     comp_list.append(name)
             if comp_list:
                 logger.warn(
