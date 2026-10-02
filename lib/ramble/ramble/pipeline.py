@@ -617,18 +617,17 @@ class SetupPipeline(Pipeline):
                 with open(script_path, "w+", encoding="utf-8") as f:
                     f.write(module_content)
 
-        experiment_file = open(self.workspace.all_experiments_path, "w+", encoding="utf-8")
         shell = ramble.config.get("config:shell")
         shell_path = os.path.join("/bin/", shell)
-        experiment_file.write(f"#!{shell_path}\n")
-        self.workspace.experiments_script = experiment_file
+        self.workspace.experiments_script = [f"#!{shell_path}\n"]
 
     def _complete(self):
         super()._complete()
-        self.workspace.experiments_script.close()
         experiment_file_path = os.path.join(
             self.workspace.root, self.workspace.all_experiments_path
         )
+        with open(experiment_file_path, "w+", encoding="utf-8") as f:
+            f.writelines(self.workspace.experiments_script)
         os.chmod(experiment_file_path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
 
 

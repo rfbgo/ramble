@@ -518,7 +518,7 @@ class Workspace:
         #  }
         self.application_configs = {}
 
-        self.experiments_script = None
+        self.experiments_script = []
 
         self._read()
 

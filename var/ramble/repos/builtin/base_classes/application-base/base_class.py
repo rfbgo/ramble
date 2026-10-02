@@ -3282,8 +3282,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
 
             self._render_object_templates(exec_vars)
 
-            experiment_script = workspace.experiments_script
-            experiment_script.write(
+            workspace.experiments_script.append(
                 self.expander.expand_var("{batch_submit}\n")
             )
 
