@@ -625,11 +625,25 @@ class SetupPipeline(Pipeline):
 
     def _complete(self):
         super()._complete()
-        self.workspace.experiments_script.close()
+        self._close_experiments_script()
         experiment_file_path = os.path.join(
             self.workspace.root, self.workspace.all_experiments_path
         )
         os.chmod(experiment_file_path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
+
+    def run(self):
+        try:
+            super().run()
+        finally:
+            # _prepare opens the experiments script; make sure it is closed
+            # even if setup fails before _complete runs.
+            self._close_experiments_script()
+
+    def _close_experiments_script(self):
+        script = self.workspace.experiments_script
+        if script is not None and not script.closed:
+            script.close()
+        self.workspace.experiments_script = None
 
 
 class PushToCachePipeline(Pipeline):
