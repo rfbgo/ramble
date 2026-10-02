@@ -518,8 +518,6 @@ class Workspace:
         #  }
         self.application_configs = {}
 
-        self.experiments_script = None
-
         self._read()
 
         # Create a logger to redirect certain prints from screen to log file

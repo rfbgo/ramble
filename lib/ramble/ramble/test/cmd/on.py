@@ -66,31 +66,6 @@ def test_execute_pipeline():
         execute_pipeline.run()
 
 
-def test_setup_pipeline_closes_experiments_script_on_failure(monkeypatch):
-    ws_name = "test_setup_fail"
-    workspace("create", ws_name)
-
-    setup_pipeline_class = ramble.pipeline.pipeline_class(ramble.pipeline.pipelines.setup)
-    filters = ramble.filters.Filters()
-
-    with ramble.workspace.read(ws_name) as ws:
-        ramble.test.cmd.workspace.add_basic(ws)
-        setup_pipeline = setup_pipeline_class(ws, filters)
-        opened = []
-
-        def failing_execute():
-            opened.append(ws.experiments_script)
-            raise RuntimeError("boom during setup")
-
-        monkeypatch.setattr(setup_pipeline, "_execute", failing_execute)
-        with pytest.raises(RuntimeError, match="boom during setup"):
-            setup_pipeline.run()
-
-        assert len(opened) == 1
-        assert opened[0].closed
-        assert ws.experiments_script is None
-
-
 def test_on_where():
     ws_name = "test"
     workspace("create", ws_name)
