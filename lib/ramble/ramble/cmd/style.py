@@ -172,11 +172,14 @@ def changed_files(
     changed = set()
 
     with working_dir(root):
+        real_root = os.path.realpath(root)
         try:
             git("rev-parse", "--is-inside-work-tree", output=str, error=str)
         except ProcessError:
             # if not a git repo, return all python files matching include patterns
             for f in glob.glob(os.path.join(root, "**", "*.py"), recursive=True):
+                if os.path.commonpath([real_root, os.path.realpath(f)]) != real_root:
+                    continue
                 rel_f = os.path.relpath(f, root)
                 if is_external_repo or any(fnmatch.fnmatch(rel_f, p) for p in include_patterns):
                     changed.add(rel_f)
@@ -199,8 +202,10 @@ def changed_files(
                 ):
                     continue
 
-                # Exclude non-existent files
+                # Exclude non-existent files or paths escaping root
                 if not os.path.exists(f):
+                    continue
+                if os.path.commonpath([real_root, os.path.realpath(f)]) != real_root:
                     continue
 
                 changed.add(f)

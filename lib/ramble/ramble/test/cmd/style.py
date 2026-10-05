@@ -7,6 +7,8 @@
 # except according to those terms.
 
 
+import os
+
 import pytest
 
 from ramble import main
@@ -288,3 +290,28 @@ def test_style_valid_root_fix(tmpdir):
 def test_style_root_and_repo_path_mutually_exclusive(tmpdir):
     with pytest.raises(SystemExit):
         style_cmd("--root", str(tmpdir), "--repo-path", str(tmpdir), fail_on_error=False)
+
+
+def test_style_root_ignores_paths_escaping_root(tmpdir):
+    root_dir = tmpdir.join("root")
+    outside_dir = tmpdir.join("outside")
+    outside_dir.ensure(dir=True)
+
+    outside_file = outside_dir.join("external.py")
+    outside_content = "import sys\nimport os\n"
+    outside_file.write(outside_content)
+
+    bin_dir = root_dir.join("bin")
+    bin_dir.ensure(dir=True)
+    bin_dir.join("ramble").write("#!/bin/sh\n")
+
+    lib_dir = root_dir.join("lib", "ramble", "ramble")
+    lib_dir.ensure(dir=True)
+    inside_file = lib_dir.join("inside.py")
+    inside_file.write("import os\n\nprint(os.name)\n")
+
+    os.symlink(str(outside_file), str(lib_dir.join("escaped_link.py")))
+
+    files = style.changed_files(all_files=True, root=str(root_dir))
+    assert files == [os.path.join("lib", "ramble", "ramble", "inside.py")]
+    assert outside_file.read() == outside_content
