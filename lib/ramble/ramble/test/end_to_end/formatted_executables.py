@@ -123,11 +123,6 @@ ramble:
 
 
 def test_object_formatted_executables(mock_modifiers, workspace_name):
-    mod_config = r"""
-modifiers:
-- name: formatted-exec-mod
-"""
-
     template_suffix = r"""
 {mod_formatted_exec}
 """
@@ -136,11 +131,7 @@ modifiers:
 
     ws.write()
 
-    modifier_path = os.path.join(ws.config_dir, "modifiers.yaml")
     exec_path = os.path.join(ws.config_dir, "execute_experiment.tpl")
-
-    with open(modifier_path, "w+", encoding="utf-8") as f:
-        f.write(mod_config)
 
     with open(exec_path, "a", encoding="utf-8") as f:
         f.write(template_suffix)
@@ -160,6 +151,10 @@ modifiers:
         "--default-variable-value",
         "1",
         global_args=global_args,
+    )
+
+    workspace(
+        "manage", "modifiers", "--add", "--name", "formatted-exec-mod", global_args=global_args
     )
 
     ws._re_read()

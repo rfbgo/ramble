@@ -267,39 +267,32 @@ def test_modifier_variants_works_with_when(
     workspace_name = test_name
     global_args = ["-w", workspace_name]
 
-    test_config = f"""
-ramble:
-  variants:
-    package_manager: spack
-    zlib_type: modifier
-    inc_zlib: true
-  variables:
-    mpi_command: ''
-    batch_submit: 'batch_submit {{execute_experiment}}'
-    processes_per_node: 1
-    modeless_required_var: 1
-  applications:
-    when-variants:
-      workloads:
-        test_wl:
-          experiments:
-            test:
-              variables:
-                n_ranks: 1
-                n_nodes: 1
-                processes_per_node: 1
-  modifiers:
-  - name: test-mod
-    mode: {mode}
-"""
-
     with ramble.workspace.create(workspace_name) as ws:
-        ws.write()
-
-        config_path = os.path.join(ws.config_dir, ramble.workspace.CONFIG_FILE_NAME)
-
-        with open(config_path, "w+", encoding="utf-8") as f:
-            f.write(test_config)
+        workspace(
+            "manage",
+            "experiments",
+            "when-variants",
+            "--wf",
+            "test_wl",
+            "-e",
+            "test",
+            "-v",
+            "n_ranks=1",
+            "-v",
+            "n_nodes=1",
+            "-v",
+            "processes_per_node=1",
+            "-V",
+            "package_manager=spack",
+            "--default-variable-value",
+            "1",
+            global_args=global_args,
+        )
+        workspace(
+            "manage", "modifiers", "--add", "-n", "test-mod", "-m", mode, global_args=global_args
+        )
+        config("add", "variants:zlib_type:modifier", global_args=global_args)
+        config("add", "variants:inc_zlib:true", global_args=global_args)
 
         ws._re_read()
         workspace("concretize", "-f", global_args=global_args)
@@ -418,9 +411,9 @@ def test_variant_expansion(workspace_name, variant_scope, expected_bool, expecte
         config("add", f"variants:val:{expected_val}", global_args=global_args)
 
         if variant_scope == "mod_pkg_args":
-            with open(os.path.join(ws.config_dir, "modifiers.yaml"), "w+", encoding="utf-8") as f:
-                f.write("""modifiers:
-- name: spack-mod""")
+            workspace(
+                "manage", "modifiers", "--add", "--name", "spack-mod", global_args=global_args
+            )
 
         ws._re_read()
         workspace("concretize", global_args=global_args)

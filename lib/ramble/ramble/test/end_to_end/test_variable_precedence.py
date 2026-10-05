@@ -46,17 +46,17 @@ def test_variable_cross_pass_precedence(workspace_name):
             global_args=global_args,
         )
 
-        # Edit workspace config directly
-        with open(ws.config_file_path, encoding="utf-8") as f:
-            import yaml  # type: ignore
-
-            data = yaml.safe_load(f)
-
-        data["ramble"]["modifiers"] = [{"name": "precedence-test", "mode": "test_mode"}]
-        data["ramble"]["variants"] = {"trigger": "True"}
-
-        with open(ws.config_file_path, "w", encoding="utf-8") as f:
-            yaml.dump(data, f)
+        workspace(
+            "manage",
+            "modifiers",
+            "--add",
+            "--name",
+            "precedence-test",
+            "--mode",
+            "test_mode",
+            global_args=global_args,
+        )
+        config("add", "variants:trigger:True", global_args=global_args)
 
         ws._re_read()
 

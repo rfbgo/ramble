@@ -823,10 +823,7 @@ def test_modifier_variable_when(workspace_name, inc_value, mutable_mock_mods_rep
             global_args=global_args,
         )
 
-        config_path = os.path.join(ws.config_dir, "modifiers.yaml")
-        with open(config_path, "w+", encoding="utf-8") as f:
-            f.write("modifiers:\n")
-            f.write(" - name: when-modifier\n")
+        workspace("manage", "modifiers", "--add", "-n", "when-modifier", global_args=global_args)
 
         config("add", f"variants:modifier_included:{inc_value}", global_args=global_args)
 
@@ -1546,10 +1543,9 @@ def test_obj_env_var_when(workspace_name, obj, mutable_mock_wms_repo, mutable_mo
         if obj == "app":
             config("add", "variants:app_env_var_included:true", global_args=global_args)
         elif obj == "mod":
-            mod_config_path = os.path.join(ws.config_dir, "modifiers.yaml")
-            with open(mod_config_path, "w+", encoding="utf-8") as f:
-                f.write("modifiers:\n")
-                f.write(" - name: when-modifier\n")
+            workspace(
+                "manage", "modifiers", "--add", "-n", "when-modifier", global_args=global_args
+            )
             config("add", "variants:mod_env_var_included:true", global_args=global_args)
         elif obj == "wf_man":
             config("add", "variants:workflow_manager_included:true", global_args=global_args)
@@ -1614,10 +1610,7 @@ def test_env_var_modification_when(workspace_name, env_var_mod_when, expected_ex
             global_args=global_args,
         )
 
-        mod_config_path = os.path.join(ws.config_dir, "modifiers.yaml")
-        with open(mod_config_path, "w+", encoding="utf-8") as f:
-            f.write("modifiers:\n")
-            f.write(" - name: when-modifier\n")
+        workspace("manage", "modifiers", "--add", "-n", "when-modifier", global_args=global_args)
 
         config(
             "add",
@@ -1672,10 +1665,7 @@ def test_executable_modification_when(workspace_name, exec_mod_when, expected_ex
             global_args=global_args,
         )
 
-        mod_config_path = os.path.join(ws.config_dir, "modifiers.yaml")
-        with open(mod_config_path, "w+", encoding="utf-8") as f:
-            f.write("modifiers:\n")
-            f.write(" - name: when-modifier\n")
+        workspace("manage", "modifiers", "--add", "-n", "when-modifier", global_args=global_args)
 
         config(
             "add",
@@ -1733,11 +1723,16 @@ def test_variable_modification_when(workspace_name, var_mod_when, modifier_mode,
             global_args=global_args,
         )
 
-        mod_config_path = os.path.join(ws.config_dir, "modifiers.yaml")
-        with open(mod_config_path, "w+", encoding="utf-8") as f:
-            f.write("modifiers:\n")
-            f.write(" - name: when-modifier\n")
-            f.write(f"   mode: {modifier_mode}\n")
+        workspace(
+            "manage",
+            "modifiers",
+            "--add",
+            "-n",
+            "when-modifier",
+            "-m",
+            modifier_mode,
+            global_args=global_args,
+        )
 
         config(
             "add",
@@ -1787,10 +1782,7 @@ def test_package_manager_requirement_when(workspace_name):
             global_args=global_args,
         )
 
-        mod_config_path = os.path.join(ws.config_dir, "modifiers.yaml")
-        with open(mod_config_path, "w+", encoding="utf-8") as f:
-            f.write("modifiers:\n")
-            f.write(" - name: when-modifier\n")
+        workspace("manage", "modifiers", "--add", "-n", "when-modifier", global_args=global_args)
 
         ws._re_read()
         workspace("setup", global_args=global_args)
@@ -1835,11 +1827,16 @@ def test_obj_required_var_when(
         ]
 
         if obj == "mod":
-            mod_config_path = os.path.join(ws.config_dir, "modifiers.yaml")
-            with open(mod_config_path, "w+", encoding="utf-8") as f:
-                f.write("modifiers:\n")
-                f.write(" - name: when-modifier\n")
-                f.write("   mode: test")
+            workspace(
+                "manage",
+                "modifiers",
+                "--add",
+                "-n",
+                "when-modifier",
+                "-m",
+                "test",
+                global_args=global_args,
+            )
         elif obj == "wf_man":
             config("add", "variants:workflow_manager_included:true", global_args=global_args)
         elif obj == "pkg_man":
@@ -1896,11 +1893,16 @@ def test_obj_required_key_when(
         ]
 
         if obj == "mod":
-            mod_config_path = os.path.join(ws.config_dir, "modifiers.yaml")
-            with open(mod_config_path, "w+", encoding="utf-8") as f:
-                f.write("modifiers:\n")
-                f.write(" - name: when-modifier\n")
-                f.write("   mode: test")
+            workspace(
+                "manage",
+                "modifiers",
+                "--add",
+                "-n",
+                "when-modifier",
+                "-m",
+                "test",
+                global_args=global_args,
+            )
         elif obj == "wf_man":
             config("add", "variants:workflow_manager_included:true", global_args=global_args)
         elif obj == "pkg_man":

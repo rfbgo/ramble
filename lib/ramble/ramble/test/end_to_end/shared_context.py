@@ -32,39 +32,37 @@ def test_shared_contexts(
     mock_modifiers,
     workspace_name,
 ):
-    test_config = """
-ramble:
-  variables:
-    mpi_command: 'mpirun -n {n_ranks} -ppn {processes_per_node}'
-    batch_submit: 'batch_submit {execute_experiment}'
-    partition: 'part1'
-    processes_per_node: '1'
-    n_threads: '1'
-    modeless_required_var: '1'
-  applications:
-    shared-context:
-      workloads:
-        test_wl:
-          experiments:
-            simple_test:
-              modifiers:
-                - name: test-mod
-              variables:
-                n_nodes: 1
-  software:
-    packages: {}
-    environments: {}
-"""
+    global_args = ["-w", workspace_name]
     with ramble.workspace.create(workspace_name) as ws:
-        ws.write()
-
-        config_path = os.path.join(ws.config_dir, ramble.workspace.CONFIG_FILE_NAME)
-
-        with open(config_path, "w+", encoding="utf-8") as f:
-            f.write(test_config)
+        workspace(
+            "manage",
+            "experiments",
+            "shared-context",
+            "--wf",
+            "test_wl",
+            "-e",
+            "simple_test",
+            "-v",
+            "n_nodes=1",
+            "-v",
+            "processes_per_node=1",
+            "-v",
+            "modeless_required_var=1",
+            global_args=global_args,
+        )
+        workspace(
+            "manage",
+            "modifiers",
+            "--add",
+            "-n",
+            "test-mod",
+            "-s",
+            "shared-context:test_wl:simple_test",
+            global_args=global_args,
+        )
         ws._re_read()
 
-        workspace("setup", "--dry-run", global_args=["-w", workspace_name])
+        workspace("setup", "--dry-run", global_args=global_args)
 
         # Create fake figures of merit.
         exp_dir = os.path.join(ws.root, "experiments", "shared-context", "test_wl", "simple_test")

@@ -180,10 +180,9 @@ def test_object_env_var_definitions(
             global_args=global_args,
         )
 
-        mod_config_path = os.path.join(ws.config_dir, "modifiers.yaml")
-        with open(mod_config_path, "w+", encoding="utf-8") as f:
-            f.write("modifiers:\n")
-            f.write(" - name: when-modifier\n")
+        workspace(
+            "manage", "modifiers", "--add", "--name", "when-modifier", global_args=global_args
+        )
 
         config("add", "variants:app_env_var_included:true", global_args=global_args)
         config("add", "variants:workflow_manager_included:true", global_args=global_args)
@@ -272,6 +271,8 @@ ramble:
     processes_per_node: 1
     n_nodes: 1
     info-app-dep_path: /not/a/path
+  modifiers:
+  - name: info
   applications:
     basic:
       workloads:
@@ -288,8 +289,6 @@ ramble:
             wl_no_match_auto_env_var:
               variables:
                 auto_env_var: 123
-  modifiers:
-  - name: info
 """
     ws, ws_name = make_workspace_from_config(test_config)
 
