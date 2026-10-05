@@ -6,8 +6,6 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-import os
-
 import pytest
 
 import ramble.experiment_set
@@ -32,38 +30,38 @@ def test_required_variables(
     test_name, mode, expect_error, mutable_mock_workspace_path, mutable_applications
 ):
     workspace_name = test_name
-
-    test_config = f"""
-ramble:
-  variables:
-    mpi_command: ''
-    batch_submit: 'batch_submit {{execute_experiment}}'
-    processes_per_node: 1
-  applications:
-    hostname:
-      workloads:
-        local:
-          experiments:
-            test:
-              variables:
-                n_nodes: 1
-  modifiers:
-  - name: gcp-metadata
-    mode: {mode}
-"""
+    global_args = ["-w", workspace_name]
 
     with ramble.workspace.create(workspace_name) as ws:
-        ws.write()
-
-        config_path = os.path.join(ws.config_dir, ramble.workspace.CONFIG_FILE_NAME)
-
-        with open(config_path, "w+", encoding="utf-8") as f:
-            f.write(test_config)
+        workspace(
+            "manage",
+            "experiments",
+            "hostname",
+            "--wf",
+            "local",
+            "-e",
+            "test",
+            "-v",
+            "n_nodes=1",
+            "-v",
+            "processes_per_node=1",
+            global_args=global_args,
+        )
+        workspace(
+            "manage",
+            "modifiers",
+            "--add",
+            "-n",
+            "gcp-metadata",
+            "-m",
+            mode,
+            global_args=global_args,
+        )
 
         ws._re_read()
 
         if expect_error:
             with pytest.raises(expect_error):
-                workspace("setup", "--dry-run", global_args=["-D", ws.root])
+                workspace("setup", "--dry-run", global_args=global_args)
         else:
-            workspace("setup", "--dry-run", global_args=["-D", ws.root])
+            workspace("setup", "--dry-run", global_args=global_args)

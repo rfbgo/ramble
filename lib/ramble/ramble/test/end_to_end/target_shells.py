@@ -6,8 +6,6 @@
 # option. This file may not be copied, modified, or distributed
 # except according to those terms.
 
-import os
-
 import pytest
 
 import ramble.workspace
@@ -19,6 +17,7 @@ pytestmark = pytest.mark.usefixtures(
     "mutable_mock_workspace_path",
 )
 
+config = RambleCommand("config")
 workspace = RambleCommand("workspace")
 
 
@@ -30,42 +29,31 @@ workspace = RambleCommand("workspace")
     ],
 )
 def test_target_shells_directive(configured_shell, expect_error):
-    test_config = f"""
-ramble:
-  variables:
-    mpi_command: ''
-    batch_submit: '{{execute_experiment}}'
-    processes_per_node: 1
-    n_ranks: 1
-  applications:
-    hostname:
-      workloads:
-        local:
-          experiments:
-            test: {{}}
-  modifiers:
-  # This requires bash shell
-  - name: wait-for-bg-jobs
-  config:
-    shell: {configured_shell}
-  software:
-    packages: {{}}
-    environments: {{}}
-"""
-
     ws_name = f"test_{configured_shell}"
+    global_args = ["-w", ws_name]
     ws = ramble.workspace.create(ws_name)
-    ws.write()
-
-    config_path = os.path.join(ws.config_dir, ramble.workspace.CONFIG_FILE_NAME)
-
-    with open(config_path, "w+", encoding="utf-8") as f:
-        f.write(test_config)
+    workspace(
+        "manage",
+        "experiments",
+        "hostname",
+        "--wf",
+        "local",
+        "-e",
+        "test",
+        "-v",
+        "n_ranks=1",
+        "-v",
+        "processes_per_node=1",
+        global_args=global_args,
+    )
+    # This requires bash shell
+    workspace("manage", "modifiers", "--add", "-n", "wait-for-bg-jobs", global_args=global_args)
+    config("add", f"config:shell:{configured_shell}", global_args=global_args)
 
     ws._re_read()
 
     if expect_error:
         with pytest.raises(RambleCommandError):
-            workspace("setup", "--dry-run", global_args=["-w", ws_name])
+            workspace("setup", "--dry-run", global_args=global_args)
     else:
-        workspace("setup", "--dry-run", global_args=["-w", ws_name])
+        workspace("setup", "--dry-run", global_args=global_args)

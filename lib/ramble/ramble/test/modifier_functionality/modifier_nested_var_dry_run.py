@@ -49,12 +49,16 @@ def test_nested_modifier_var(
         with open(template_path, "w+", encoding="utf-8") as f:
             f.write("{level1_mod_var}")
 
-        modifier_config_path = os.path.join(ws1.config_dir, "modifiers.yaml")
-
-        with open(modifier_config_path, "w+", encoding="utf-8") as f:
-            f.write("modifiers:\n")
-            f.write("- name: test-mod\n")
-            f.write("  mode: test\n")
+        workspace(
+            "manage",
+            "modifiers",
+            "--add",
+            "--name",
+            "test-mod",
+            "--mode",
+            "test",
+            global_args=global_args,
+        )
 
         workspace("setup", "--dry-run", global_args=global_args)
 

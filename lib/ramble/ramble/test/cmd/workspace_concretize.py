@@ -59,11 +59,7 @@ def test_workspace_concretize_additive(workspace_name):
         assert "wrf" in content
         assert "intel-oneapi-vtune" not in content
 
-    modifiers_path = os.path.join(ws.config_dir, "modifiers.yaml")
-
-    with open(modifiers_path, "w+", encoding="utf-8") as f:
-        f.write("""modifiers:
-- name: intel-aps""")
+    workspace("manage", "modifiers", "--add", "--name", "intel-aps", global_args=global_args)
 
     workspace("concretize", "-q", global_args=global_args)
 

@@ -23,31 +23,32 @@ pytestmark = pytest.mark.usefixtures(
 
 def test_status_markers(request):
     ws_name = request.node.name
-    test_config = """
-ramble:
-  modifiers:
-  - name: status-markers
-  variables:
-    processes_per_node: 1
-    n_nodes: 1
-    mpi_command: ''
-    batch_submit: '{execute_experiment}'
-  applications:
-    hostname:
-      workloads:
-        local:
-          experiments:
-            test: {}
-"""
-    ws = ramble.workspace.create(ws_name)
-    ws.write()
-    config_path = os.path.join(
-        ws.config_dir, ramble.workspace.CONFIG_FILE_NAME
-    )
-    with open(config_path, "w+", encoding="utf-8") as f:
-        f.write(test_config)
-    ws._re_read()
-    workspace("setup", "--dry-run", global_args=["-D", ws.root])
+    global_args = ["-w", ws_name]
+    with ramble.workspace.create(ws_name) as ws:
+        workspace(
+            "manage",
+            "experiments",
+            "hostname",
+            "--wf",
+            "local",
+            "-e",
+            "test",
+            "-v",
+            "n_nodes=1",
+            "-v",
+            "processes_per_node=1",
+            global_args=global_args,
+        )
+        workspace(
+            "manage",
+            "modifiers",
+            "--add",
+            "-n",
+            "status-markers",
+            global_args=global_args,
+        )
+        ws._re_read()
+        workspace("setup", "--dry-run", global_args=global_args)
     run_dir = os.path.join(ws.experiment_dir, "hostname", "local", "test")
     with open(
         os.path.join(run_dir, "execute_experiment"), encoding="utf-8"
