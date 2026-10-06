@@ -638,8 +638,7 @@ Experiment Repeats
 
 Ramble provides a simple mechanism to repeat the same experiment a specified number of
 times, and calculates summary statistics for the set of repeated experiments. To enable
-repeats, an ``n_repeats`` block can be added at the application, workload, or experiment
-level.
+repeats, an ``n_repeats`` block can be added at the config or experiment level.
 
 .. code-block:: yaml
 
@@ -649,10 +648,8 @@ level.
         repeat_success_strict: [True/False]
       applications:
         hostname:
-          n_repeats: int
           workloads:
             serial:
-              n_repeats: int
               experiments:
                 test_experiment:
                   n_repeats: int
