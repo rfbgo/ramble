@@ -192,3 +192,58 @@ ramble:
         assert "hostname-overridden >>" in content
         # The old executable should not be included
         assert "hostname >>" not in content
+
+
+@pytest.mark.parametrize(
+    "injection_block,expected_err",
+    [
+        (
+            "- name: non_existent_exec",
+            'attempting to inject a non existing executable "non_existent_exec"',
+        ),
+        (
+            "- name: custom_exec\n  order: before\n  relative_to: non_existent_rel",
+            'attempting to inject executable "custom_exec" '
+            'relative to a non existing executable "non_existent_rel"',
+        ),
+        (
+            "- name: custom_exec\n  order: before\n  relative_to: unscheduled_exec",
+            'attempting to inject executable "custom_exec" '
+            'relative to a non existing executable "unscheduled_exec"',
+        ),
+        (
+            "- name: custom_exec\n  order: invalid_order",
+            'injection order of executable "custom_exec" is set to an '
+            'invalid value of "invalid_order"',
+        ),
+    ],
+)
+def test_executable_injection_errors(make_workspace_from_config, injection_block, expected_err):
+    indented_injection = "\n".join(
+        f"                {line}" for line in injection_block.splitlines()
+    )
+    test_config = f"""
+ramble:
+  variables:
+    processes_per_node: 1
+    n_nodes: 1
+  applications:
+    hostname:
+      workloads:
+        local:
+          experiments:
+            test:
+              internals:
+                custom_executables:
+                  custom_exec:
+                    template:
+                    - 'echo "hello"'
+                  unscheduled_exec:
+                    template:
+                    - 'echo "unscheduled"'
+                executable_injection:
+{indented_injection}
+"""
+    _, ws_name = make_workspace_from_config(test_config)
+    with pytest.raises(ramble.error.RambleCommandError, match=expected_err):
+        workspace("setup", "--dry-run", global_args=["-w", ws_name])
