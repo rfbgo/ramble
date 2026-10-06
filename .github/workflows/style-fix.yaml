@@ -21,6 +21,9 @@ jobs:
       startsWith(github.event.check_run.name, 'PR-Style-') &&
       github.event.check_run.conclusion == 'failure'
     runs-on: ubuntu-latest
+    concurrency:
+      group: style-failure-comment-${{ github.event.check_run.head_sha }}
+      cancel-in-progress: false
     permissions:
       contents: read
       issues: write
@@ -107,9 +110,13 @@ jobs:
       github.event.comment.user.type != 'Bot' &&
       (
         contains(github.event.comment.body, '/style-fix') ||
-        contains(github.event.comment.body, '@ramblebot fix style')
+        contains(github.event.comment.body, '@ramblebot fix style') ||
+        contains(github.event.comment.body, '@ramblebot style fix')
       )
     runs-on: ubuntu-latest
+    concurrency:
+      group: style-fix-pr-${{ github.event.issue.number }}
+      cancel-in-progress: false
     permissions:
       contents: read
       issues: write
@@ -121,8 +128,13 @@ jobs:
         with:
           script: |
             const commentBody = (context.payload.comment.body || '').trim();
-            if (commentBody !== '/style-fix' && commentBody !== '@ramblebot fix style') {
-              core.info('Comment does not strictly match /style-fix or @ramblebot fix style; ignoring.');
+            const validCommands = [
+              '/style-fix',
+              '@ramblebot fix style',
+              '@ramblebot style fix',
+            ];
+            if (!validCommands.includes(commentBody)) {
+              core.info('Comment does not strictly match /style-fix, @ramblebot fix style, or @ramblebot style fix; ignoring.');
               core.setOutput('authorized', 'false');
               return;
             }
@@ -270,6 +282,7 @@ jobs:
             --base "origin/${BASE_REF}" > /tmp/style_output.txt 2>&1
           STYLE_EXIT_CODE=$?
           set -e
+          cat /tmp/style_output.txt
 
           if git -C "$WORKTREE" diff --quiet; then
             if [ "$STYLE_EXIT_CODE" -eq 0 ]; then
@@ -295,7 +308,7 @@ jobs:
             "$GITHUB_WORKSPACE/trusted-ramble/bin/ramble" style \
             --root-relative \
             --root "$WORKTREE" \
-            --base "origin/${BASE_REF}" > /tmp/post_fix_style_output.txt 2>&1
+            --base "origin/${BASE_REF}"
           POST_FIX_EXIT_CODE=$?
           set -e
           echo "post_fix_exit_code=${POST_FIX_EXIT_CODE}" >> "$GITHUB_OUTPUT"
@@ -313,7 +326,7 @@ jobs:
           set -e
           WORKTREE="/tmp/pr-worktree"
           if [ -z "$STYLE_FIX_SSH_KEY" ]; then
-            echo "STYLE_FIX_SSH_KEY secret is not configured." > /tmp/push_output.txt
+            echo "STYLE_FIX_SSH_KEY secret is not configured." >&2
             echo "status=push_failed" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -329,7 +342,7 @@ jobs:
           set +e
           GIT_SSH_COMMAND="ssh -i ~/.ssh/id_style_fix -o IdentitiesOnly=yes" \
             git -C "$WORKTREE" push --force-with-lease="refs/heads/${HEAD_REF}:${HEAD_SHA}" \
-            fork "HEAD:refs/heads/${HEAD_REF}" > /tmp/push_output.txt 2>&1
+            fork "HEAD:refs/heads/${HEAD_REF}"
           PUSH_EXIT_CODE=$?
           set -e
 
