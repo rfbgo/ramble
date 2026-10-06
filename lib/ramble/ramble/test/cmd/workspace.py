@@ -3115,7 +3115,7 @@ def test_manage_modifier_no_modifier_errors(workspace_name):
 @pytest.mark.parametrize(
     "action,scope,error_message",
     [
-        ("--add", "blarg", "No scope matches requested scope of blarg"),
+        ("--add", "blarg", "No application matches requested scope blarg"),
         ("--add", "foo:test_wl:generated", "No application matches requested scope foo"),
         ("--add", "basic:foo", "No workload matches requested scope foo in application basic"),
         (
@@ -3145,11 +3145,10 @@ def test_manage_modifier_add_invalid_scope_errors(workspace_name, action, scope,
             global_args=global_args,
         )
 
-        with pytest.raises(ramble.error.RambleCommandError) as err:
+        with pytest.raises(ramble.error.RambleCommandError, match=error_message):
             workspace(
                 "manage", "modifiers", action, "-s", scope, "-n", "lscpu", global_args=global_args
             )
-            assert error_message in err
 
 
 @pytest.mark.parametrize(
