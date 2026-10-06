@@ -11,7 +11,6 @@ import graphlib
 import itertools
 import re
 from collections import defaultdict
-from typing import DefaultDict
 
 import ramble.error
 import ramble.expander
@@ -30,12 +29,12 @@ class AttributeGraph:
         self.node_definitions = {}
         self.adj_list = {}
         self._prepared = False
-        self._sorted = None
+        self._sorted: tuple = ()
 
     def _make_editable(self):
         """Make this graph editable, and remove any defined ordering"""
         if self._prepared:
-            self._sorted = None
+            self._sorted = ()
             self._prepared = False
 
     def update_graph(self, node, dep_nodes=None, internal_order=False):
@@ -225,10 +224,7 @@ class PhaseGraph(AttributeGraph):
         """
         if dependencies is None:
             dependencies = []
-        if self._prepared:
-            del self._sorted
-            self._sorted = None
-            self._prepared = False
+        self._make_editable()
 
         if phase_name not in self.node_definitions:
             phase_node = ramble.util.graph.GraphNode(phase_name)
@@ -365,7 +361,6 @@ class ExecutableGraph(AttributeGraph):
         #                  executable in the list
         # If `relative_to` is set, and the executable name is not found, raise a fatal error.
 
-        exec_node = self.node_definitions[exec_name]
         cur_exec_order = list(self.walk())
 
         exp_name = self._obj_inst.expander.experiment_namespace
@@ -388,14 +383,17 @@ class ExecutableGraph(AttributeGraph):
                 f'attempting to inject a non existing executable "{exec_name}".'
             )
 
+        exec_node = self.node_definitions[exec_name]
+
         if relative is not None:
             relative_error = False
+            relative_node = None
             if relative not in self.node_definitions:
                 relative_error = True
-
-            relative_node = self.node_definitions[relative]
-            if relative_node not in cur_exec_order:
-                relative_error = True
+            else:
+                relative_node = self.node_definitions[relative]
+                if relative_node not in cur_exec_order:
+                    relative_error = True
 
             if relative_error:
                 logger.die(
@@ -405,7 +403,6 @@ class ExecutableGraph(AttributeGraph):
                     f'relative to a non existing executable "{relative}".'
                 )
 
-            relative_node = self.node_definitions[relative]
             order_index = cur_exec_order.index(relative_node)
 
             if order == self.supported_injection_orders.before:
@@ -461,21 +458,18 @@ class FormattedExecutableGraph(AttributeGraph):
     def __init__(self, formatted_execs: dict, obj_inst):
         """Constructs a new FormattedExecutableGraph and evaluates dependencies"""
         super().__init__(obj_inst)
-        self._formatted_executable_dependencies: DefaultDict[str, list] = defaultdict(list)
 
         # Define all graph nodes
         for exec_name, exec_def in formatted_execs.items():
             exec_node = ramble.util.graph.GraphNode(exec_name, attribute=exec_def)
             super().add_node(exec_node)
 
+        capture_group = r"(\w+)"
+        expansion_pattern = re.compile(rf"{ramble.expander.Expander.expansion_str(capture_group)}")
+
         # Search for internal dependencies and define edges
         for exec_node in self.node_definitions.values():
             formatted_conf = exec_node.attribute
-
-            capture_group = r"(\w+)"
-            expansion_pattern = re.compile(
-                rf"{ramble.expander.Expander.expansion_str(capture_group)}"
-            )
             expansion_strs = set()
 
             if namespace.prefix in formatted_conf:
