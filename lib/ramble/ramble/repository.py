@@ -1106,15 +1106,21 @@ class Repo:
     def dirname_for_object_name(self, obj_name):
         """Get the directory name for a particular object.  This is the
         directory that contains its object.py file."""
-        path_priorities = [
-            os.path.join(self.objects_path, obj_name),  # Default
-            os.path.join(self.objects_path, obj_name.replace("_", "-")),  # Hyphens
-            os.path.join(self.objects_path, obj_name.replace("-", "_")),  # Underscores
-        ]
-        for path in path_priorities:
-            if os.path.isdir(path):
-                return path
-        return path_priorities[0]
+        default_path = os.path.join(self.objects_path, obj_name)
+        if os.path.isdir(default_path):
+            return default_path
+
+        if "_" in obj_name:
+            hyphen_path = os.path.join(self.objects_path, obj_name.replace("_", "-"))
+            if os.path.isdir(hyphen_path):
+                return hyphen_path
+
+        if "-" in obj_name:
+            underscore_path = os.path.join(self.objects_path, obj_name.replace("-", "_"))
+            if os.path.isdir(underscore_path):
+                return underscore_path
+
+        return default_path
 
     def filename_for_object_name(self, obj_name):
         """Get the filename for the module we should load for a particular
@@ -1130,11 +1136,7 @@ class Repo:
 
     def object_path(self, spec):
         spec_name = spec.name if isinstance(spec, ramble.spec.Spec) else spec
-        return os.path.join(
-            self.objects_path,
-            self.dirname_for_object_name(spec_name),
-            self.filename_for_object_name(spec_name),
-        )
+        return self.filename_for_object_name(spec_name)
 
     @property
     def _obj_checker(self):

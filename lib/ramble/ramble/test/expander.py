@@ -289,6 +289,9 @@ def test_expansion_namespaces():
 @pytest.mark.parametrize(
     "input_list,output",
     [
+        (None, True),
+        (frozenset(), True),
+        ([], True),
         (["package_manager=spack"], True),
         (["test_variant=defined", "package_manager=spack"], True),
         (["test_variant=undefined", "package_manager=spack"], False),
