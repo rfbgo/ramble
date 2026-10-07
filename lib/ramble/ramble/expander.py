@@ -18,7 +18,7 @@ import string
 import sys
 from contextlib import contextmanager
 from enum import Enum
-from typing import Dict, FrozenSet, List, Optional, Set, Union
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, Pattern, Set, Union
 
 import ramble.config
 import ramble.error
@@ -174,7 +174,7 @@ def _maybe(expander, var_name, default=""):
         return default
 
 
-supported_math_operators = {
+supported_math_operators: Dict[Any, Callable[..., Any]] = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
     ast.Mult: operator.mul,
@@ -195,13 +195,12 @@ supported_math_operators = {
     ast.Mod: operator.mod,
     ast.BitAnd: operator.and_,
     ast.BitOr: operator.or_,
-    ast.BitXor: operator.xor,
     ast.Invert: operator.invert,
     ast.LShift: operator.lshift,
     ast.RShift: operator.rshift,
 }
 
-supported_scalar_function_pointers = {
+supported_scalar_function_pointers: Dict[str, Callable[..., Any]] = {
     "str": str,
     "int": int,
     "float": float,
@@ -267,11 +266,14 @@ def pow2_range(start, stop=None, inclusive=True):
     return values
 
 
-supported_list_function_pointers = {
+supported_list_function_pointers: Dict[str, Callable[..., Any]] = {
     "range": range,
     "pow2_range": pow2_range,
     "power2_range": pow2_range,
 }
+
+
+_dynamic_list_regex: Optional[Pattern[str]] = None
 
 
 def is_dynamic_list_expression(val) -> bool:
@@ -280,12 +282,15 @@ def is_dynamic_list_expression(val) -> bool:
     Returns True if val is a string matching a call to any function registered in
     `supported_list_function_pointers`.
     """
-    if not isinstance(val, str):
+    if not isinstance(val, str) or "(" not in val or not supported_list_function_pointers:
         return False
-    if not supported_list_function_pointers:
-        return False
-    func_names = "|".join(re.escape(fn) for fn in supported_list_function_pointers)
-    return bool(re.search(rf"\b(?:{func_names})\s*\(", val))
+
+    global _dynamic_list_regex
+    if _dynamic_list_regex is None:
+        func_names = "|".join(re.escape(fn) for fn in supported_list_function_pointers)
+        _dynamic_list_regex = re.compile(rf"\b(?:{func_names})\s*\(")
+
+    return bool(_dynamic_list_regex.search(val))
 
 
 supported_modules = {
@@ -495,7 +500,7 @@ class ExpansionGraph:
         self.root.root = self.root
 
         opened = []
-        children = []
+        children: List[List[ExpansionNode]] = []
         escaped = False
         for i, c in enumerate(self.str):
             if c == ExpansionDelimiter.left and not escaped:
@@ -612,11 +617,12 @@ class Expander:
         self._no_expand_vars = no_expand_vars.copy()
 
     def flush_used_variable_stage(self):
-        self._used_variable_stage = set()
+        self._used_variable_stage.clear()
 
     def merge_used_variable_stage(self):
-        self._used_variables = self._used_variables.union(self._used_variable_stage)
-        self.flush_used_variable_stage()
+        if self._used_variable_stage:
+            self._used_variables.update(self._used_variable_stage)
+            self._used_variable_stage.clear()
 
     def referenced_variables(self, in_str, extra_vars: Optional[Dict] = None) -> Set[str]:
         """Find the variables referenced when expanding a string.
@@ -785,15 +791,19 @@ class Expander:
         lists to be generated before rendering experiments, but does not support
         pulling a list from a different experiment.
         """
-        if isinstance(var, str) and is_dynamic_list_expression(var):
+        if not isinstance(var, str):
+            return var
+        if is_dynamic_list_expression(var):
             try:
                 value = self.expand_var(var, typed=True)
                 if isinstance(value, list):
                     return value
             except Exception:
                 pass
+        if "(" not in var and "[" not in var:
+            return var
         try:
-            math_ast = _ast_parse(str(var))
+            math_ast = _ast_parse(var)
             value = self.eval_math(math_ast.body)
         except (MathEvaluationError, AttributeError, ValueError, SyntaxError):
             return var
@@ -970,36 +980,28 @@ class Expander:
             bool: ``True`` or ``False`` based if the experiment's variants satisfy
             the input requirement.
         """
-        if reqs is None:
+        if not reqs:
             return True
 
-        variant_definitions = set()
+        variant_definitions = variant_set.as_set(self) if hasattr(variant_set, "as_set") else set()
 
-        if hasattr(variant_set, "as_set"):
-            for variant in variant_set.as_set(self):
-                variant_definitions.add(variant)
-
-        satisfied = True
         if isinstance(reqs, str):
             reqs = [reqs]
-        elif isinstance(reqs, frozenset):
-            reqs = list(reqs)
 
         for req in reqs:
             if "@" in req and "=" not in req and "+" not in req and "~" not in req:
                 variant_name, _ = req.split("@")
                 version = variant_set.version(variant_name)
-                if hasattr(version, "satisfies"):
-                    satisfied = satisfied and version.satisfies(req)
-                else:
-                    satisfied = False
+                if not hasattr(version, "satisfies") or not version.satisfies(req):
+                    return False
             else:
                 exp_req = self.expand_var(
                     req, extra_vars=extra_vars, merge_used_stage=merge_used_stage
                 )
 
-                satisfied = satisfied and exp_req in variant_definitions
-        return satisfied
+                if exp_req not in variant_definitions:
+                    return False
+        return True
 
     @staticmethod
     def expansion_str(in_str):
@@ -1128,9 +1130,7 @@ class Expander:
         others will generate integers (if the inputs are integers).
         """
         try:
-            if hasattr(ast, "Constant") and isinstance(node, ast.Constant):
-                return self._ast_constant(node)
-            elif _is_name_constant_node(node):  # pragma: no cover
+            if isinstance(node, _AST_CONSTANT) or _is_name_constant_node(node):
                 return self._ast_constant(node)
             elif _is_num_node(node):
                 return self._ast_num(node)

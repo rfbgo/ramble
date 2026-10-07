@@ -2691,6 +2691,7 @@ def test_dynamic_custom_list_function(workspace_name, monkeypatch):
         return list(range(start, stop))
 
     monkeypatch.setitem(ramble.expander.supported_list_function_pointers, "custom_seq", custom_seq)
+    monkeypatch.setattr(ramble.expander, "_dynamic_list_regex", None)
 
     workspace("create", workspace_name)
 
