@@ -21,7 +21,13 @@ def get_template(object_type):
     # Map ObjectType to template file names
     mapping = {
         ramble.repository.ObjectTypes.applications: "application.py.tpl",
+        ramble.repository.ObjectTypes.base_applications: "application.py.tpl",
         ramble.repository.ObjectTypes.modifiers: "modifier.py.tpl",
+        ramble.repository.ObjectTypes.base_modifiers: "modifier.py.tpl",
+        ramble.repository.ObjectTypes.package_managers: "package_manager.py.tpl",
+        ramble.repository.ObjectTypes.base_package_managers: "package_manager.py.tpl",
+        ramble.repository.ObjectTypes.workflow_managers: "workflow_manager.py.tpl",
+        ramble.repository.ObjectTypes.base_workflow_managers: "workflow_manager.py.tpl",
     }
 
     tpl_name = mapping.get(object_type, "generic.py.tpl")
@@ -91,14 +97,26 @@ def create_object(
     # Choose template & default base class
     template = get_template(object_type)
 
-    if object_type == ramble.repository.ObjectTypes.applications:
-        default_base = "ExecutableApplication"
-    elif object_type == ramble.repository.ObjectTypes.modifiers:
-        default_base = "BasicModifier"
-    else:
-        default_base = "object"
+    default_bases = {
+        ramble.repository.ObjectTypes.applications: "ExecutableApplication",
+        ramble.repository.ObjectTypes.base_applications: "ExecutableApplication",
+        ramble.repository.ObjectTypes.modifiers: "BasicModifier",
+        ramble.repository.ObjectTypes.base_modifiers: "BasicModifier",
+        ramble.repository.ObjectTypes.package_managers: "PackageManagerBase",
+        ramble.repository.ObjectTypes.base_package_managers: "PackageManagerBase",
+        ramble.repository.ObjectTypes.workflow_managers: "WorkflowManagerBase",
+        ramble.repository.ObjectTypes.base_workflow_managers: "WorkflowManagerBase",
+        ramble.repository.ObjectTypes.systems: "SystemBase",
+        ramble.repository.ObjectTypes.base_systems: "SystemBase",
+        ramble.repository.ObjectTypes.platforms: "PlatformBase",
+        ramble.repository.ObjectTypes.base_platforms: "PlatformBase",
+        ramble.repository.ObjectTypes.utilities: "UtilityBase",
+        ramble.repository.ObjectTypes.base_utilities: "UtilityBase",
+    }
+    default_base = default_bases.get(object_type, "object")
 
     resolved_base = base_class or default_base
+    kit_name = type_def.get("kit_name") or "appkit"
 
     # Format metadata variables
     m_args = ", ".join(repr(m) for m in (maintainers or []))
@@ -114,6 +132,7 @@ def create_object(
                 name=name,
                 maintainers=m_args,
                 tags=t_args,
+                kit_name=kit_name,
             )
         )
 

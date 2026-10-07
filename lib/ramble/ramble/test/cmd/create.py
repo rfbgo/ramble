@@ -67,7 +67,11 @@ def test_create_help():
             "system",
             "my-test-system",
             [],
-            ["class MyTestSystem:", 'name = "my-test-system"'],
+            [
+                "from ramble.syskit import *",
+                "class MyTestSystem(SystemBase):",
+                'name = "my-test-system"',
+            ],
             None,
         ),
         (
@@ -353,7 +357,7 @@ def test_create_interactive_wizard_validation_and_abort(mutable_config, tmpdir, 
             "systems",
             "spec-sys",
             "system.py",
-            "class SpecSys:",
+            "class SpecSys(SystemBase):",
         ),
     ],
 )
@@ -412,7 +416,35 @@ def test_create_namespaced_spec(
             "class PluralApp(ExecutableApplication):",
         ),
         ("mod", "alias-mod", "modifiers", "modifier.py", "class AliasMod(BasicModifier):"),
-        ("sys", "alias-sys", "systems", "system.py", "class AliasSys:"),
+        ("sys", "alias-sys", "systems", "system.py", "class AliasSys(SystemBase):"),
+        (
+            "plat",
+            "alias-plat",
+            "platforms",
+            "platform.py",
+            "class AliasPlat(PlatformBase):",
+        ),
+        (
+            "package-manager",
+            "alias-pm",
+            "package_managers",
+            "package_manager.py",
+            "class AliasPm(PackageManagerBase):",
+        ),
+        (
+            "workflow-manager",
+            "alias-wm",
+            "workflow_managers",
+            "workflow_manager.py",
+            "class AliasWm(WorkflowManagerBase):",
+        ),
+        (
+            "utility",
+            "alias-util",
+            "utilities",
+            "utility.py",
+            "class AliasUtil(UtilityBase):",
+        ),
     ],
 )
 def test_create_object_type_alias(
@@ -446,6 +478,10 @@ def test_create_object_type_alias(
         with open(full_path, encoding="utf-8") as f:
             content = f.read()
             assert expected_content in content
+
+        obj_type = ramble.repository.simplify_object_type(type_alias)
+        obj_inst = ramble.repository.get(f"{repo_ns}.{obj_name}", object_type=obj_type)
+        assert obj_inst.name == obj_name
 
     finally:
         for t in ramble.repository.ObjectTypes:

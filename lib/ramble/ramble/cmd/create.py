@@ -28,6 +28,7 @@ type_mapping = {
     "workflow-manager": ramble.repository.ObjectTypes.workflow_managers,
     "system": ramble.repository.ObjectTypes.systems,
     "platform": ramble.repository.ObjectTypes.platforms,
+    "utility": ramble.repository.ObjectTypes.utilities,
 }
 
 
@@ -118,6 +119,7 @@ def discover_base_classes(obj_type):
         ramble.repository.ObjectTypes.workflow_managers: ["workflow", "wm"],
         ramble.repository.ObjectTypes.systems: ["system"],
         ramble.repository.ObjectTypes.platforms: ["platform"],
+        ramble.repository.ObjectTypes.utilities: ["utility"],
     }
 
     keywords = filters.get(obj_type, [])
