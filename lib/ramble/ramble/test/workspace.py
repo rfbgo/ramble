@@ -269,3 +269,25 @@ def test_all_applications_application_configs(mutable_mock_workspace_path):
             workspace.deactivate()
         if os.path.exists(ws_root):
             shutil.rmtree(ws_root)
+
+
+def test_no_active_workspace(make_workspace_from_config, monkeypatch):
+    ws, ws_name = make_workspace_from_config(activate=True)
+    monkeypatch.delenv(workspace.RAMBLE_WORKSPACE_VAR, raising=False)
+
+    assert workspace.active_workspace() == ws
+    with workspace.no_active_workspace():
+        assert workspace.active_workspace() is None
+        assert workspace.RAMBLE_WORKSPACE_VAR not in os.environ
+
+    assert workspace.active_workspace() == ws
+    assert workspace.RAMBLE_WORKSPACE_VAR not in os.environ
+
+    # Also verify RAMBLE_WORKSPACE env var is restored when set
+    monkeypatch.setenv(workspace.RAMBLE_WORKSPACE_VAR, ws_name)
+    with workspace.no_active_workspace():
+        assert workspace.active_workspace() is None
+        assert workspace.RAMBLE_WORKSPACE_VAR not in os.environ
+
+    assert workspace.active_workspace() == ws
+    assert os.environ.get(workspace.RAMBLE_WORKSPACE_VAR) == ws_name

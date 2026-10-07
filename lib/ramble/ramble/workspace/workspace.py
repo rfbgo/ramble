@@ -741,7 +741,7 @@ ramble:
 
         if error_sections:
             logger.warn("Your workspace configuration contains invalid sections:")
-            for section in deprecated_sections:
+            for section in error_sections:
                 logger.warn(f"     {section}")
             logger.die("Please update to the latest format.")
 
@@ -788,7 +788,6 @@ ramble:
             elif not os.path.exists(self.software_dir):
                 fs.mkdirp(self.software_dir)
 
-            fs.mkdirp(self.shared_dir)
             fs.mkdirp(self.shared_license_dir)
 
             self.write_config(CONFIG_SECTION)
@@ -861,7 +860,7 @@ ramble:
 
     def clear(self):
         self.config_sections = {}
-        self.application_configs = []
+        self.application_configs = {}
         self._previous_active = None  # previously active environment
         self.specs = []
 
@@ -2352,7 +2351,7 @@ ramble:
                 if joined_scope_part not in base_section[namespace.experiment]:
                     logger.die(
                         f"No experiment matches requested scope {joined_scope_part} "
-                        f"in application{scope_parts[0]} and workload {scope_parts[1]}"
+                        f"in application {scope_parts[0]} and workload {scope_parts[1]}"
                     )
 
                 base_section = base_section[namespace.experiment][joined_scope_part]
@@ -2394,7 +2393,7 @@ ramble:
         mod_list = self.index_modifiers()
 
         logger.all_msg(f"Workspace contains {len(mod_list)} modifiers.")
-        logger.all_msg("Additional modifiers may come from scopes outside of wokrspace")
+        logger.all_msg("Additional modifiers may come from scopes outside of workspace")
         logger.all_msg("To see a complete list of these, use:")
         logger.all_msg("   ramble config get modifiers\n\n")
 
@@ -2507,9 +2506,10 @@ ramble:
                 mod_conf = mod_tup[1]
                 if fnmatch.fnmatch(scope, scope_pattern):
                     if fnmatch.fnmatch(mod_conf["name"], name_pattern):
-                        if "mode" in mod_conf and fnmatch.fnmatch(mod_conf["mode"], mode_pattern):
-                            to_remove.append(mod_tup)
-                        else:
+                        mod_mode = mod_conf.get("mode")
+                        if mode_pattern == "*" or (
+                            mod_mode is not None and fnmatch.fnmatch(mod_mode, mode_pattern)
+                        ):
                             to_remove.append(mod_tup)
 
         removed = 0
@@ -2855,17 +2855,15 @@ def no_active_workspace():
     """Deactivate the active workspace for the duration of the context. Has no
     effect when there is no active workspace."""
     ws = active_workspace()
-    env_var = None
-    if RAMBLE_WORKSPACE_VAR in os.environ:
-        env_var = os.environ[RAMBLE_WORKSPACE_VAR]
-        del os.environ[RAMBLE_WORKSPACE_VAR]
+    env_var = os.environ.pop(RAMBLE_WORKSPACE_VAR, None)
 
     try:
         deactivate()
         yield
     finally:
-        if ws:
+        if env_var is not None:
             os.environ[RAMBLE_WORKSPACE_VAR] = env_var
+        if ws:
             activate(ws)
 
 

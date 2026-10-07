@@ -330,3 +330,47 @@ def test_remove_modifier_index_with_pattern_api_errors(workspace_name):
         ws.remove_modifier(remove_index=0, scope_pattern="workspace")
 
     assert len(ws.index_modifiers()) == 2
+
+
+def test_remove_modifier_mode_pattern_filters_correctly(workspace_name):
+    """Removing by mode_pattern only removes modifiers whose mode matches."""
+    ws = ramble.workspace.create(workspace_name)
+    ws.write()
+    global_args = ["-w", workspace_name]
+
+    workspace(
+        "manage",
+        "modifiers",
+        "--add",
+        "--name",
+        "lscpu",
+        "--mode",
+        "standard",
+        "--scope",
+        "workspace",
+        global_args=global_args,
+    )
+    workspace(
+        "manage",
+        "modifiers",
+        "--add",
+        "--name",
+        "ethtool",
+        "--scope",
+        "workspace",
+        global_args=global_args,
+    )
+    ws._re_read()
+    assert len(ws.index_modifiers()) == 2
+
+    # Non-matching mode pattern should remove nothing
+    removed = ws.remove_modifier(scope_pattern="workspace", mode_pattern="nonexistent")
+    assert removed == 0
+    assert len(ws.index_modifiers()) == 2
+
+    # Matching mode pattern should only remove the modifier with mode="standard"
+    removed = ws.remove_modifier(scope_pattern="workspace", mode_pattern="standard")
+    assert removed == 1
+    remaining = ws.index_modifiers()
+    assert len(remaining) == 1
+    assert remaining[0][1]["name"] == "ethtool"
