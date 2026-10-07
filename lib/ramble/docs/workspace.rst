@@ -404,7 +404,7 @@ To apply a deployment to an existing workspace, the ``pull`` sub-command can be 
 
 .. code-block:: console
 
-  ramble workspace pull -p file://path/to/deployment
+  $ ramble deployment pull -p file://path/to/deployment
 
 Will overwrite the contents of the currently active workspace with the contents
 from the deployment contained in ``file://path/to/deployment``.

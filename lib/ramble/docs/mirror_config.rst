@@ -48,14 +48,14 @@ are also documented via ``spack mirror -h``. Likewise, short descriptions of
 Creating Ramble Mirrors
 -----------------------
 
-In an activated named or anonymous workspace (specified via the ``ramble workspace -d`` argument), write
+In an activated named or anonymous workspace (specified via the ``ramble -D`` argument), write
 a configuration for any applications and application experiment workloads you want to create
 a mirror for.
 
 Then run the following command to create input file and software mirrors:
 .. code-block:: console
 
-    $ ramble workspace [-d WORKSPACE_DIR] mirror create -d MIRROR_PATH
+    $ ramble [-D WORKSPACE_DIR] workspace mirror -d MIRROR_PATH
 
 Note that the ``-d MIRROR_PATH`` argument is not optional, even though ``ramble workspace mirror -h``
 indicates that it is an optional argument. The path must be located on the local
@@ -65,7 +65,7 @@ filesystem.
 Mirror Structure
 ----------------
 
-``ramble workspace create`` creates ramble and spack mirrors with a structure
+``ramble workspace mirror`` creates ramble and spack mirrors with a structure
 similar to the following, which uses a mirror of wrfv3 as an example:
 
 .. code-block:: console

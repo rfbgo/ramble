@@ -768,9 +768,9 @@ experiment modifiers. Experiment modifiers encapsulate several aspects of a
 standard modification to an experiment, such as prepending a binary with a tool
 or profiler, and can be applied to experiments to modify their behavior.
 
-Available experiment modifiers can be seen using ``ramble mods list``, and more
-information about a particular modifier can be see with
-``ramble mods info <mod_name>``.
+Available experiment modifiers can be seen using ``ramble list --type modifiers``, and more
+information about a particular modifier can be seen with
+``ramble info --type modifiers <mod_name>``.
 
 Modifiers can be applied to experiments using the following YAML syntax:
 

@@ -135,7 +135,7 @@ At this stage, you can explore the experiments defined in the workspace using:
 
 .. code-block:: console
 
-   $ ramble -D includes-workspace info
+   $ ramble -D includes-workspace workspace info
 
 This command should output that workspace contains 6 experiments, representing
 the three node counts crossed with the two sizes.
@@ -169,8 +169,8 @@ you can examine the differences from the following commands:
 
 .. code-block:: console
 
-   $ ramble -D includes-workspace info
-   $ ramble -D squash-workspace info
+   $ ramble -D includes-workspace workspace info
+   $ ramble -D squash-workspace workspace info
 
 Additionally, the ``squash-workspace`` should not refer to any external files.
 To verify this, explore the contents of the configuration file:
@@ -192,7 +192,7 @@ Removing Unnecessary Portions of a Configuration File
 -----------------------------------------------------
 
 If you examined the external configuration files we wrote earlier in the
-``include-workspace`` you might have noticed there are several portions that
+``includes-workspace`` you might have noticed there are several portions that
 are not used directly. This includes variables in the experiment definition,
 along with software packages within the software definitions.
 
@@ -232,7 +232,7 @@ workspaces using:
 
 .. code-block:: console
 
-   $ rm -rf include-workspace squash-workspace
+   $ rm -rf includes-workspace squash-workspace
 
 
 The skills learned in this tutorial should help you construct more reproducible
