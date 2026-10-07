@@ -1,0 +1,446 @@
+# On-demand `ramble style --fix` workflow.
+
+name: PR Style Fix
+
+on:
+  check_run:
+    types:
+      - completed
+  issue_comment:
+    types:
+      - created
+
+permissions:
+  contents: read
+
+jobs:
+  style-failure-comment:
+    name: Comment on PR Style Failure
+    if: >-
+      github.event_name == 'check_run' &&
+      startsWith(github.event.check_run.name, 'PR-Style-') &&
+      github.event.check_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: style-failure-comment-${{ github.event.check_run.head_sha }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Post style fix hint on PR
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const checkRun = context.payload.check_run;
+            const headSha = checkRun.head_sha;
+
+            let prNumber = null;
+            for (const pr of (checkRun.pull_requests || [])) {
+              if (pr.url && pr.url.includes(`/${owner}/${repo}/`)) {
+                prNumber = pr.number;
+                break;
+              }
+            }
+
+            // Fallback for PRs from forks where check_run.pull_requests may be empty
+            if (!prNumber) {
+              const openPrs = await github.paginate(github.rest.pulls.list, {
+                owner,
+                repo,
+                state: 'open',
+                per_page: 100,
+              });
+              const matchedPr = openPrs.find(pr => pr.head.sha === headSha);
+              if (matchedPr) {
+                prNumber = matchedPr.number;
+              }
+            }
+
+            if (!prNumber) {
+              core.info(`No open PR found for head SHA ${headSha}.`);
+              return;
+            }
+
+            const marker = '<!-- ramble-style-fix-hint -->';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+
+            if (comments.some(c => c.body && c.body.includes(marker))) {
+              core.info(`Style hint comment already exists on PR #${prNumber}; skipping.`);
+              return;
+            }
+
+            const body = [
+              marker,
+              'It looks like this pull request has style check issues! I can help fix formatting automatically if you ask me. Just comment:',
+              '',
+              '```',
+              '/style-fix',
+              '```',
+              '(or `@ramblebot fix style`)',
+              '',
+              "...and I'll run `ramble style --fix` and amend your latest commit with the fixes.",
+              '',
+              'Alternatively, you can run locally:',
+              '```bash',
+              'ramble style --fix',
+              '```',
+              'and update the pull request.',
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body,
+            });
+
+  fix-style:
+    name: Run ramble style --fix
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request != null &&
+      github.event.comment.user.type != 'Bot' &&
+      (
+        contains(github.event.comment.body, '/style-fix') ||
+        contains(github.event.comment.body, '@ramblebot fix style') ||
+        contains(github.event.comment.body, '@ramblebot style fix')
+      )
+    runs-on: ubuntu-latest
+    concurrency:
+      group: style-fix-pr-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Authorize request and fetch PR metadata
+        id: pr_info
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const commentBody = (context.payload.comment.body || '').trim();
+            const validCommands = [
+              '/style-fix',
+              '@ramblebot fix style',
+              '@ramblebot style fix',
+            ];
+            if (!validCommands.includes(commentBody)) {
+              core.info('Comment does not strictly match /style-fix, @ramblebot fix style, or @ramblebot style fix; ignoring.');
+              core.setOutput('authorized', 'false');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.issue.number;
+            const sender = context.payload.comment.user.login;
+            const commentId = context.payload.comment.id;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber,
+            });
+
+            if (pr.state !== 'open') {
+              core.info(`PR #${prNumber} is not open; ignoring style-fix request.`);
+              core.setOutput('authorized', 'false');
+              return;
+            }
+
+            const author = pr.user.login;
+            let authorized = (sender === author);
+
+            if (!authorized) {
+              try {
+                const { data: perm } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner,
+                  repo,
+                  username: sender,
+                });
+                authorized = ['admin', 'maintain', 'write'].includes(perm.permission);
+              } catch (err) {
+                authorized = false;
+              }
+            }
+
+            if (!authorized) {
+              core.info(`User @${sender} is not authorized to request a style fix on PR #${prNumber}.`);
+              core.setOutput('authorized', 'false');
+              return;
+            }
+
+            if (!pr.head.repo) {
+              core.info(`Source repository for PR #${prNumber} no longer exists.`);
+              core.setOutput('authorized', 'false');
+              return;
+            }
+
+            // Never push to protected upstream branches (develop, main, releases/*)
+            const protectedBranchRegex = /^(develop|main|releases\/.*)$/;
+            if (
+              pr.head.repo.full_name === `${owner}/${repo}` &&
+              protectedBranchRegex.test(pr.head.ref)
+            ) {
+              core.info(`Refusing to run automatic style fix on protected branch ${pr.head.ref}.`);
+              core.setOutput('authorized', 'false');
+              return;
+            }
+
+            await github.rest.reactions.createForIssueComment({
+              owner,
+              repo,
+              comment_id: commentId,
+              content: 'eyes',
+            });
+
+            core.setOutput('authorized', 'true');
+            core.setOutput('pr_number', String(pr.number));
+            core.setOutput('base_ref', pr.base.ref);
+            core.setOutput('head_ref', pr.head.ref);
+            core.setOutput('head_sha', pr.head.sha);
+            core.setOutput('head_repo_full_name', pr.head.repo.full_name);
+
+      - name: Checkout trusted Ramble
+        if: steps.pr_info.outputs.authorized == 'true'
+        uses: actions/checkout@v7
+        with:
+          path: trusted-ramble
+          persist-credentials: false
+
+      - name: Set up Python
+        if: steps.pr_info.outputs.authorized == 'true'
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'trusted-ramble/requirements*.txt'
+
+      - name: Install style dependencies
+        if: steps.pr_info.outputs.authorized == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r trusted-ramble/requirements-pinned.txt
+
+      - name: Run ramble style --fix and commit
+        id: style_fix
+        if: steps.pr_info.outputs.authorized == 'true'
+        env:
+          BASE_REF: ${{ steps.pr_info.outputs.base_ref }}
+          HEAD_REF: ${{ steps.pr_info.outputs.head_ref }}
+          HEAD_SHA: ${{ steps.pr_info.outputs.head_sha }}
+          HEAD_REPO_FULL_NAME: ${{ steps.pr_info.outputs.head_repo_full_name }}
+        run: |
+          set -e
+
+          WORKTREE="/tmp/pr-worktree"
+          rm -rf "$WORKTREE"
+          mkdir -p "$WORKTREE"
+
+          git -C "$WORKTREE" init
+          git -C "$WORKTREE" remote add upstream "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -C "$WORKTREE" remote add fork "https://github.com/${HEAD_REPO_FULL_NAME}.git"
+
+          git -C "$WORKTREE" fetch --depth=50 upstream "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          git -C "$WORKTREE" fetch --depth=50 fork "${HEAD_REF}:refs/heads/pr-branch"
+          git -C "$WORKTREE" checkout pr-branch
+
+          if ! git -C "$WORKTREE" merge-base "refs/remotes/origin/${BASE_REF}" HEAD >/dev/null 2>&1; then
+            git -C "$WORKTREE" fetch --unshallow fork "${HEAD_REF}" || true
+            git -C "$WORKTREE" fetch upstream "${BASE_REF}:refs/remotes/origin/${BASE_REF}" || true
+          fi
+
+          CURRENT_SHA=$(git -C "$WORKTREE" rev-parse HEAD)
+          if [ "$CURRENT_SHA" != "$HEAD_SHA" ]; then
+            echo "status=sha_mismatch" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git -C "$WORKTREE" rev-parse -q --verify HEAD^2 >/dev/null 2>&1; then
+            echo "status=merge_commit" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Lock down trusted-ramble before invoking linters on untrusted PR files
+          chmod -R a-w "$GITHUB_WORKSPACE/trusted-ramble"
+          trap 'chmod -R u+w "$GITHUB_WORKSPACE/trusted-ramble" 2>/dev/null || true' EXIT
+
+          set +e
+          GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null \
+            "$GITHUB_WORKSPACE/trusted-ramble/bin/ramble" style \
+            --fix \
+            --root-relative \
+            --root "$WORKTREE" \
+            --base "origin/${BASE_REF}" > /tmp/style_output.txt 2>&1
+          STYLE_EXIT_CODE=$?
+          set -e
+          cat /tmp/style_output.txt
+
+          if git -C "$WORKTREE" diff --quiet; then
+            if [ "$STYLE_EXIT_CODE" -eq 0 ]; then
+              echo "status=already_clean" >> "$GITHUB_OUTPUT"
+            else
+              echo "status=unfixable_errors" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          git -C "$WORKTREE" diff > /tmp/style_fix.patch
+
+          AUTHOR_NAME=$(git -C "$WORKTREE" log -1 --format='%an' HEAD)
+          AUTHOR_EMAIL=$(git -C "$WORKTREE" log -1 --format='%ae' HEAD)
+
+          git -C "$WORKTREE" config user.name "$AUTHOR_NAME"
+          git -C "$WORKTREE" config user.email "$AUTHOR_EMAIL"
+          git -C "$WORKTREE" commit -a --amend --no-edit
+
+          # Re-run style check after fixing to see if any unfixable errors remain
+          set +e
+          GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null \
+            "$GITHUB_WORKSPACE/trusted-ramble/bin/ramble" style \
+            --root-relative \
+            --root "$WORKTREE" \
+            --base "origin/${BASE_REF}"
+          POST_FIX_EXIT_CODE=$?
+          set -e
+          echo "post_fix_exit_code=${POST_FIX_EXIT_CODE}" >> "$GITHUB_OUTPUT"
+          echo "status=ready_to_push" >> "$GITHUB_OUTPUT"
+
+      - name: Push style fixes
+        id: push_changes
+        if: steps.pr_info.outputs.authorized == 'true' && steps.style_fix.outputs.status == 'ready_to_push'
+        env:
+          HEAD_REF: ${{ steps.pr_info.outputs.head_ref }}
+          HEAD_SHA: ${{ steps.pr_info.outputs.head_sha }}
+          HEAD_REPO_FULL_NAME: ${{ steps.pr_info.outputs.head_repo_full_name }}
+          STYLE_FIX_SSH_KEY: ${{ secrets.STYLE_FIX_SSH_KEY }}
+        run: |
+          set -e
+          WORKTREE="/tmp/pr-worktree"
+          if [ -z "$STYLE_FIX_SSH_KEY" ]; then
+            echo "STYLE_FIX_SSH_KEY secret is not configured." >&2
+            echo "status=push_failed" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          trap 'rm -f ~/.ssh/id_style_fix' EXIT
+          printf "%s\n" "$STYLE_FIX_SSH_KEY" > ~/.ssh/id_style_fix
+          chmod 600 ~/.ssh/id_style_fix
+          ssh-keyscan -t rsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          git -C "$WORKTREE" remote set-url fork "git@github.com:${HEAD_REPO_FULL_NAME}.git"
+
+          set +e
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/id_style_fix -o IdentitiesOnly=yes" \
+            git -C "$WORKTREE" push --force-with-lease="refs/heads/${HEAD_REF}:${HEAD_SHA}" \
+            fork "HEAD:refs/heads/${HEAD_REF}"
+          PUSH_EXIT_CODE=$?
+          set -e
+
+          if [ "$PUSH_EXIT_CODE" -eq 0 ]; then
+            echo "status=pushed" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=push_failed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post result comment on PR
+        if: steps.pr_info.outputs.authorized == 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr_info.outputs.pr_number }}
+          HEAD_REF: ${{ steps.pr_info.outputs.head_ref }}
+          STATUS: ${{ steps.push_changes.outputs.status || steps.style_fix.outputs.status }}
+          POST_FIX_EXIT_CODE: ${{ steps.style_fix.outputs.post_fix_exit_code }}
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const prNumber = Number(process.env.PR_NUMBER);
+            const headRef = process.env.HEAD_REF;
+            const status = process.env.STATUS;
+            const postFixExitCode = process.env.POST_FIX_EXIT_CODE;
+
+            function readTruncated(filePath, maxLen = 60000) {
+              if (!fs.existsSync(filePath)) return '';
+              const content = fs.readFileSync(filePath, 'utf8').trim();
+              if (content.length > maxLen) {
+                return content.slice(0, maxLen) + '\n... truncated ...';
+              }
+              return content;
+            }
+
+            const styleOutput = readTruncated('/tmp/style_output.txt');
+            const detailsBlock = styleOutput
+              ? `<details>\n<summary><b>ramble style --fix</b></summary>\n\n\`\`\`bash\n${styleOutput}\n\`\`\`\n</details>\n`
+              : '';
+
+            const allowEditsUrl =
+              'https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-fork#enabling-repository-maintainer-permissions-on-existing-pull-requests';
+
+            let body = '';
+
+            if (status === 'pushed') {
+              body = [
+                'I ran `ramble style --fix` and amended your latest commit with the style fixes!',
+                '',
+                detailsBlock,
+                postFixExitCode !== '0'
+                  ? '> [!WARNING]\n> Some `flake8`, `mypy`, or `ruff` issues could not be fixed automatically. Please review the output above and fix the remaining issues manually.\n'
+                  : '',
+                'If you make further changes locally, please sync your branch first before pushing:',
+                '```bash',
+                `git pull --rebase origin ${headRef}`,
+                '```',
+              ].filter(Boolean).join('\n');
+            } else if (status === 'already_clean') {
+              body = [
+                'I ran `ramble style --fix`, and all style checks are already clean—no changes were needed!',
+                '',
+                detailsBlock,
+              ].filter(Boolean).join('\n');
+            } else if (status === 'unfixable_errors') {
+              body = [
+                'I ran `ramble style --fix`, but I was not able to make any automatic changes. Keep in mind that `flake8`, `mypy`, and some `ruff` errors must be resolved manually.',
+                '',
+                detailsBlock,
+              ].filter(Boolean).join('\n');
+            } else if (status === 'push_failed') {
+              const patch = readTruncated('/tmp/style_fix.patch', 30000);
+              const patchBlock = patch
+                ? `<details>\n<summary><b>Suggested style diff (git apply)</b></summary>\n\n\`\`\`diff\n${patch}\n\`\`\`\n</details>\n`
+                : '';
+              body = [
+                'I ran `ramble style --fix` and formatted the modified files, but I was unable to push the changes to your branch.',
+                `Did you check [Allow edits from maintainers](${allowEditsUrl}) when opening the pull request?`,
+                '',
+                detailsBlock,
+                patchBlock,
+                'You can apply these fixes locally by running `ramble style --fix` and amending your commit (`git commit -a --amend --no-edit`).',
+              ].filter(Boolean).join('\n');
+            } else if (status === 'sha_mismatch') {
+              body = 'The pull request HEAD changed while I was preparing to run `ramble style --fix`. Please comment `/style-fix` again if you still need style fixes on the latest commit.';
+            } else if (status === 'merge_commit') {
+              body = 'I cannot run `ramble style --fix` because the latest commit on this branch is a merge commit, which cannot be safely amended. Please rebase your branch (or push a non-merge commit) and comment `/style-fix` again.';
+            } else {
+              body = [
+                'I encountered an unexpected issue while running `ramble style --fix`.',
+                '',
+                detailsBlock,
+              ].filter(Boolean).join('\n');
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body,
+            });
