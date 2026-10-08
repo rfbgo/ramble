@@ -267,8 +267,9 @@ experiment configurations. The options are extensive, and are thus not covered
 here but users are invited to experiment and pass the ``-h`` for more
 information.
 
-Advanced options like ``--workflow-manager`` and ``--package-manager`` can be
-used to set key variable variants to quickly invoke additional core ramble
+Options like ``--variant-definition`` (or ``-V``) with
+``workflow_manager=<workflow_manager>`` and ``package_manager=<package_manager>``
+can be used to set key variants to quickly invoke additional core ramble
 features, and the intended user for this feature is both automation and human
 users alike.
 

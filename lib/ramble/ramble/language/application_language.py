@@ -67,10 +67,16 @@ def workload(
     its application.
 
     Args:
-        executable (str): The name of an executable to be used
-        executables (str): A list of executable names to be used
-        input (str): Optional, name of an input be used
-        inputs (str): Optional, A list of input names that will be used
+        name (str): Name of the workload
+        executables (list[str] | None): A list of executable names to be used
+        executable (str | None): The name of an executable to be used
+        input (str | None): Optional, name of an input to be used
+        inputs (list[str] | None): Optional, a list of input names that will be used
+        tags (list[str] | None): Optional, a list of tags for this workload
+        when (list[str] | None): List of when conditions to apply to directive
+        where (list[str] | None): Optional, a list of where filters to apply to this workload
+        exclude_where (list[str] | None): Optional, a list of exclude_where filters to apply
+            to this workload
 
     One of executable, or executables is required as an input argument.
     """
@@ -107,7 +113,10 @@ def workload_group(name, workloads=None, mode=None, when=None, **kwargs):
 
     Args:
         name (str): The name of the group
-        workloads (list(str) | None): A list of workloads to be grouped
+        workloads (list[str] | None): A list of workloads to be grouped
+        mode (str | None): Mode for updating an existing workload group (e.g., 'append' to
+            extend workloads, otherwise overwrites by default)
+        when (list[str] | None): List of when conditions to apply to directive
     """
     if workloads is None:
         workloads = []
@@ -164,18 +173,20 @@ def executable(name, template, when=None, **kwargs):
     Args:
         name (str): Name of the executable
         template (list[str] | str): The template command this executable should generate from
-        use_mpi (bool): determines if this executable should be
-            wrapped with an `mpirun` like command or not
-        mpi (bool): Alias for ``use_mpi``
-        variables (dict): Dictionary of variable definitions to use for this
+        use_mpi (bool): Determines if this executable should be
+            wrapped with an `mpirun` like command or not. Defaults to False
+        mpi (bool): Alias for ``use_mpi``. Defaults to False
+        variables (dict | None): Dictionary of variable definitions to use for this
             executable only
         redirect (str): Optional, sets the path for outputs to be written to.
-            defaults to {log_file}
-        output_capture (str): Optional, Declare which output (stdout, stderr,
-            both) to capture. Defaults to stdout
-        run_in_background (bool): Optional, Declare if the command should
+            Defaults to {log_file}
+        output_capture (ramble.util.output_capture.OUTPUT_CAPTURE | str): Optional, declare which
+            output (stdout, stderr, both) to capture. Defaults to OUTPUT_CAPTURE.ALL
+        run_in_background (bool): Optional, declare if the command should
             run in the background. Defaults to False
-        when (list | None): List of when conditions to apply to directive
+        allow_extension (bool): Optional, declare if the executable can be extended.
+            Defaults to False
+        when (list[str] | None): List of when conditions to apply to directive
     """
 
     def _execute_executable(app):
@@ -208,7 +219,7 @@ def input_file(
     """Adds an input file definition to this application
 
     Defines a new input file.
-    An input file must define it's name, and a url where the input can be
+    An input file must define its name, and a url where the input can be
     fetched from.
 
     Args:
@@ -216,13 +227,12 @@ def input_file(
         url (str): Path to the input file / archive
         description (str): Description of this input file
         target_dir (str): Optional, the directory where the archive will be
-                               expanded. Defaults to the '{workload_input_dir}'
-                               + os.sep + '{input_name}'
-        sha256 (str): Optional, the expected sha256 checksum for the input file
-        extension (str): Optiona, the extension to use for the input, if it isn't part of the
-                              file name.
-        expand (bool): Optional. Whether the input should be expanded or not. Defaults to True
-        when (list | None): List of when conditions to apply to directive
+            expanded. Defaults to '{workload_input_dir}'
+        sha256 (str | None): Optional, the expected sha256 checksum for the input file
+        extension (str | None): Optional, the extension to use for the input, if it isn't part of
+            the file name
+        expand (bool): Optional, whether the input should be expanded or not. Defaults to True
+        when (list[str] | None): List of when conditions to apply to directive
     """
 
     def _execute_input_file(app):
@@ -274,7 +284,7 @@ def workload_variable(
     """Define a new variable to be used in experiments
 
     Defines a new variable that can be defined within the
-    experiments.yaml config file, to control various aspects of
+    ramble.yaml config file, to control various aspects of
     an experiment.
 
     These are specific to each workload.
@@ -283,20 +293,20 @@ def workload_variable(
         name (str): Name of variable to define
         default: Default value of variable definition
         description (str): Description of variable's purpose
-        values (list): Optional list of suggested values for this variable
+        values (list | None): Optional list of suggested values for this variable
         strict (bool): If True (the default) and values is not None, the variable's value
                        will be validated against the values list.
-        workload (str): Single workload this variable is used in
-        workloads (list): List of modes this variable is used in
-        workload_group (str): Name of workload group this variable is used in.
-        workload_defaults (dict): Dictionary mapping workload names to default values.
-                                  Mututally exclusive with workload, workloads, workload_group,
+        workload (str | None): Single workload this variable is used in
+        workloads (list[str] | None): List of workloads this variable is used in
+        workload_group (str | None): Name of workload group this variable is used in
+        workload_defaults (dict | None): Dictionary mapping workload names to default values.
+                                  Mutually exclusive with workload, workloads, workload_group,
                                   and default.
         expandable (bool): True if the variable should be expanded, False if not.
         track_used (bool): True if the variable should be tracked as used,
                            False if not. Can help with allowing lists without vectorizing
                            experiments.
-        when (list | None): List of when conditions to apply to directive
+        when (list[str] | None): List of when conditions to apply to directive
         environment_variable_name (str | None): If not None, an environment variable of this name
                                                 will be defined with the value of this variable.
     """

@@ -33,8 +33,7 @@ Basic Structure
 
 .. code-block:: python
 
-    from ramble.utility import UtilityBase
-    from ramble.language.utility_language import *
+    from ramble.toolkit import *
 
     class MyUtil(UtilityBase):
         """MyUtil provides system information capabilities."""

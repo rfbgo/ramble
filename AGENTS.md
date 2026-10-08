@@ -100,7 +100,7 @@ Ramble is extensible through user-defined objects. These objects are Python clas
     *   **Modifiers:** Allow for systematic alterations to application configurations or execution parameters.
     *   **Package Managers:** Interfaces to software installation tools like Spack, EESSI, etc.
     *   **Workflow Managers:** Interfaces to batch systems or workflow tools (e.g., Slurm, LSF).
-    These types, and their base classes, are enumerated in `lib/ramble/ramble/repository.py` within the `ObjectTypes` Enum.
+    These types, and their base classes, are enumerated in `lib/ramble/ramble/object_types.py` within the `ObjectTypes` Enum.
 *   **Ramble Definition Language:** Ramble uses a set of Python classes and decorators to define the structure and attributes of each object type. These are implemented in the `lib/ramble/ramble/language` directory. This includes files like:
     *   `application_language.py`
     *   `modifier_language.py`
@@ -120,7 +120,7 @@ New definitions are typically placed in a user-created repository and added to t
 
 This section provides a practical guide for creating a new Ramble application definition by focusing on the key patterns and concepts.
 
-1.  **Repository Structure**: To determine the correct directory structure for a custom definition, inspect the `ObjectTypes` Enum in `lib/ramble/ramble/repository.py`. This enum defines the valid object types (e.g., `APPLICATIONS`, `MODIFIERS`). The value of each enum member (e.g., `'applications'`) is the name of the required subdirectory within a repository. Each specific definition should then be placed in its own directory inside that subdirectory. For example, a new application would be located at `my-repo/applications/my-app-name/application.py`.
+1.  **Repository Structure**: To determine the correct directory structure for a custom definition, inspect the `ObjectTypes` Enum in `lib/ramble/ramble/object_types.py`. This enum defines the valid object types with lowercase member names (e.g., `applications`, `modifiers`) and integer `.value`s. The `.name` of each enum member (e.g., `'applications'`, matching `dir_name` in `type_definitions`) is the name of the required subdirectory within a repository. Each specific definition should then be placed in its own directory inside that subdirectory. For example, a new application would be located at `my-repo/applications/my-app-name/application.py`.
 
 2.  **The Definition File**: The definition file (e.g., `application.py`) contains a Python class that inherits from a base class. There are two categories of base definitions to be aware of:
     *   **Fundamental Base Classes**: These are the abstract building blocks for new definitions (e.g., `executable-application`, `basic-modifier`). This is the most common starting point for creating a new definition from scratch. You can discover them by running:

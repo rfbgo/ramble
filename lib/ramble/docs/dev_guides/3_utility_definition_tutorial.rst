@@ -44,8 +44,7 @@ Open `utility.py` and start by importing the necessary base classes and language
 
 .. code-block:: python
 
-    from ramble.utility import UtilityBase
-    from ramble.language.utility_language import *
+    from ramble.toolkit import *
 
     class MyTool(UtilityBase):
         """MyTool is a mock utility for this tutorial."""
@@ -128,8 +127,7 @@ Your complete ``utility.py`` should look like this:
 
 .. code-block:: python
 
-    from ramble.utility import UtilityBase
-    from ramble.language.utility_language import *
+    from ramble.toolkit import *
 
     class MyTool(UtilityBase):
         """MyTool is a mock utility for this tutorial."""
