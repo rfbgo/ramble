@@ -358,9 +358,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
                 workload_found = True
                 if not self.expander:
                     workload = workloads[workload_name]
-                elif self.expander.satisfies(
-                    when_set, self.experiment_variants()
-                ):
+                elif self.satisfy_when(when_set):
                     if workload:
                         logger.die(
                             f"Workload {workload_name} is defined with "
@@ -436,7 +434,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         all_workloads_names = set()
         found = False
         for when_set, workloads in self.workloads.items():
-            if self.expander.satisfies(when_set, self.experiment_variants()):
+            if self.satisfy_when(when_set):
                 for workload_name, workload in workloads.items():
                     if workload_name in all_workloads_names:
                         logger.die(
@@ -489,10 +487,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
 
         if self.package_manager is not None:
             for pkgname, config in self.required_packages.items():
-                if self.expander.satisfies(
-                    config["when"],
-                    variant_set=self.experiment_variants(),
-                ):
+                if self.satisfy_when(config["when"]):
                     self.keywords.update_keys(
                         {
                             f"{pkgname}_path": {
@@ -837,8 +832,8 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
                     wl_group_when_set,
                     workload_group_list,
                 ) in group_inst.workloads.items():
-                    if (not wl_group_when_set) or self.expander.satisfies(
-                        wl_group_when_set, self.experiment_variants()
+                    if (not wl_group_when_set) or self.satisfy_when(
+                        wl_group_when_set
                     ):
                         if self.expander.workload_name in workload_group_list:
                             self.object_variants.multi_value_variant(
@@ -853,9 +848,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
 
         for workload in workloads:
             for var_when_set, var_list in workload.variables.items():
-                if self.expander.satisfies(
-                    var_when_set, self.experiment_variants()
-                ):
+                if self.satisfy_when(var_when_set):
                     for var in var_list:
                         if not var.expandable:
                             self.no_expand_vars.add(var.name)
@@ -1142,9 +1135,9 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         last_match_idx = -1
 
         for i, phase in enumerate(ordered_phases):
-            if self.expander.satisfies(
-                phase.when, variant_set=self.experiment_variants()
-            ) and any(fnmatch.fnmatch(phase.key, pf) for pf in phase_filters):
+            if self.satisfy_when(phase.when) and any(
+                fnmatch.fnmatch(phase.key, pf) for pf in phase_filters
+            ):
                 selected_phases.add(phase)
                 last_match_idx = i
 
@@ -1846,7 +1839,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         commands = []
         all_cleanups = {}
         for when_set, named_cleanups in self.cleanups.items():
-            if self.expander.satisfies(when_set, self.experiment_variants()):
+            if self.satisfy_when(when_set):
                 all_cleanups.update(named_cleanups)
 
         for name, cleanup_props in all_cleanups.items():
@@ -1891,9 +1884,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         when_satisfied = {
             when_set
             for when_set in all_executables
-            if self.expander.satisfies(
-                when_set, variant_set=self.experiment_variants()
-            )
+            if self.satisfy_when(when_set)
         }
 
         for when_set in when_satisfied:
@@ -2181,14 +2172,12 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         workloads = self.get_workloads()
         for workload in workloads:
             for var_when_set, var_list in workload.variables.items():
-                if self.expander.satisfies(
-                    var_when_set, self.experiment_variants()
-                ):
+                if self.satisfy_when(var_when_set):
                     for var in var_list:
                         wl_vars[var.name] = var
 
         for when_key, var_list in self.object_variables.items():
-            if self.expander.satisfies(when_key, self.experiment_variants()):
+            if self.satisfy_when(when_key):
                 for var in var_list:
                     wl_vars[var.name] = var
 
@@ -2213,9 +2202,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
                 when_set,
                 env_var_list,
             ) in workload.environment_variables.items():
-                if self.expander.satisfies(
-                    when_set, self.experiment_variants()
-                ):
+                if self.satisfy_when(when_set):
                     for env_var in env_var_list:
                         selected_env_vars[env_var.name] = env_var
 
@@ -2223,7 +2210,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
             when_set,
             env_var_list,
         ) in self.object_environment_variables.items():
-            if self.expander.satisfies(when_set, self.experiment_variants()):
+            if self.satisfy_when(when_set):
                 for env_var in env_var_list:
                     selected_env_vars[env_var.name] = env_var
 
@@ -2479,9 +2466,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
 
         for formatted_exec_group in formatted_exec_groups:
             for when_set, formatted_exec_defs in formatted_exec_group.items():
-                if not self.expander.satisfies(
-                    when_set, variant_set=self.experiment_variants()
-                ):
+                if not self.satisfy_when(when_set):
                     continue
 
                 for var_name, formatted_conf in formatted_exec_defs.items():
@@ -2596,11 +2581,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
 
         # Batch 'when' evaluation to avoid repeat expander calls
         when_satisfied = {
-            when_set
-            for when_set in self.inputs
-            if self.expander.satisfies(
-                when_set, variant_set=self.experiment_variants()
-            )
+            when_set for when_set in self.inputs if self.satisfy_when(when_set)
         }
 
         inputs = {}

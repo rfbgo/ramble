@@ -318,9 +318,7 @@ class PackageManagerBase(ObjectMixin, metaclass=DirectiveMeta):
             return False
 
         return any(
-            self.app_inst.expander.satisfies(
-                info.when, variant_set=self.experiment_variants()
-            )
+            self.satisfy_when(info.when)
             for definitions in app_inst.software_specs.values()
             for info in definitions
         )
