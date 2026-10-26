@@ -330,12 +330,12 @@ def format_data(data_in):
                 for fom in context["foms"]:
                     raw_fom_type = fom.get("fom_type")
                     fom_type_obj = FomType.from_value(raw_fom_type) or FomType.UNDEFINED
-                    better_direction_obj = None
                     if isinstance(raw_fom_type, dict) and "better_direction" in raw_fom_type:
-                        better_direction_obj = BetterDirection.from_value(
-                            raw_fom_type["better_direction"]
+                        better_direction_obj = (
+                            BetterDirection.from_value(raw_fom_type["better_direction"])
+                            or fom_type_obj.better_direction()
                         )
-                    if better_direction_obj is None:
+                    else:
                         better_direction_obj = fom_type_obj.better_direction()
 
                     # TODO: check on value to make sure it's a number
