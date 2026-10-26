@@ -730,9 +730,7 @@ class LogsPipeline(Pipeline):
             print_header = True
             if archive_patterns:
                 for when_set, patterns in archive_patterns.items():
-                    if not app_inst.expander.satisfies(
-                        reqs=when_set, variant_set=app_inst.experiment_variants()
-                    ):
+                    if not app_inst.satisfy_when(when_set):
                         continue
                     for pattern in patterns.values():
                         exp_pattern = app_inst.expander.expand_var(pattern)

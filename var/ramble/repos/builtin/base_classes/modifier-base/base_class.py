@@ -504,7 +504,7 @@ class ModifierBase(ObjectMixin, metaclass=DirectiveMeta):
         pre_execs = []
         post_execs = []
         for when_set, exec_mods in self.executable_modifiers.items():
-            if self.expander.satisfies(when_set, self.experiment_variants()):
+            if self.satisfy_when(when_set):
                 for exec_mod, mod_conf in exec_mods.items():
                     if self.executable_modification_applies(
                         exec_mod, mod_conf["usage_filter"], executable
@@ -523,18 +523,14 @@ class ModifierBase(ObjectMixin, metaclass=DirectiveMeta):
 
     def all_env_var_modifications(self):
         for when_set, env_var_mods in self.env_var_modifications.items():
-            if not self.expander.satisfies(
-                when_set, self.experiment_variants()
-            ):
+            if not self.satisfy_when(when_set):
                 continue
 
             yield from env_var_mods.values()
 
     def all_package_manager_requirements(self):
         for when_set in self.package_manager_requirements:
-            if not self.expander.satisfies(
-                when_set, self.experiment_variants()
-            ):
+            if not self.satisfy_when(when_set):
                 continue
 
             yield from self.package_manager_requirements[when_set]
@@ -547,9 +543,7 @@ class ModifierBase(ObjectMixin, metaclass=DirectiveMeta):
         """
 
         for when_key, var_list in self.object_variables.items():
-            if not self.expander.satisfies(
-                when_key, self.experiment_variants()
-            ):
+            if not self.satisfy_when(when_key):
                 continue
 
             for var in var_list:

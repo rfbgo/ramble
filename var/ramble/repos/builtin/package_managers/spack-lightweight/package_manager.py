@@ -198,9 +198,7 @@ class SpackLightweight(PackageManagerBase):
 
         for config_dict in package_manager_config_dicts:
             for config in config_dict.values():
-                keep_config = app_inst.expander.satisfies(
-                    config["when"], variant_set=self.experiment_variants()
-                )
+                keep_config = self.satisfy_when(config["when"])
                 if keep_config:
                     self.runner.add_config(config["config"])
 
@@ -237,10 +235,7 @@ class SpackLightweight(PackageManagerBase):
                     added_packages = set(self.runner.added_packages())
                     for pkg, conf in app_inst.required_packages.items():
                         if (
-                            app_inst.expander.satisfies(
-                                conf["when"],
-                                variant_set=self.experiment_variants(),
-                            )
+                            self.satisfy_when(conf["when"])
                             and pkg not in added_packages
                         ):
                             logger.die(

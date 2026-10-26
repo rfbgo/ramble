@@ -154,9 +154,7 @@ class Pip(PackageManagerBase):
             installed_pkgs = self.runner.installed_packages()
             for pkg, conf in app_inst.required_packages.items():
                 if (
-                    app_inst.expander.satisfies(
-                        conf["when"], variant_set=self.experiment_variants()
-                    )
+                    self.satisfy_when(conf["when"])
                     and pkg not in installed_pkgs
                 ):
                     sorted_vars = sorted(
