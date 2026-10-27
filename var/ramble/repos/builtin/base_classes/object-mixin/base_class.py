@@ -11,6 +11,8 @@ from html import escape
 from typing import Any, Optional
 
 import ramble.config
+import ramble.definitions.families
+import ramble.variants
 from ramble.definitions.versions import ObjectVersion
 from ramble.error import ObjectValidationError
 from ramble.language.shared_language import SharedMeta
@@ -26,9 +28,41 @@ class ObjectMixin(metaclass=SharedMeta):
     _language_types = ["shared"]
     _verbosity = "short"
 
-    def __init__(self):
+    def __init__(self, file_path: Optional[str] = None):
         if not hasattr(self, "selected_version"):
             self.selected_version = None
+
+        self._file_path = file_path
+        self.app_inst = None
+
+        self.object_variants = ramble.variants.VariantSet()
+        if hasattr(self, "class_variants"):
+            for var_args in self.class_variants.values():
+                self.object_variants.default_variant(**var_args)
+
+        if hasattr(self, "origin_type"):
+            if getattr(self, "families", None) is None:
+                self.families = ramble.definitions.families.Families(
+                    self.origin_type, list(getattr(self, "class_families", ()))
+                )
+
+            if self.origin_type not in ("application", "modifier"):
+                self.object_variants.default_variant(
+                    self.origin_type,
+                    default=self.name,
+                    description=f"Name of {self.origin_type.replace('_', ' ')} for an experiment",
+                )
+
+            for family in self.families:
+                self.object_variants.multi_value_variant(
+                    self.families.family_type,
+                    value=family,
+                )
+
+    def set_application(self, app_inst):
+        """Set a reference to the associated app_inst"""
+        self.app_inst = app_inst
+        self.clear_variant_cache()
 
     def __str__(self):
         return self.name
@@ -128,9 +162,9 @@ class ObjectMixin(metaclass=SharedMeta):
 
     def _get_app_inst(self):
         # This helper gets the app_inst for different object types
-        if hasattr(self, "app_inst"):
-            return self.app_inst
-        return self
+        if getattr(self, "origin_type", None) == "application":
+            return self
+        return getattr(self, "app_inst", None)
 
     @classmethod
     def _get_object_type(cls):

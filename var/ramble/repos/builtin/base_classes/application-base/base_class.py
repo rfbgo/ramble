@@ -40,7 +40,6 @@ import ramble.util.hashing
 import ramble.util.lock as lk
 import ramble.util.path
 import ramble.util.stats
-import ramble.variants
 from ramble.definitions.variables import CommandVariable
 from ramble.error import (
     ApplicationError,
@@ -190,11 +189,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
     }
 
     def __init__(self, file_path):
-        super().__init__()
-
-        self.object_variants = ramble.variants.VariantSet()
-        for var_args in self.class_variants.values():
-            self.object_variants.default_variant(**var_args)
+        super().__init__(file_path)
 
         self.keywords = ramble.keywords.keywords.copy()
         self.object_variants.default_variant(
@@ -252,9 +247,6 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         # A dict storing fom values, currently it only stores inmem FOMs
         self._fom_map = {}
         self._template_paths_defined = False
-
-        # Ensure we always have the application name, and this is never empty
-        self._file_path = file_path
 
         self.license_names = self.license_names + [self.name]
 
@@ -449,6 +441,28 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
                 f"  {sorted_variants}"
             )
 
+    def _instantiate_associated_object(self, spec_str, object_type):
+        """Instantiate an associated object from a spec string and attach it to this application."""
+        obj_name, _, maybe_ver = spec_str.partition("@")
+        try:
+            obj = ramble.repository.get(obj_name, object_type)
+            obj.set_application(self)
+            if maybe_ver:
+                obj.set_version(
+                    version_number=maybe_ver,
+                    description=f"{obj_name} {maybe_ver}",
+                )
+            return obj
+        except ramble.repository.UnknownObjectError:
+            singular = ramble.repository.type_definitions[object_type][
+                "singular"
+            ]
+            logger.die(
+                f"{obj_name} is not a valid {singular}. "
+                f"Valid {singular}s can be listed via:\n"
+                f"\tramble list --type {object_type.name}"
+            )
+
     def _set_package_manager(self):
         pkgman = conversions.canonical_none(
             self.expander.expand_var(
@@ -457,26 +471,9 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         )
 
         if pkgman is not None:
-            pkgman_name, _, maybe_pkgman_ver = pkgman.partition("@")
-
-            try:
-                pkgman_type = ramble.repository.ObjectTypes.package_managers
-                self.package_manager = ramble.repository.get(
-                    pkgman_name, pkgman_type
-                )
-                self.package_manager.set_application(self)
-
-                if maybe_pkgman_ver:
-                    self.package_manager.set_version(
-                        version_number=maybe_pkgman_ver,
-                        description=f"{pkgman_name} {maybe_pkgman_ver}",
-                    )
-            except ramble.repository.UnknownObjectError:
-                logger.die(
-                    f"{pkgman_name} is not a valid package manager. "
-                    "Valid package managers can be listed via:\n"
-                    "\tramble list --type package_managers"
-                )
+            self.package_manager = self._instantiate_associated_object(
+                pkgman, ramble.repository.ObjectTypes.package_managers
+            )
 
         if self.package_manager is not None:
             for pkgname, config in self.required_packages.items():
@@ -498,49 +495,25 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         if sys_var is None:
             sys_var = "user-managed"
 
-        if sys_var is not None:
-            sys_name, _, maybe_sys_ver = sys_var.partition("@")
+        self.system = self._instantiate_associated_object(
+            sys_var, ramble.repository.ObjectTypes.systems
+        )
 
-            try:
-                sys_type = ramble.repository.ObjectTypes.systems
-                self.system = ramble.repository.get(sys_name, sys_type)
-                self.system.set_application(self)
-                if maybe_sys_ver:
-                    self.system.set_version(
-                        version_number=maybe_sys_ver,
-                        description=f"{sys_name} {maybe_sys_ver}",
-                    )
-            except ramble.repository.UnknownObjectError:
-                logger.die(
-                    f"{sys_name} is not a valid system. "
-                    "Valid systems can be listed via:\n"
-                    "\tramble list --type systems"
-                )
-
+        if self.system:
             added_defaults = False
-            for var_name in [
-                "platform",
-                "package_manager",
-                "workflow_manager",
-            ]:
-                if (
-                    self.experiment_variants(allow_caching=False).value(
-                        var_name
+            for var_name in (
+                namespace.platform,
+                namespace.package_manager,
+                namespace.workflow_manager,
+            ):
+                default_value = getattr(
+                    self.system, f"system_default_{var_name}", None
+                )
+                if default_value and var_name not in self.variants:
+                    self.object_variants.experiment_variant(
+                        var_name, default_value
                     )
-                    is None
-                ):
-                    default_value = getattr(
-                        self.system, f"system_default_{var_name}", None
-                    )
-                    if default_value:
-                        self.experiment_variants(
-                            allow_caching=False
-                        ).default_variant(
-                            var_name,
-                            default=default_value,
-                            description=f"{var_name} selection variant",
-                        )
-                        added_defaults = True
+                    added_defaults = True
             if added_defaults:
                 self.clear_variant_cache()
 
@@ -557,31 +530,18 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         if plat_var is None:
             plat_var = "user-managed"
 
-        if plat_var is not None:
-            plat_name, _, maybe_plat_ver = plat_var.partition("@")
+        plat_name, _, _ = plat_var.partition("@")
 
-            if self.system and self.system.system_available_platforms:
-                if plat_name not in self.system.system_available_platforms:
-                    logger.die(
-                        f"Platform {plat_name} is not available in system {self.system.name}. "
-                        f"Available platforms are: {', '.join(self.system.system_available_platforms)}"
-                    )
-
-            try:
-                plat_type = ramble.repository.ObjectTypes.platforms
-                self.platform = ramble.repository.get(plat_name, plat_type)
-                self.platform.set_application(self)
-                if maybe_plat_ver:
-                    self.platform.set_version(
-                        version_number=maybe_plat_ver,
-                        description=f"{plat_name} {maybe_plat_ver}",
-                    )
-            except ramble.repository.UnknownObjectError:
+        if self.system and self.system.system_available_platforms:
+            if plat_name not in self.system.system_available_platforms:
                 logger.die(
-                    f"{plat_name} is not a valid platform. "
-                    "Valid platforms can be listed via:\n"
-                    "\tramble list --type platforms"
+                    f"Platform {plat_name} is not available in system {self.system.name}. "
+                    f"Available platforms are: {', '.join(self.system.system_available_platforms)}"
                 )
+
+        self.platform = self._instantiate_associated_object(
+            plat_var, ramble.repository.ObjectTypes.platforms
+        )
 
     def _apply_system_and_platform_variables(self):
         """Apply variables from system and platform objects"""
@@ -615,30 +575,13 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
             )
         )
 
-        workflow_name = ""
         # Map None to the default of user-managed
         if workflow is None:
             workflow = "user-managed"
 
-        try:
-            workflow_name, _, maybe_workflow_ver = workflow.partition("@")
-
-            wfman_type = ramble.repository.ObjectTypes.workflow_managers
-            self.workflow_manager = ramble.repository.get(
-                workflow_name, wfman_type
-            )
-            self.workflow_manager.set_application(self)
-            if maybe_workflow_ver:
-                self.workflow_manager.set_version(
-                    version_number=maybe_workflow_ver,
-                    description=f"{workflow_name} {maybe_workflow_ver}",
-                )
-        except ramble.repository.UnknownObjectError:
-            logger.die(
-                f"{workflow_name} is not a valid workflow manager. "
-                "Valid workflow managers can be listed via:\n"
-                "\tramble list --type workflow_managers"
-            )
+        self.workflow_manager = self._instantiate_associated_object(
+            workflow, ramble.repository.ObjectTypes.workflow_managers
+        )
 
     def set_success_list(self, success_criteria):
         self.success_list = ramble.success_criteria.ScopedCriteriaList()
@@ -759,42 +702,6 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
 
         # Set up remaining variants
         self._set_system()
-
-        # Apply defaults from system and platform
-        if self.system:
-            added_defaults = False
-            if (
-                self.system.default_platform
-                and namespace.platform not in self.variants
-            ):
-                self.object_variants.experiment_variant(
-                    namespace.platform, self.system.system_default_platform
-                )
-                added_defaults = True
-
-            if (
-                self.system.default_package_manager
-                and namespace.package_manager not in self.variants
-            ):
-                self.object_variants.experiment_variant(
-                    namespace.package_manager,
-                    self.system.system_default_package_manager,
-                )
-                added_defaults = True
-
-            if (
-                self.system.default_workflow_manager
-                and namespace.workflow_manager not in self.variants
-            ):
-                self.object_variants.experiment_variant(
-                    namespace.workflow_manager,
-                    self.system.system_default_workflow_manager,
-                )
-                added_defaults = True
-
-            if added_defaults:
-                self.clear_variant_cache()
-
         self._set_platform()
         self._set_package_manager()
         self._set_workflow_manager()

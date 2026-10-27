@@ -12,9 +12,7 @@ import os
 import tempfile
 from typing import List
 
-import ramble.definitions.families
 import ramble.repository
-import ramble.variants
 from ramble.fetch_strategy import VCS_CHECKOUT_ATTRIBUTES
 from ramble.language.language_base import DirectiveMeta
 from ramble.language.shared_language import register_phase
@@ -57,36 +55,10 @@ class PackageManagerBase(ObjectMixin, metaclass=DirectiveMeta):
     requires_software_environment = True
 
     def __init__(self, file_path):
-        super().__init__()
+        super().__init__(file_path)
 
-        self.object_variants = ramble.variants.VariantSet()
-        for var_args in self.class_variants.values():
-            self.object_variants.default_variant(**var_args)
-
-        if getattr(self, "families", None) is None:
-            self.families = ramble.definitions.families.Families(
-                self.origin_type, list(self.class_families)
-            )
-
-        self._file_path = file_path
-
-        self.app_inst = None
         self.keywords = None
-
         self._allow_unprefixed_specs = True
-
-        self.object_variants.default_variant(
-            self.origin_type,
-            default=self.name,
-            description="Name of package manager for an experiment",
-        )
-
-        for family in self.families:
-            self.object_variants.multi_value_variant(
-                self.families.family_type,
-                value=family,
-            )
-
         self.output_prefix = self.name
 
     @property
@@ -354,9 +326,8 @@ class PackageManagerBase(ObjectMixin, metaclass=DirectiveMeta):
         Args:
             app_inst: The experiment this package manager will act on.
         """
-        self.app_inst = app_inst
+        super().set_application(app_inst)
         self.keywords = app_inst.keywords
-        self.clear_variant_cache()
 
     def build_used_variables(self):
         """Build a set of all used variables

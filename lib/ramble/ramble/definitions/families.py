@@ -26,6 +26,9 @@ class Families:
         self.family_type = f"{origin_type}_family"
         self.families = families if families is not None else []
 
+    def __bool__(self) -> bool:
+        return bool(self.families)
+
     def __iter__(self):
         """Iterate over families"""
         yield from self.families
