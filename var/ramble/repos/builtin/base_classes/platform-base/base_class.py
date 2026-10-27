@@ -7,8 +7,7 @@
 # except according to those terms.
 """Define base classes for platform definitions"""
 
-import ramble.definitions.families
-import ramble.variants
+import ramble.repository
 from ramble.language.language_base import DirectiveMeta
 from ramble.language.shared_language import (
     register_validator,
@@ -87,36 +86,3 @@ class PlatformBase(ObjectMixin, metaclass=DirectiveMeta):
             message="Number of accelerators per node ({accelerators_per_node}) "
             "exceeds max accelerators on node ({max_accelerators_per_node})",
         )
-
-    def __init__(self, file_path):
-        super().__init__()
-
-        self.object_variants = ramble.variants.VariantSet()
-        for var_args in self.class_variants.values():
-            self.object_variants.default_variant(**var_args)
-
-        if getattr(self, "families", None) is None:
-            self.families = ramble.definitions.families.Families(
-                self.origin_type, list(self.class_families.keys())
-            )
-
-        self._file_path = file_path
-
-        self.object_variants.default_variant(
-            self.origin_type,
-            default=self.name,
-            description="Name of platform for an experiment",
-        )
-
-        for family in self.families:
-            self.object_variants.multi_value_variant(
-                self.families.family_type,
-                value=family,
-            )
-
-        self.app_inst = None
-
-    def set_application(self, app_inst):
-        """Set the application instance for this platform"""
-        self.app_inst = app_inst
-        self.clear_variant_cache()

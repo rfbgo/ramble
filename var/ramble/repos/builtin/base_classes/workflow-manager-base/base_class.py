@@ -10,8 +10,7 @@
 import abc
 from typing import Collection, Iterator
 
-import ramble.definitions.families
-import ramble.variants
+import ramble.repository
 from ramble.expander import ExpanderError
 from ramble.language.language_base import DirectiveMeta
 from ramble.language.shared_language import variant
@@ -68,38 +67,8 @@ class WorkflowManagerBase(ObjectMixin, metaclass=DirectiveMeta):
     )
 
     def __init__(self, file_path):
-        super().__init__()
-
-        self.object_variants = ramble.variants.VariantSet()
-        for var_args in self.class_variants.values():
-            self.object_variants.default_variant(**var_args)
-
-        if getattr(self, "families", None) is None:
-            self.families = ramble.definitions.families.Families(
-                self.origin_type, list(self.class_families.keys())
-            )
-
-        self._file_path = file_path
-
-        self.object_variants.default_variant(
-            self.origin_type,
-            default=self.name,
-            description="Name of workflow manager for an experiment",
-        )
-
-        for family in self.families:
-            self.object_variants.multi_value_variant(
-                self.families.family_type,
-                value=family,
-            )
-
-        self.app_inst = None
+        super().__init__(file_path)
         self.runner = None
-
-    def set_application(self, app_inst):
-        """Set a reference to the associated app_inst"""
-        self.app_inst = app_inst
-        self.clear_variant_cache()
 
     @abc.abstractmethod
     def get_status(self, workspace):

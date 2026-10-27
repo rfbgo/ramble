@@ -35,21 +35,10 @@ class UtilityBase(ObjectMixin, metaclass=DirectiveMeta):
     SYSTEM_PATH = "system"
 
     def __init__(self, file_path):
-        super().__init__()
+        super().__init__(file_path)
 
-        self.object_variants = ramble.variants.VariantSet()
-        for var_args in self.class_variants.values():
-            self.object_variants.default_variant(**var_args)
-
-        self._file_path = file_path
         self.workspace = None
         self.keywords = None
-
-        self.object_variants.default_variant(
-            self.origin_type,
-            default=self.name,
-            description="Name of external dependency for an experiment",
-        )
 
     @ObjectMixin.workspace_cache
     def _check_exact_match_via_vcs(self, exec_path, exact_version):

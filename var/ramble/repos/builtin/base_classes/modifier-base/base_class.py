@@ -11,7 +11,6 @@ import fnmatch
 import re
 
 import ramble.repository
-import ramble.variants
 from ramble.error import (
     ConflictingModifiersError,
     InvalidModeError,
@@ -56,17 +55,11 @@ class ModifierBase(ObjectMixin, metaclass=DirectiveMeta):
     mode("disabled", description="Mode to disable all modifier functionality")
 
     def __init__(self, file_path):
-        super().__init__()
+        super().__init__(file_path)
 
-        self.object_variants = ramble.variants.VariantSet()
-        for var_args in self.class_variants.values():
-            self.object_variants.default_variant(**var_args)
-
-        self._file_path = file_path
         self._on_executables = ["*"]
         self.expander = None
         self._usage_mode = None
-        self.app_inst = None
         self._executable_modification_applied = set()
 
         self._mod_regex = re.compile(
