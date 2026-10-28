@@ -15,6 +15,9 @@ import urllib.parse
 
 import llnl.util.filesystem as fs
 
+import ramble.config
+import ramble.fetch_strategy
+import ramble.stage
 from ramble.error import ApplicationError
 from ramble.pkgmankit import *
 from ramble.util.executable import PrefixedExecutable, which

@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
+import ramble.config
 import ramble.workspace
 from ramble.main import RambleCommand
 from ramble.pkg_man.builtin import spack_lightweight

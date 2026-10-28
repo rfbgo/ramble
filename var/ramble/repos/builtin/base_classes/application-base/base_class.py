@@ -18,7 +18,7 @@ import shutil
 import stat
 import time
 from html import escape
-from typing import Dict
+from typing import Dict, Optional
 
 import llnl.util.filesystem as fs
 from llnl.util.tty import color
@@ -40,6 +40,7 @@ import ramble.util.hashing
 import ramble.util.lock as lk
 import ramble.util.path
 import ramble.util.stats
+import ramble.workload
 from ramble.definitions.variables import CommandVariable
 from ramble.error import (
     ApplicationError,
@@ -159,7 +160,7 @@ def _get_phase_func_wrapper(workspace, phase_func, phase_name):
 
 
 class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
-    _mro_obj_type_cache = {}
+    _mro_obj_type_cache: dict = {}
     name = "application-base"
     origin_type = "application"
     _builtin_name = NS_SEPARATOR.join(("builtin", "{name}"))
@@ -509,7 +510,9 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
                 default_value = getattr(
                     self.system, f"system_default_{var_name}", None
                 )
-                if default_value and var_name not in self.variants:
+                if default_value and (
+                    not self.variants or var_name not in self.variants
+                ):
                     self.object_variants.experiment_variant(
                         var_name, default_value
                     )
@@ -764,7 +767,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
         self._define_custom_executables()
 
     def non_reserved_variables(
-        self, remove_keys: set = None
+        self, remove_keys: Optional[set] = None
     ) -> Dict[str, str]:
         """Replicate this instances variables, and remove any reserved variables from the dict.
         Additionally, remove any variables in the remove_keys set.
@@ -3285,7 +3288,7 @@ class ApplicationBase(ObjectMixin, metaclass=DirectiveMeta):
             ("env_vars", self._env_variable_sets),
         ]
 
-        added_objects = {}
+        added_objects: dict = {}
         for obj_type, obj in self.objects(yield_all=True):
             if obj_type not in added_objects:
                 added_objects[obj_type] = set()

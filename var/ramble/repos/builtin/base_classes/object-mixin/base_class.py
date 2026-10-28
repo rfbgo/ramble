@@ -12,6 +12,7 @@ from typing import Any, Optional
 
 import ramble.config
 import ramble.definitions.families
+import ramble.repository
 import ramble.variants
 from ramble.definitions.versions import ObjectVersion
 from ramble.error import ObjectValidationError
@@ -24,13 +25,14 @@ from ramble.util.logger import logger
 class ObjectMixin(metaclass=SharedMeta):
     """A mixin class for Ramble objects"""
 
+    origin_type: str
     _name = None
     _language_types = ["shared"]
     _verbosity = "short"
 
     def __init__(self, file_path: Optional[str] = None):
         if not hasattr(self, "selected_version"):
-            self.selected_version = None
+            self.selected_version: Optional[ObjectVersion] = None
 
         self._file_path = file_path
         self.app_inst = None
@@ -231,7 +233,7 @@ class ObjectMixin(metaclass=SharedMeta):
             self.selected_version = version
         else:
             self.selected_version = ObjectVersion(
-                version_number=version_number,
+                version_number=version_number or "",
                 description=description,
                 origin_type=self.origin_type,
                 version_to_pep440=self.version_to_pep440,

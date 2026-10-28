@@ -77,7 +77,7 @@ class RunDirectory(BasicModifier):
 
     def apply_run_directory_change(
         self, executable_name, executable, app_inst
-    ) -> None:
+    ):
         pre_cmds = []
         post_cmds = []
         exec_regex = self.expander.expand_var_name("apply_exec_regex")
