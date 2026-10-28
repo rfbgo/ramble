@@ -316,3 +316,29 @@ def test_style_root_ignores_paths_escaping_root(tmpdir):
     files = style.changed_files(all_files=True, root=str(root_dir))
     assert files == [os.path.join("lib", "ramble", "ramble", "inside.py")]
     assert outside_file.read() == outside_content
+
+
+def test_style_mypy_repo_file(tmpdir):
+    _require_tools("mypy")
+    bin_dir = tmpdir.join("bin")
+    bin_dir.ensure(dir=True)
+    bin_dir.join("ramble").write("#!/bin/sh\n")
+
+    lib_dir = tmpdir.join("lib", "ramble", "ramble")
+    lib_dir.ensure(dir=True)
+    lib_dir.join("__init__.py").write("")
+    lib_dir.join("repository.py").write("")
+
+    app_dir = tmpdir.join("var", "ramble", "repos", "builtin", "applications", "my-app")
+    app_dir.ensure(dir=True)
+    app_file = app_dir.join("application.py")
+    app_file.write(
+        "import ramble.repository\n\n"
+        "def bad() -> None:\n"
+        "    return ramble.non_existent_submodule\n"
+    )
+
+    out = style_cmd("--root", str(tmpdir), "-a", "-t", "mypy", fail_on_error=False)
+    assert style_cmd.returncode != 0
+    assert "var/ramble/repos/builtin/applications/my-app/application.py" in out
+    assert "[attr-defined]" in out
