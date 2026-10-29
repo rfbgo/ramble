@@ -1,4 +1,4 @@
-# Copyright 2022-2025 The Ramble Authors
+# Copyright 2022-2026 The Ramble Authors
 #
 # Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
 # https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -124,6 +124,10 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "perf" not in item.keywords:
                 item.add_marker(skip_non_perf)
+            elif not hasattr(item, "_nodeid"):
+                # Workaround for pytest-benchmark <= 5.3.0 incompatibility with pytest >= 9.2.0,
+                # which removed the private Node._nodeid attribute.
+                item._nodeid = item.nodeid
     else:
         skip_perf = pytest.mark.skip(reason="skipped perf test [use --perf to run]")
         for item in items:
