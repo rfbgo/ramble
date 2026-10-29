@@ -7,6 +7,7 @@
 # except according to those terms.
 
 import subprocess
+import sys
 
 import pytest
 
@@ -48,8 +49,9 @@ def test_pytest_help():
     [(""), ("--list")],
     ids=["main", "list"],
 )
-def test_failed_import(extra_flag):
-    out = ramble_test(extra_flag, "-p", "fake-pytest", fail_on_error=False)
+def test_failed_import(extra_flag, monkeypatch):
+    monkeypatch.setitem(sys.modules, "pytest", None)
+    out = ramble_test(extra_flag, fail_on_error=False)
     assert "Ensure requirements-dev.txt are installed" in out
 
 
