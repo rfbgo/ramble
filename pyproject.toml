@@ -142,6 +142,8 @@ directory = "htmlcov"
 # Otherwise mypy uses the running python's version
 python_version = "3.10"
 no_site_packages = true
+mypy_path = "lib/ramble"
+explicit_package_bases = true
 # TODO: Add in more files for type-checking
 # For now, only type-check the util directory
 files = [
@@ -156,10 +158,18 @@ allow_redefinition = true
 # Only enable ramble modules and share helper scripts
 module = [
     "ramble.*",
+    "share.ramble.scripts.*",
     "_ramble_cleaner",
     "_ramble_file_editor",
 ]
 ignore_errors = false
+
+[[tool.mypy.overrides]]
+module = [
+    "var.ramble.repos.*",
+]
+ignore_errors = false
+disable_error_code = ["valid-type", "misc"]
 
 [[tool.mypy.overrides]]
 # Ignore numpy type stubs since they use 3.12 syntax
@@ -177,6 +187,7 @@ module = [
     "ramble.filters",
     "ramble.graphs",
     "ramble.pipeline",
+    "share.ramble.scripts.*",
     "_ramble_cleaner",
     "_ramble_file_editor",
 ]

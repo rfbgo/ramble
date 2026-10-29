@@ -604,17 +604,66 @@ def run_mypy(mypy_cmd, file_list, args):
     mypy_args = ["--config-file", config_file]
     mypy_args.extend(get_tool_args(args, "mypy"))
 
-    if file_list:
+    temp_dir = None
+    path_map = {}
+    try:
         mypy_files = [
-            f for f in file_list if f.startswith(("lib/ramble/ramble/", "share/ramble/scripts/"))
+            f
+            for f in (file_list or [])
+            if f.startswith(("lib/ramble/ramble/", "share/ramble/scripts/", "var/ramble/repos/"))
         ]
         if not mypy_files:
             print_tool_result("mypy", 0)
             return 0
-        mypy_args.extend(mypy_files)
 
-    output = mypy_cmd(*mypy_args, fail_on_error=False, output=str, error=str)
-    returncode = mypy_cmd.returncode
+        root = _get_root(args)
+        resolved_files = []
+        for f in mypy_files:
+            stem_path, ext = os.path.splitext(f)
+            if f.startswith("var/ramble/repos/") and ("-" in stem_path or "." in stem_path):
+                if temp_dir is None:
+                    temp_dir = tempfile.mkdtemp()
+                parts = f.split(os.sep)
+                stem, ext = os.path.splitext(parts[-1])
+                # mypy needs the file names to be valid python identifiers
+                safe_parts = [p.replace("-", "_").replace(".", "_") for p in parts[:-1]] + [
+                    stem.replace("-", "_") + ext
+                ]
+                dest_rel = os.path.join(*safe_parts)
+                dest_abs = os.path.join(temp_dir, dest_rel)
+                mkdirp(os.path.dirname(dest_abs))
+                shutil.copy2(os.path.join(root, f), dest_abs)
+                resolved_files.append(dest_abs)
+                path_map[dest_rel] = f
+            else:
+                resolved_files.append(f)
+
+        mypy_args.extend(resolved_files)
+
+        extra_env = {}
+        if temp_dir is not None:
+            mypy_path_entries = [temp_dir]
+            existing_mypy_path = os.environ.get("MYPYPATH")
+            if existing_mypy_path:
+                mypy_path_entries.append(existing_mypy_path)
+            extra_env["MYPYPATH"] = os.pathsep.join(mypy_path_entries)
+
+        output = mypy_cmd(
+            *mypy_args,
+            extra_env=extra_env,
+            fail_on_error=False,
+            output=str,
+            error=str,
+        )
+        returncode = mypy_cmd.returncode
+        for staged_path, orig_path in path_map.items():
+            output = re.sub(rf"\S*{re.escape(staged_path)}", orig_path, output)
+    finally:
+        if temp_dir is not None:
+            if args.keep_temp:
+                print("Temporary files are in: ", temp_dir)
+            else:
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
     print_output(output, args)
     print_tool_result("mypy", returncode)

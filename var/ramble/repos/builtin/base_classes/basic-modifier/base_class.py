@@ -7,7 +7,9 @@
 # except according to those terms.
 
 
-from ramble.modkit import *
+import ramble.repository
+
+ModifierBase = ramble.repository.get_base_class("modifier-base")
 
 
 class BasicModifier(ModifierBase):

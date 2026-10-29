@@ -80,7 +80,7 @@ class EnvironmentModules(PackageManagerBase):
 
         return self._load_string
 
-    def populate_inventory(self, workspace, force_compute=False) -> bool:
+    def populate_inventory(self, workspace, force_compute=False):
         env_path = self.app_inst.expander.env_path
         env_hash = ramble.util.hashing.hash_string(
             self._generate_loads_content(workspace)

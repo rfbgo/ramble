@@ -739,7 +739,7 @@ class SpackRunner(CommandRunner):
     compiler_find_args = ["compiler", "find"]
 
     # This cache is to avoid duplicate spack compiler calls for pkg_specs within an env
-    _compiler_cache = {}
+    _compiler_cache: dict = {}
 
     _allowed_config_files = [
         "compilers.yaml",
